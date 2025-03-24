@@ -1,5 +1,4 @@
-flet
-flet-desktop
+flet==0.27.6
 aiofiles>=24.1.0
 httpx>=0.28.1
 streamget>=4.0.3
