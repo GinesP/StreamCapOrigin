@@ -27,7 +27,7 @@ StreamCap is a multi-platform live stream recording client that covers over 40 m
 
 ## 📸Recording Interface
 
-![StreamCap Interface](D:\Git仓库\Github\StreamCap\assets\images\example02.jpg)
+![StreamCap Interface](./assets/images/example02.jpg)
 
 ## 🛠️Quick Start
 
@@ -79,7 +79,7 @@ Example input URLs:
 ```
 Douyin:
 https://live.douyin.com/745964462470
-https://v.douyin.com/iQFeBnt/
+https://v.douyin.com/iQFeBnt/ (Node.js Required)
 https://live.douyin.com/yall1102  （Link+unique ID）
 https://v.douyin.com/CeiU5cbX  （Anchor homepage address）
 

@@ -15,6 +15,7 @@
 </div><br>
 
 
+
 StreamCap 是一个多平台直播流录制客户端，覆盖 40+ 国内外主流直播平台，支持批量录制、循环监控、定时监控和自动转码等功能。
 
 ## ✨功能特性
@@ -27,7 +28,7 @@ StreamCap 是一个多平台直播流录制客户端，覆盖 40+ 国内外主�
 
 ## 📸录制界面
 
-![StreamCap Interface](D:\Git仓库\Github\StreamCap\assets\images\example01.png)
+![StreamCap Interface](./assets/images/example01.png)
 
 ## 🛠️快速开始
 
@@ -78,7 +79,7 @@ python main.py
 ```
 抖音:
 https://live.douyin.com/745964462470
-https://v.douyin.com/iQFeBnt/
+https://v.douyin.com/iQFeBnt/  (需Node.js)
 https://live.douyin.com/yall1102  （链接+抖音号）
 https://v.douyin.com/CeiU5cbX  （主播主页地址）
 
