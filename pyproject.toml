@@ -1,0 +1,60 @@
+[project]
+name = "StreamCap"
+version = "0.0.1"
+description = "An HTTP Stream Capture Tool."
+authors = [{ name = "Hmily" }]
+license = {text = "Apache-2.0"}
+readme = "README.md"
+url='https://github.com/ihmily/StreamCap'
+requires-python = ">=3.10,<4.0"
+
+dependencies = [
+    "flet",
+    "flet-desktop",
+    "streamget>=4.0.3",
+    "certifi>=2025.1.31",
+    "screeninfo>=0.8.1",
+    "httpx[http2]>=0.28.1",
+    "PyExecJS>=1.5.1"
+]
+
+[project.urls]
+Documentation = "https://github.com/ihmily/StreamCap"
+Homepage = "https://github.com/ihmily/StreamCap"
+Source = "https://github.com/ihmily/StreamCap"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.flet]
+org = "io.github.ihmily.streamcap"
+product = "StreamCap"
+company = "io.github.ihmily.streamcap"
+copyright = "Copyright (C) 2025 by Hmily"
+compile.app = false
+compile.packages = false
+compile.cleanup = true
+
+[tool.flet.app]
+path ="."
+
+[tool.poetry]
+package-mode = false
+packages = [
+    { include = "app", from = "." },
+]
+
+[tool.poetry.dependencies]
+flet = { version = "^0.27.6", extras = ["all"] }
+screeninfo = "~0.8.1"
+httpx = "^0.28.1"
+certifi = ">=2025.1.31"
+PyExecJS = "~1.5.1"
+streamget = ">=4.0.3"
+
+[tool.poetry.group.lint]
+optional = true
+
+[tool.poetry.group.lint.dependencies]
+ruff = "~0.9.10"
