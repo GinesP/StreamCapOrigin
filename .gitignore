@@ -92,7 +92,7 @@ storage/
 ffmpeg/
 node/
 node-v*.zip
-ffmpeg*
+ffmpeg*.zip
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
