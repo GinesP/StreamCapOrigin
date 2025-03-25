@@ -225,6 +225,12 @@ Faceit:
 https://www.faceit.com/zh/players/Compl1/stream
 ```
 
+## ❤️贡献者
+
+<a href="https://github.com/ihmily/StreamCap/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ihmily/StreamCap" />
+</a>
+
 ## 📜许可证
 
 StreamCap在Apache License 2.0下发布。有关详情，请参阅[LICENSE](./LICENSE)文件。

@@ -219,6 +219,12 @@ Faceit:
 https://www.faceit.com/zh/players/Compl1/stream
 ```
 
+## ❤️Contributors
+
+<a href="https://github.com/ihmily/StreamCap/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ihmily/StreamCap" />
+</a>
+
 ## 📜License
 
 StreamCap is released under the Apache License 2.0. For more details, see the [LICENSE](./LICENSE) file.
@@ -232,5 +238,3 @@ Special thanks to the following open-source projects and technologies for their 
 - [streamget](https://github.com/ihmily/streamget)
 
 If you have any questions or suggestions, please feel free to contact us via GitHub Issues.
-
----
