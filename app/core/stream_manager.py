@@ -181,17 +181,18 @@ class LiveStreamRecorder:
         """
         The child process executes ffmpeg for recording
         """
-        save_file_path = ffmpeg_command[-1]
-
-        process = await asyncio.create_subprocess_exec(
-            *ffmpeg_command,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            startupinfo=self.subprocess_start_info,
-        )
 
         try:
+            save_file_path = ffmpeg_command[-1]
+
+            process = await asyncio.create_subprocess_exec(
+                *ffmpeg_command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                startupinfo=self.subprocess_start_info,
+            )
+
             self.recording.status_info = RecordingStatus.RECORDING
             logger.info(f"Recording in Progress: {live_url}")
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
@@ -387,13 +388,13 @@ class LiveStreamRecorder:
     def get_headers_params(live_url, platform_key):
         live_domain = "/".join(live_url.split("/")[0:3])
         record_headers = {
-            'pandalive': 'origin:https://www.pandalive.co.kr',
-            'winktv': 'origin:https://www.winktv.co.kr',
-            'popkontv': 'origin:https://www.popkontv.com',
-            'flextv': 'origin:https://www.flextv.co.kr',
-            'qiandurebo': 'referer:https://qiandurebo.com',
-            '17live': 'referer:https://17.live/en/live/6302408',
-            'lang': 'referer:https://www.lang.live',
-            'shopee': f'origin:{live_domain}',
+            "pandalive": "origin:https://www.pandalive.co.kr",
+            "winktv": "origin:https://www.winktv.co.kr",
+            "popkontv": "origin:https://www.popkontv.com",
+            "flextv": "origin:https://www.flextv.co.kr",
+            "qiandurebo": "referer:https://qiandurebo.com",
+            "17live": "referer:https://17.live/en/live/6302408",
+            "lang": "referer:https://www.lang.live",
+            "shopee": f"origin:{live_domain}",
         }
         return record_headers.get(platform_key)
