@@ -264,7 +264,8 @@ class RecordingManager:
             else:
                 recording.status_info = RecordingStatus.MONITORING
                 title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[recording.quality]}"
-                if recording.streamer_name == self._["live_room"]:
+                if recording.streamer_name == self._["live_room"] or \
+                        f"[{self._['is_live']}]" in recording.display_title:
                     recording.update(
                         {
                             "streamer_name": stream_info.anchor_name,
