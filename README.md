@@ -16,7 +16,7 @@
 
 
 
-StreamCap 是一个多平台直播流录制客户端，覆盖 40+ 国内外主流直播平台，支持批量录制、循环监控、定时监控和自动转码等功能。
+StreamCap 是一个基于FFmpeg和StreamGet的多平台直播流录制客户端，覆盖 40+ 国内外主流直播平台，支持批量录制、循环监控、定时监控和自动转码等功能。
 
 ## ✨功能特性
 
@@ -32,19 +32,12 @@ StreamCap 是一个多平台直播流录制客户端，覆盖 40+ 国内外主�
 
 ## 🛠️快速开始
 
-### 1.直接运行已构建程序
+### 1.**运行预构建的程序**：
 
-1.**下载预构建的程序**：
+访问 [StreamCap Releases](https://github.com/ihmily/StreamCap/releases/latest) 页面，根据自身系统下载最新版本的 `StreamCap.zip` 压缩包。
 
-访问 [StreamCap Releases](https://github.com/ihmily/StreamCap/releases/latest) 页面，下载最新版本的 `StreamCap.zip` 压缩包。
-
-2.**解压程序**：
-
-将下载的压缩包解压到任意目录。
-
-3.**运行可执行文件**：
-
-打开解压后的文件夹，双击运行 `StreamCap.exe` 文件即可启动程序。
+- **Windows 用户**：下载 `StreamCap.zip` 文件，解压后运行 `StreamCap.exe`。
+- **macOS 用户**：下载 `StreamCap.dmg` 文件，按照提示完成安装。
 
 ### 2.从源代码运行
 
@@ -61,6 +54,8 @@ cd StreamCap
 
 ```bash
 pip install -r requirements.txt
+# 或者
+poetry install
 ```
 
 3.**运行程序**：
@@ -70,11 +65,21 @@ pip install -r requirements.txt
 python main.py
 ```
 
-如果程序提示缺少 FFmpeg，请访问 FFmpeg 官方下载页面[Download FFmpeg](https://ffmpeg.org/download.html)，下载预编译的 FFmpeg 可执行文件。
+如果程序提示缺少 FFmpeg，请访问 FFmpeg 官方下载页面[Download FFmpeg](https://ffmpeg.org/download.html)，下载预编译的 FFmpeg 可执行文件，并配置环境变量。
 
 ## 😺已支持平台
 
-示例地址：
+**国内平台（30+）**：
+
+抖音、快手、虎牙、斗鱼、B站、小红书、YY、映客、Acfun、Blued、京东、淘宝...
+
+**海外平台（10+）**：
+
+TikTok、Twitch、PandTV、Soop、Twitcasting、CHZZK、Shopee、Youtube、LiveMe、Flextv、Popkontv、Bigo...
+
+**示例地址：**
+
+如未备注，默认都使用直播间地址录制
 
 ```
 抖音:
@@ -102,9 +107,8 @@ https://www.yy.com/22490906/22490906
 B站:
 https://live.bilibili.com/320
 
-小红书（推荐使用主页地址):
-https://www.xiaohongshu.com/user/profile/6330049c000000002303c7ed?appuid=5f3f478a00000000010005b3
-http://xhslink.com/xpJpfM
+小红书:
+http://xhslink.com/xpJpfM  (一次性地址，暂不支持循环监控)
 
 bigo直播:
 https://www.bigo.tv/cn/716418802
@@ -159,13 +163,10 @@ LiveMe:
 https://www.liveme.com/zh/v/17141543493018047815/index.html
 
 花椒直播:
-https://www.huajiao.com/l/345096174
-
-流星直播:
-https://www.7u66.com/100960
+https://www.huajiao.com/l/345096174  (一次性地址，暂不支持循环监控)
 
 ShowRoom:
-https://www.showroom-live.com/room/profile?room_id=480206  （主播主页地址）
+https://www.showroom-live.com/room/profile?room_id=480206  (主播主页地址)
 
 Acfun:
 https://live.acfun.cn/live/179922
@@ -177,7 +178,7 @@ https://www.inke.cn/liveroom/index.html?uid=22954469&id=1720860391070904
 https://live.ybw1666.com/800002949
 
 知乎直播:
-https://www.zhihu.com/people/ac3a467005c5d20381a82230101308e9 (主播主页地址)
+https://www.zhihu.com/people/ac3a467005c5d20381a82230101308e9  (主播主页地址)
 
 CHZZK:
 https://chzzk.naver.com/live/458f6ec20b034f49e0fc6d03921646d2
@@ -212,10 +213,10 @@ https://h.catshow168.com/live/preview.html?uid=19066357&anchorUid=18895331
 Shopee:
 https://sg.shp.ee/GmpXeuf?uid=1006401066&session=802458
 
-Youtube:
+Youtube(需配置cookie):
 https://www.youtube.com/watch?v=cS6zS5hi1w0
 
-淘宝(需cookie):
+淘宝(需配置cookie):
 https://m.tb.cn/h.TWp0HTd
 
 京东:

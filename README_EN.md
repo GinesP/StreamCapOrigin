@@ -15,7 +15,7 @@
 </div><br>
 
 
-StreamCap is a multi-platform live stream recording client that covers over 40 mainstream live streaming platforms worldwide. It supports batch recording, loop monitoring, scheduled monitoring, and automatic transcoding.
+StreamCap is a multi-platform live stream recording client based on FFmpeg and StreamGet. It covers over 40 mainstream live streaming platforms both domestically and internationally, and supports features such as batch recording, loop monitoring, timed monitoring, and automatic transcoding.
 
 ## ✨Features
 
@@ -31,19 +31,12 @@ StreamCap is a multi-platform live stream recording client that covers over 40 m
 
 ## 🛠️Quick Start
 
-### 1. Running the Pre-built Program
+### 1. **Run the Pre-Built Program**
 
-1.**Download the Pre-built Program**:
+Visit the [StreamCap Releases](https://github.com/ihmily/StreamCap/releases/latest) page and download the latest version according to your operating system:
 
-Visit the [StreamCap Releases](https://github.com/ihmily/StreamCap/releases/latest) page and download the latest version of the `StreamCap.zip` package.
-
-2.**Unzip the Program**:
-
-Extract the downloaded package to any directory.
-
-3.**Run the Executable File**:
-
-Open the extracted folder and double-click the `StreamCap.exe` file to launch the program.
+- **Windows Users**: Download the `StreamCap.zip` file, extract it, and run `StreamCap.exe`.
+- **macOS Users**: Download the `StreamCap.dmg` file and follow the on-screen instructions to install.
 
 ### 2. Running from Source Code
 
@@ -60,6 +53,8 @@ cd StreamCap
 
 ```bash
 pip install -r requirements.txt
+# or
+poetry install
 ```
 
 3.**Run the Program**:
@@ -70,18 +65,26 @@ Use the following command to start the program:
 python main.py
 ```
 
-If the program prompts that FFmpeg is missing, please visit the FFmpeg official download page [Download FFmpeg](https://ffmpeg.org/download.html) to download the precompiled FFmpeg executable.
+If the program prompts that FFmpeg is missing, please visit the FFmpeg official download page [Download FFmpeg](https://ffmpeg.org/download.html) to download the precompiled FFmpeg executable files and configure the environment variables.
 
 ## 😺 Supported Platforms
 
-Example input URLs:
+**Domestic Platforms (30+)**:  
+Douyin, Kuaishou, Huya, Douyu, Bilibili, RedNote, YY, Inke, Acfun, Blued, JD, Taobao, ...
+
+**International Platforms (10+)**:  
+TikTok, Twitch, PandTV, Soop, Twitcasting, CHZZK, Shopee, YouTube, LiveMe, Flextv, Popkontv, Bigo, ...
+
+**Example URLs**:  
+
+If no specific note is provided, the live stream room URL is used for recording by default.
 
 ```
 Douyin:
 https://live.douyin.com/745964462470
 https://v.douyin.com/iQFeBnt/ (Node.js Required)
 https://live.douyin.com/yall1102  （Link+unique ID）
-https://v.douyin.com/CeiU5cbX  （Anchor homepage address）
+https://v.douyin.com/CeiU5cbX  (Anchor's homepage URL)
 
 TikTok:
 https://www.tiktok.com/@pearlgaga88/live
@@ -103,6 +106,7 @@ BiliBili:
 https://live.bilibili.com/320
 
 ReadNote:
+(One-time use URLs, not supported for loop monitoring)
 http://xhslink.com/xpJpfM
 
 Bigo:
@@ -158,11 +162,11 @@ LiveMe:
 https://www.liveme.com/zh/v/17141543493018047815/index.html
 
 Huajiao Live:
+(One-time use URLs, not supported for loop monitoring)
 https://www.huajiao.com/l/345096174
 
-
 ShowRoom:
-https://www.showroom-live.com/room/profile?room_id=480206  （Anchor homepage address）
+https://www.showroom-live.com/room/profile?room_id=480206  (Anchor's homepage URL)
 
 Acfun:
 https://live.acfun.cn/live/179922
@@ -174,7 +178,7 @@ Yinbo:
 https://live.ybw1666.com/800002949
 
 Zhihu:
-https://www.zhihu.com/people/ac3a467005c5d20381a82230101308e9 (Anchor homepage address)
+https://www.zhihu.com/people/ac3a467005c5d20381a82230101308e9  (Anchor's homepage URL)
 
 CHZZK:
 https://chzzk.naver.com/live/458f6ec20b034f49e0fc6d03921646d2
@@ -207,9 +211,11 @@ Shopee:
 https://sg.shp.ee/GmpXeuf?uid=1006401066&session=802458
 
 Youtube:
+(Requires configuring cookies)
 https://www.youtube.com/watch?v=cS6zS5hi1w0
 
-Taobao(Need cookie):
+Taobao:
+(Requires configuring cookies)
 https://m.tb.cn/h.TWp0HTd
 
 JD:
