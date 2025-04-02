@@ -34,7 +34,7 @@
     "select_resolution": "选择录制清晰度",
     "input_anchor_name": "输入主播名称",
     "default_input": "可默认不填",
-    "input_record_format": "输入录制格式-默认ts",
+    "select_record_format": "选择录制格式-默认ts",
     "input_save_path": "输入录制保存路径",
     "is_segment_enabled": "分段录制是否开启",
     "segment_record_time": "录制分段时间",

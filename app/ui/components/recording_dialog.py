@@ -56,7 +56,7 @@ class RecordingDialog:
             value=initial_values.get("streamer_name", ""),
         )
         record_format_field = ft.Dropdown(
-            label=self._["input_record_format"],
+            label=self._["select_record_format"],
             options=[ft.dropdown.Option(i) for i in VideoFormat.get_formats()],
             border_radius=5,
             filled=False,
