@@ -239,8 +239,11 @@ class LiveStreamRecorder:
             if return_code in safe_return_code:
                 if self.recording.monitor_status:
                     self.recording.status_info = RecordingStatus.MONITORING
+                    display_title = self.recording.title
                 else:
                     self.recording.status_info = RecordingStatus.STOPPED_MONITORING
+                    display_title = self.recording.display_title
+
                 self.recording.live_title = None
                 if not self.recording.recording:
                     logger.success(f"Live recording has stopped: {record_name}")
@@ -248,7 +251,7 @@ class LiveStreamRecorder:
                     self.recording.recording = False
                     logger.success(f"Live recording completed: {record_name}")
 
-                self.recording.update({"display_title": self.recording.title})
+                self.recording.update({"display_title": display_title})
                 self.app.page.run_task(self.app.record_card_manager.update_cards, self.recording)
                 if self.app.recording_enabled:
                     self.app.page.run_task(self.app.record_manager.check_if_live, self.recording)
