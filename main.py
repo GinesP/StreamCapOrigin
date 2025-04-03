@@ -6,6 +6,7 @@ import flet as ft
 from screeninfo import get_monitors
 
 from app.app_manager import App, execute_dir
+from app.ui.components.progress_overlay import ProgressOverlay
 
 
 def main(page: ft.Page):
@@ -24,6 +25,9 @@ def main(page: ft.Page):
     page.window.center()
     app = App(page)
 
+    progress_overlay = ProgressOverlay()
+    page.overlay.append(progress_overlay.overlay)
+
     def route_change(e):
         tr = ft.TemplateRoute(e.route)
         if tr.match("/"):
@@ -35,6 +39,15 @@ def main(page: ft.Page):
         else:
             page.go("/")
 
+    async def on_window_event(e):
+        if e.data == "close":
+            progress_overlay.show()
+            page.update()
+            await app.cleanup()
+            page.window.destroy()
+
+    page.window.prevent_close = True
+    page.window.on_event = on_window_event
     page.on_route_change = route_change
     page.update()
     route_change(ft.RouteChangeEvent(route=page.route))

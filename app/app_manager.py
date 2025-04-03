@@ -6,6 +6,7 @@ from . import InstallationManager, execute_dir
 from .core.config_manager import ConfigManager
 from .core.language_manager import LanguageManager
 from .core.record_manager import RecordingManager
+from .process_manager import AsyncProcessManager
 from .ui.components.recording_card import RecordingCardManager
 from .ui.components.show_snackbar import ShowSnackBar
 from .ui.navigation.sidebar import LeftNavigationMenu, NavigationSidebar
@@ -21,6 +22,7 @@ class App:
         self.page = page
         self.run_path = execute_dir
         self.assets_dir = os.path.join(execute_dir, "assets")
+        self.process_manager = AsyncProcessManager()
         self.config_manager = ConfigManager(self.run_path)
         self.content_area = ft.Column(
             controls=[],
@@ -87,3 +89,9 @@ class App:
     async def clear_content_area(self):
         self.content_area.clean()
         self.content_area.update()
+
+    async def cleanup(self):
+        await self.process_manager.cleanup()
+
+    def add_ffmpeg_process(self, process):
+        self.process_manager.add_process(process)

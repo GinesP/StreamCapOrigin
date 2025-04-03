@@ -193,6 +193,7 @@ class LiveStreamRecorder:
                 startupinfo=self.subprocess_start_info,
             )
 
+            self.app.add_ffmpeg_process(process)
             self.recording.status_info = RecordingStatus.RECORDING
             logger.info(f"Recording in Progress: {live_url}")
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
@@ -253,7 +254,7 @@ class LiveStreamRecorder:
 
                 self.recording.update({"display_title": display_title})
                 self.app.page.run_task(self.app.record_card_manager.update_cards, self.recording)
-                if self.app.recording_enabled:
+                if self.app.recording_enabled and process in self.app.process_manager.ffmpeg_processes:
                     self.app.page.run_task(self.app.record_manager.check_if_live, self.recording)
                 else:
                     self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
