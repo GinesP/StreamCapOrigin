@@ -1,12 +1,12 @@
 import asyncio
 import os
-from typing import List
+
 from .utils.logger import logger
 
 
 class AsyncProcessManager:
     def __init__(self):
-        self.ffmpeg_processes: List[asyncio.subprocess.Process] = []
+        self.ffmpeg_processes: list[asyncio.subprocess.Process] = []
 
     def add_process(self, process: asyncio.subprocess.Process):
         """Add an asynchronous process to the management list"""
