@@ -169,6 +169,10 @@ class RecordingManager:
 
     async def check_if_live(self, recording: Recording):
         """Check if the live stream is available, fetch stream data and update is_live status."""
+
+        if recording.recording:
+            return
+
         if not recording.monitor_status:
             recording.display_title = f"[{self._['monitor_stopped']}] {recording.title}"
             recording.status_info = RecordingStatus.STOPPED_MONITORING
@@ -217,6 +221,7 @@ class RecordingManager:
             if not stream_info or not stream_info.anchor_name:
                 logger.error(f"Fetch stream data failed: {recording.url}")
                 recording.is_checking = False
+                recording.status_info = RecordingStatus.LIVE_STATUS_CHECK_ERROR
                 return
 
             if self.settings.user_config.get("remove_emojis"):
