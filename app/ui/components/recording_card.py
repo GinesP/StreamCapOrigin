@@ -179,14 +179,19 @@ class RecordingCardManager:
         self.app.page.update()
 
     async def edit_recording_callback(self, recording_list: list[dict]):
-        recording = recording_list[0]
-        rec_id = recording["rec_id"]
-        recording_obj = self.app.record_manager.find_recording_by_id(rec_id)
-        await self.app.record_manager.update_recording_card(recording_obj, updated_info=recording)
-        if not recording["monitor_status"]:
-            recording_obj.display_title = f"[{self._['monitor_stopped']}] " + recording_obj.title
-        await self.update_card(recording_obj)
-        self.app.page.pubsub.send_others_on_topic("update", recording)
+        recording_dict = recording_list[0]
+        rec_id = recording_dict["rec_id"]
+        recording = self.app.record_manager.find_recording_by_id(rec_id)
+
+        await self.app.record_manager.update_recording_card(recording, updated_info=recording_dict)
+        if not recording_dict["monitor_status"]:
+            recording.display_title = f"[{self._['monitor_stopped']}] " + recording.title
+
+        recording.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
+            recording.scheduled_start_time, recording.monitor_hours)
+
+        await self.update_card(recording)
+        self.app.page.pubsub.send_others_on_topic("update", recording_dict)
 
     async def on_toggle_recording(self, recording: Recording):
         """Toggle the recording state for a specific recording."""

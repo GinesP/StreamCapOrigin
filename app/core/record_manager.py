@@ -211,8 +211,8 @@ class RecordingManager:
             recording.status_info = RecordingStatus.STATUS_CHECKING
             recording.detection_time = datetime.now().time()
             if recording.scheduled_recording and recording.scheduled_start_time and recording.monitor_hours:
-                end_time = utils.add_hours_to_time(recording.scheduled_start_time, recording.monitor_hours)
-                scheduled_time_range = f"{recording.scheduled_start_time}~{end_time}"
+                scheduled_time_range = await self.get_scheduled_time_range(
+                    recording.scheduled_start_time, recording.monitor_hours)
                 recording.scheduled_time_range = scheduled_time_range
                 in_scheduled = utils.is_current_time_within_range(scheduled_time_range)
                 if not in_scheduled:
@@ -376,3 +376,13 @@ class RecordingManager:
 
         else:
             self.app.recording_enabled = True
+
+    @staticmethod
+    async def get_scheduled_time_range(scheduled_start_time, monitor_hours) -> str | None:
+        if not scheduled_start_time and monitor_hours:
+            return
+
+        end_time = utils.add_hours_to_time(scheduled_start_time, float(monitor_hours))
+        scheduled_time_range = f"{scheduled_start_time}~{end_time}"
+
+        return scheduled_time_range

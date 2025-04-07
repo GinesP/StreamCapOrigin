@@ -111,6 +111,9 @@ class HomePage(PageBase):
             self.recording_card_area.controls.append(card)
             self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
 
+            recording.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
+                recording.scheduled_start_time, recording.monitor_hours)
+
             if update:
                 self.recording_card_area.update()
 
@@ -169,6 +172,7 @@ class HomePage(PageBase):
             await self.app.record_manager.add_recording(recording)
             self.page.run_task(self.add_record_card, recording, True)
             self.app.page.pubsub.send_others_on_topic("add", recording)
+
         await self.app.snack_bar.show_snack_bar(self._["add_recording_success_tip"], bgcolor=ft.Colors.GREEN)
 
     async def search_on_click(self, _e):

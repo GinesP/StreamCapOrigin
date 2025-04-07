@@ -9,7 +9,7 @@ import string
 import subprocess
 import sys
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -134,7 +134,7 @@ def jsonp_to_json(jsonp_str: str) -> OptionalDict:
         raise Exception("No JSON data found in JSONP response.")
 
 
-def open_folder(directory_path):
+def open_folder(directory_path: str):
     try:
         if sys.platform == "win32":
             os.startfile(directory_path)
@@ -143,33 +143,34 @@ def open_folder(directory_path):
         else:
             subprocess.run(["xdg-open", directory_path], check=True)
     except FileNotFoundError:
-        logger.error(f"Unable to open folder. The command may not be available on this system.")
+        logger.error("Unable to open folder. The command may not be available on this system.")
     except subprocess.CalledProcessError:
         logger.error(f"Failed to open folder '{directory_path}'. Please ensure the path is valid and accessible.")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
 
 
-def add_hours_to_time(time_str, hours_to_add):
-    time_formats = ["%H:%M:%S", "%H:%M"]
+def add_hours_to_time(time_str: str, hours_to_add: float) -> str:
+    time_formats: list[str] = ["%H:%M:%S", "%H:%M"]
     for time_format in time_formats:
         try:
-            time_obj = datetime.strptime(time_str, time_format)
-            new_time_obj = time_obj + timedelta(hours=float(hours_to_add))
-            new_time_str = new_time_obj.strftime(time_formats[0])
+            time_obj: datetime = datetime.strptime(time_str, time_format)
+            new_time_obj: datetime = time_obj + timedelta(hours=hours_to_add)
+            new_time_str: str = new_time_obj.strftime(time_formats[0])
             return new_time_str
         except ValueError:
             pass
+    raise ValueError("Invalid time format provided.")
 
 
-def is_time_greater_than_now(time_str):
-    time_format = "%H:%M:%S"
-    input_time = datetime.strptime(time_str, time_format).time()
-    current_time = datetime.now().time()
+def is_time_greater_than_now(time_str: str) -> bool:
+    time_format: str = "%H:%M:%S"
+    input_time: time = datetime.strptime(time_str, time_format).time()
+    current_time: time = datetime.now().time()
     return input_time > current_time
 
 
-def is_current_time_within_range(time_range_str):
+def is_current_time_within_range(time_range_str: str):
     """
     Determine whether the current time is within the time range
 
