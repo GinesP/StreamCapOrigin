@@ -20,11 +20,16 @@ class RecordingCardManager:
         self.app.language_manager.add_observer(self)
         self._ = {}
         self.load()
+        self.pubsub_subscribe()
 
     def load(self):
         language = self.app.language_manager.language
         for key in ("recording_card", "recording_manager", "base", "home_page", "video_quality"):
             self._.update(language.get(key, {}))
+
+    def pubsub_subscribe(self):
+        self.app.page.pubsub.subscribe_topic("update", self.subscribe_update_card)
+        self.app.page.pubsub.subscribe_topic("delete", self.subscribe_remove_cards)
 
     async def create_card(self, recording: Recording):
         """Create a card for a given recording."""
@@ -124,7 +129,7 @@ class RecordingCardManager:
             "monitor_button": monitor_button,
         }
 
-    async def update_cards(self, recording):
+    async def update_card(self, recording):
         """Update only the recordings cards in the scrollable content area."""
         if recording.rec_id in self.cards_obj:
             recording_card = self.cards_obj[recording.rec_id]
@@ -161,8 +166,10 @@ class RecordingCardManager:
             )
             self.app.page.run_task(self.app.record_manager.check_if_live, recording)
             self.app.page.run_task(self.app.snack_bar.show_snack_bar, self._["start_monitor_tip"], ft.Colors.GREEN)
-        await self.update_cards(recording)
-        self.app.page.run_task(self.app.record_manager.save_to_json)
+
+        await self.update_card(recording)
+        self.app.page.pubsub.send_others_on_topic("update", recording)
+        self.app.page.run_task(self.app.record_manager.persist_recordings)
 
     async def show_recording_info_dialog(self, recording: Recording):
         """Display a dialog with detailed information about the recording."""
@@ -175,10 +182,11 @@ class RecordingCardManager:
         recording = recording_list[0]
         rec_id = recording["rec_id"]
         recording_obj = self.app.record_manager.find_recording_by_id(rec_id)
-        await self.app.record_manager.update_recording(recording_obj, updated_info=recording)
+        await self.app.record_manager.update_recording_card(recording_obj, updated_info=recording)
         if not recording["monitor_status"]:
             recording_obj.display_title = f"[{self._['monitor_stopped']}] " + recording_obj.title
-        await self.update_cards(recording_obj)
+        await self.update_card(recording_obj)
+        self.app.page.pubsub.send_others_on_topic("update", recording)
 
     async def on_toggle_recording(self, recording: Recording):
         """Toggle the recording state for a specific recording."""
@@ -197,7 +205,8 @@ class RecordingCardManager:
                 else:
                     await self.app.snack_bar.show_snack_bar(self._["please_start_monitor_tip"])
 
-            await self.update_cards(recording)
+            await self.update_card(recording)
+            self.app.page.pubsub.send_others_on_topic("update", recording)
 
     async def on_delete_recording(self, recording: Recording):
         """Delete a recording from the list and update UI."""
@@ -212,11 +221,27 @@ class RecordingCardManager:
 
     async def remove_recording_card(self, recordings: list[Recording]):
         home_page = self.app.current_page
-        for recording in recordings:
-            if recording.rec_id in self.cards_obj:
-                card = self.cards_obj[recording.rec_id]["card"]
-                home_page.recording_card_area.controls.remove(card)
-                del self.cards_obj[recording.rec_id]
+
+        existing_ids = {rec.rec_id for rec in self.app.record_manager.recordings}
+        remove_ids = {rec.rec_id for rec in recordings}
+        keep_ids = existing_ids - remove_ids
+
+        cards_to_remove = [
+            card_data["card"]
+            for rec_id, card_data in self.cards_obj.items()
+            if rec_id not in keep_ids
+        ]
+
+        home_page.recording_card_area.controls = [
+            control
+            for control in home_page.recording_card_area.controls
+            if control not in cards_to_remove
+        ]
+
+        self.cards_obj = {
+            k: v for k, v in self.cards_obj.items()
+            if k in keep_ids
+        }
         home_page.recording_card_area.update()
 
     @staticmethod
@@ -318,3 +343,9 @@ class RecordingCardManager:
 
     async def recording_card_on_click(self, _, recording: Recording):
         await self.on_card_click(recording)
+
+    async def subscribe_update_card(self, _, recording: Recording):
+        await self.update_card(recording)
+
+    async def subscribe_remove_cards(self, _, recordings: list[Recording]):
+        await self.remove_recording_card(recordings)

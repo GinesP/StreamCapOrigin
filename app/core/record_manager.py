@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from datetime import datetime, timedelta
 
 from ..messages.message_pusher import MessagePusher
@@ -10,11 +11,15 @@ from .platform_handlers import get_platform_info
 from .stream_manager import LiveStreamRecorder
 
 
+class GlobalRecordingState:
+    recordings = []
+    lock = threading.Lock()
+
+
 class RecordingManager:
     def __init__(self, app):
         self.app = app
         self.settings = app.settings
-        self.recordings = []
         self.periodic_task_started = False
         self.loop_time_seconds = None
         self.app.language_manager.add_observer(self)
@@ -22,6 +27,14 @@ class RecordingManager:
         self._ = {}
         self.load()
         self.initialize_dynamic_state()
+
+    @property
+    def recordings(self):
+        return GlobalRecordingState.recordings
+
+    @recordings.setter
+    def recordings(self, value):
+        raise AttributeError("Please use add_recording/update_recording methods to modify data")
 
     def load(self):
         language = self.app.language_manager.language
@@ -31,7 +44,8 @@ class RecordingManager:
     def load_recordings(self):
         """Load recordings from a JSON file into objects."""
         recordings_data = self.app.config_manager.load_recordings_config()
-        self.recordings = [Recording.from_dict(rec) for rec in recordings_data]
+        if not GlobalRecordingState.recordings:
+            GlobalRecordingState.recordings = [Recording.from_dict(rec) for rec in recordings_data]
         logger.info(f"Live Recordings: Loaded {len(self.recordings)} items")
 
     def initialize_dynamic_state(self):
@@ -42,11 +56,31 @@ class RecordingManager:
             recording.loop_time_seconds = self.loop_time_seconds
             recording.update_title(self._[recording.quality])
 
-    async def update_recording(self, recording: Recording, updated_info: dict):
+    async def add_recording(self, recording):
+        with GlobalRecordingState.lock:
+            GlobalRecordingState.recordings.append(recording)
+            await self.persist_recordings()
+
+    async def remove_recording(self, recording: Recording):
+        with GlobalRecordingState.lock:
+            GlobalRecordingState.recordings.remove(recording)
+            await self.persist_recordings()
+
+    async def clear_all_recordings(self):
+        with GlobalRecordingState.lock:
+            GlobalRecordingState.recordings.clear()
+            await self.persist_recordings()
+
+    async def persist_recordings(self):
+        """Persist recordings to a JSON file."""
+        data_to_save = [rec.to_dict() for rec in self.recordings]
+        await self.app.config_manager.save_recordings_config(data_to_save)
+
+    async def update_recording_card(self, recording: Recording, updated_info: dict):
         """Update an existing recording object and persist changes to a JSON file."""
         if recording:
             recording.update(updated_info)
-            self.app.page.run_task(self.save_to_json)
+            self.app.page.run_task(self.persist_recordings)
 
     @staticmethod
     async def _update_recording(
@@ -74,9 +108,10 @@ class RecordingManager:
                 selected=False,
             )
             self.app.page.run_task(self.check_if_live, recording)
-            self.app.page.run_task(self.app.record_card_manager.update_cards, recording)
+            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+            self.app.page.pubsub.send_others_on_topic("update", recording)
             if auto_save:
-                self.app.page.run_task(self.save_to_json)
+                self.app.page.run_task(self.persist_recordings)
 
     async def stop_monitor_recording(self, recording: Recording, auto_save: bool = True):
         """
@@ -91,9 +126,10 @@ class RecordingManager:
                 selected=False,
             )
             self.stop_recording(recording)
-            self.app.page.run_task(self.app.record_card_manager.update_cards, recording)
+            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+            self.app.page.pubsub.send_others_on_topic("update", recording)
             if auto_save:
-                self.app.page.run_task(self.save_to_json)
+                self.app.page.run_task(self.persist_recordings)
 
     async def start_monitor_recordings(self):
         """
@@ -105,7 +141,7 @@ class RecordingManager:
         for recording in pre_start_monitor_recordings:
             if cards_obj[recording.rec_id]["card"].visible:
                 self.app.page.run_task(self.start_monitor_recording, recording, auto_save=False)
-        self.app.page.run_task(self.save_to_json)
+        self.app.page.run_task(self.persist_recordings)
         logger.info(f"Batch Start Monitor Recordings: {[i.rec_id for i in pre_start_monitor_recordings]}")
 
     async def stop_monitor_recordings(self, selected_recordings: list[Recording | None] | None = None):
@@ -119,19 +155,18 @@ class RecordingManager:
         for recording in pre_stop_monitor_recordings:
             if cards_obj[recording.rec_id]["card"].visible:
                 self.app.page.run_task(self.stop_monitor_recording, recording, auto_save=False)
-        self.app.page.run_task(self.save_to_json)
+        self.app.page.run_task(self.persist_recordings)
         logger.info(f"Batch Stop Monitor Recordings: {[i.rec_id for i in pre_stop_monitor_recordings]}")
 
     async def get_selected_recordings(self):
         return [recording for recording in self.recordings if recording.selected]
 
-    def remove_recordings(self, recordings: list[Recording]):
+    async def remove_recordings(self, recordings: list[Recording]):
         """Remove a recording from the list and update the JSON file."""
         for recording in recordings:
             if recording in self.recordings:
-                self.recordings.remove(recording)
+                await self.remove_recording(recording)
                 logger.info(f"Delete Items: {recording.rec_id}-{recording.streamer_name}")
-        self.app.page.run_task(self.save_to_json)
 
     def find_recording_by_id(self, rec_id: str):
         """Find a recording by its ID (hash of dict representation)."""
@@ -139,11 +174,6 @@ class RecordingManager:
             if rec.rec_id == rec_id:
                 return rec
         return None
-
-    async def save_to_json(self):
-        """Persist recordings to a JSON file."""
-        recordings_data = [rec.to_dict() for rec in self.recordings]
-        await self.app.config_manager.save_recordings_config(recordings_data)
 
     async def check_all_live_status(self):
         """Check the live status of all recordings and update their display titles."""
@@ -264,7 +294,8 @@ class RecordingManager:
                     self.start_update(recording)
                     self.app.page.run_task(recorder.start_recording, stream_info)
 
-                self.app.page.run_task(self.app.record_card_manager.update_cards, recording)
+                self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                self.app.page.pubsub.send_others_on_topic("update", recording)
 
             else:
                 recording.status_info = RecordingStatus.MONITORING
@@ -278,8 +309,9 @@ class RecordingManager:
                             "display_title": title,
                         }
                     )
-                    self.app.page.run_task(self.app.record_card_manager.update_cards, recording)
-                    self.app.page.run_task(self.save_to_json)
+                    self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                    self.app.page.pubsub.send_others_on_topic("update", recording)
+                    self.app.page.run_task(self.persist_recordings)
 
     @staticmethod
     def start_update(recording: Recording):
@@ -323,8 +355,9 @@ class RecordingManager:
             return str(total_duration).split(".")[0]
 
     async def delete_recording_cards(self, recordings: list[Recording]):
-        self.remove_recordings(recordings)
         self.app.page.run_task(self.app.record_card_manager.remove_recording_card, recordings)
+        self.app.page.pubsub.send_others_on_topic('delete', recordings)
+        await self.remove_recordings(recordings)
 
     async def check_free_space(self, output_dir: str | None = None):
         disk_space_limit = float(self.settings.user_config.get("recording_space_threshold"))

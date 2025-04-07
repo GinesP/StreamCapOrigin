@@ -28,6 +28,7 @@ class HomePage(PageBase):
     def init(self):
         self.recording_card_area = ft.Column(controls=[], spacing=10, expand=True)
         self.add_recording_dialog = RecordingDialog(self.app, self.add_recording)
+        self.pubsub_subscribe()
 
     async def load(self):
         """Load the home page content."""
@@ -36,6 +37,10 @@ class HomePage(PageBase):
         await self.add_record_cards()
         self.page.run_task(self.show_all_cards)
         self.page.on_keyboard_event = self.on_keyboard
+
+    def pubsub_subscribe(self):
+        self.app.page.pubsub.subscribe_topic('add', self.subscribe_add_cards)
+        self.app.page.pubsub.subscribe_topic('delete_all', self.subscribe_del_all_cards)
 
     def create_home_title_area(self):
         return ft.Row(
@@ -161,10 +166,9 @@ class HomePage(PageBase):
 
             recording.loop_time_seconds = int(user_config.get("loop_time_seconds", 300))
             recording.update_title(self._[recording.quality])
-            self.app.record_manager.recordings.append(recording)
+            await self.app.record_manager.add_recording(recording)
             self.page.run_task(self.add_record_card, recording, True)
-
-        self.page.run_task(self.app.record_manager.save_to_json)
+            self.app.page.pubsub.send_others_on_topic("add", recording)
         await self.app.snack_bar.show_snack_bar(self._["add_recording_success_tip"], bgcolor=ft.Colors.GREEN)
 
     async def search_on_click(self, _e):
@@ -203,15 +207,15 @@ class HomePage(PageBase):
         tips = self._["batch_delete_confirm_tip"] if selected_recordings else self._["clear_all_confirm_tip"]
 
         async def confirm_dlg(_):
+
             if selected_recordings:
                 await self.app.record_manager.stop_monitor_recordings(selected_recordings)
                 await self.app.record_manager.delete_recording_cards(selected_recordings)
             else:
                 await self.app.record_manager.stop_monitor_recordings(self.app.record_manager.recordings)
-                self.app.record_manager.recordings = []
-                self.recording_card_area.controls.clear()
-                self.app.record_card_manager.cards_obj = {}
-                self.page.run_task(self.app.record_manager.save_to_json)
+                await self.app.record_manager.clear_all_recordings()
+                await self.delete_all_recording_cards()
+                self.app.page.pubsub.send_others_on_topic("delete_all", None)
 
             self.recording_card_area.update()
             await self.app.snack_bar.show_snack_bar(
@@ -237,6 +241,17 @@ class HomePage(PageBase):
         batch_delete_alert_dialog.open = True
         self.app.dialog_area.content = batch_delete_alert_dialog
         self.page.update()
+
+    async def delete_all_recording_cards(self):
+        self.recording_card_area.controls.clear()
+        self.recording_card_area.update()
+        self.app.record_card_manager.cards_obj = {}
+
+    async def subscribe_del_all_cards(self, *_):
+        await self.delete_all_recording_cards()
+
+    async def subscribe_add_cards(self, _, recording):
+        await self.add_record_card(recording, True)
 
     async def on_keyboard(self, e: ft.KeyboardEvent):
         if e.alt and e.key == "H":

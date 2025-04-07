@@ -1,4 +1,4 @@
-
+import argparse
 import multiprocessing
 import os
 
@@ -39,6 +39,9 @@ def main(page: ft.Page):
         else:
             page.go("/")
 
+    def disconnect(_):
+        page.pubsub.unsubscribe_all()
+
     async def on_window_event(e):
         if e.data == "close":
             progress_overlay.show()
@@ -48,11 +51,37 @@ def main(page: ft.Page):
 
     page.window.prevent_close = True
     page.window.on_event = on_window_event
+
     page.on_route_change = route_change
+    page.window.to_front()
+    page.skip_task_bar = True
+    page.always_on_top = True
+    page.focused = True
+    if os.getenv('PLATFORM') == "web":
+        page.on_disconnect = disconnect
+
     page.update()
     route_change(ft.RouteChangeEvent(route=page.route))
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Run the Flet app with optional web mode.")
+    parser.add_argument("--web", action="store_true", help="Run the app in web mode")
+    parser.add_argument("--host", type=str, default="127.0.0.1",
+                        help="Host address for the web server (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=6006, help="Port number for the web server (default: 6006)")
+    args = parser.parse_args()
+
     multiprocessing.freeze_support()
-    ft.app(target=main, assets_dir="assets")
+    if args.web or os.getenv('PLATFORM') == "web":
+        platform = "web"
+        ft.app(
+            target=main,
+            view=ft.AppView.WEB_BROWSER,
+            host=args.host,
+            port=args.port,
+            assets_dir="assets"
+        )
+    else:
+        ft.app(target=main, assets_dir="assets")

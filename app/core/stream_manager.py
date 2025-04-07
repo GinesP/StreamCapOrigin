@@ -93,7 +93,7 @@ class LiveStreamRecorder:
                 output_dir = os.path.join(output_dir, f"{now[:10]}_{live_title}")
         os.makedirs(output_dir, exist_ok=True)
         self.recording.recording_dir = output_dir
-        self.app.page.run_task(self.app.record_manager.save_to_json)
+        self.app.page.run_task(self.app.record_manager.persist_recordings)
         return output_dir
 
     def _get_save_path(self, filename: str) -> str:
@@ -225,18 +225,19 @@ class LiveStreamRecorder:
 
                 await asyncio.sleep(1)
 
+            return_code = process.returncode
+            safe_return_code = [0, 255]
             stdout, stderr = await process.communicate()
-            if stderr:
+            if return_code not in safe_return_code and stderr:
                 logger.error(f"FFmpeg Stderr Output: {str(stderr.decode()).splitlines()[0]}")
                 self.recording.status_info = RecordingStatus.RECORDING_ERROR
                 self.app.record_manager.stop_recording(self.recording)
-                await self.app.record_card_manager.update_cards(self.recording)
+                await self.app.record_card_manager.update_card(self.recording)
+                self.app.page.pubsub.send_others_on_topic("update", self.recording)
                 await self.app.snack_bar.show_snack_bar(
                     record_name + " " + self._["record_stream_error"], duration=2000
                 )
 
-            return_code = process.returncode
-            safe_return_code = [0, 255]
             if return_code in safe_return_code:
                 if self.recording.monitor_status:
                     self.recording.status_info = RecordingStatus.MONITORING
@@ -253,7 +254,8 @@ class LiveStreamRecorder:
                     logger.success(f"Live recording completed: {record_name}")
 
                 self.recording.update({"display_title": display_title})
-                self.app.page.run_task(self.app.record_card_manager.update_cards, self.recording)
+                await self.app.record_card_manager.update_card(self.recording)
+                self.app.page.pubsub.send_others_on_topic("update", self.recording)
                 if self.app.recording_enabled and process in self.app.process_manager.ffmpeg_processes:
                     self.app.page.run_task(self.app.record_manager.check_if_live, self.recording)
                 else:
@@ -400,6 +402,6 @@ class LiveStreamRecorder:
             "qiandurebo": "referer:https://qiandurebo.com",
             "17live": "referer:https://17.live/en/live/6302408",
             "lang": "referer:https://www.lang.live",
-            "shopee": f"origin:{live_domain}",
+            "shopee": "origin:" + live_domain,
         }
         return record_headers.get(platform_key)
