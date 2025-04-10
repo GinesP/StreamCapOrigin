@@ -134,7 +134,7 @@ def jsonp_to_json(jsonp_str: str) -> OptionalDict:
         raise Exception("No JSON data found in JSONP response.")
 
 
-def open_folder(directory_path: str):
+def open_folder(directory_path: str) -> bool:
     try:
         if sys.platform == "win32":
             os.startfile(directory_path)
@@ -142,12 +142,14 @@ def open_folder(directory_path: str):
             subprocess.run(["open", directory_path], check=True)
         else:
             subprocess.run(["xdg-open", directory_path], check=True)
+        return True
     except FileNotFoundError:
         logger.error("Unable to open folder. The command may not be available on this system.")
     except subprocess.CalledProcessError:
         logger.error(f"Failed to open folder '{directory_path}'. Please ensure the path is valid and accessible.")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
+    return False
 
 
 def add_hours_to_time(time_str: str, hours_to_add: float) -> str:

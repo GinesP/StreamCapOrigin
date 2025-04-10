@@ -45,7 +45,7 @@
     "single_input": "Single Input",
     "batch_input": "Batch Input",
     "live_room": "Live Room",
-    "platform_not_supported_tip": "⚠\uFE0F This platform does not support recording",
+    "platform_not_supported_tip": "⚠️ This platform does not support recording",
     "pick_time": "Pick time",
     "pick_time_tip": "Configure scheduled time",
     "time_out_of_range": "Time out of range",
@@ -112,7 +112,8 @@
     "no_recording_dir_tip": "No saved recording files",
     "none": "None",
     "recording_card_tip": "Click to select",
-    "use_proxy": "Use Proxy"
+    "use_proxy": "Use Proxy",
+    "no_support_open_dir": "⚠️ Web version does not support opening folder"
   },
   "settings_page": {
     "recording_settings": "Recording Settings",

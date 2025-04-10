@@ -294,7 +294,8 @@ class RecordingCardManager:
     async def recording_dir_on_click(self, recording: Recording):
         if recording.recording_dir:
             if os.path.exists(recording.recording_dir):
-                utils.open_folder(recording.recording_dir)
+                if not utils.open_folder(recording.recording_dir):
+                    await self.app.snack_bar.show_snack_bar(self._['no_support_open_dir'])
             else:
                 await self.app.snack_bar.show_snack_bar(self._["no_folder_tip"])
 

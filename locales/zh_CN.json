@@ -46,7 +46,7 @@
     "single_input": "单个录入",
     "batch_input": "批量录入",
     "live_room": "直播间",
-    "platform_not_supported_tip": "⚠\uFE0F 暂不支持该平台录制",
+    "platform_not_supported_tip": "⚠️ 暂不支持该平台录制",
     "pick_time": "选择时间",
     "pick_time_tip": "配置定时时间",
     "time_out_of_range": "选择时间超出范围",
@@ -114,7 +114,8 @@
     "no_recording_dir_tip": "该直播间暂无保存的录制文件",
     "none": "无",
     "recording_card_tip": "点击选中",
-    "use_proxy": "使用代理"
+    "use_proxy": "使用代理",
+    "no_support_open_dir": "⚠️ Web端不支持打开文件夹"
   },
   "settings_page": {
     "recording_settings": "录制设置",
