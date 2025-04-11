@@ -114,15 +114,13 @@ docker compose up
 docker compose stop
 ```
 
-3.**构建镜像**
+3.**构建镜像(可选)**
 
-Docker镜像仓库中代码版本可能不是最新的，如要运行本仓库主分支最新代码，可以本地自定义构建，通过修改 [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) 文件
+Docker仓库中的镜像的代码版本不一定是最新的，如有需要运行本仓库主分支最新代码，可以本地自定义构建
 
 ```bash
 docker build -t streamcap .
 ```
-
-构建完成后，请先将docker-compose.yml文件中的镜像名称修改为 `streamcap` 后再使用`docker compose` 运行。
 
 ## 😺已支持平台
 
@@ -136,7 +134,7 @@ TikTok、Twitch、PandTV、Soop、Twitcasting、CHZZK、Shopee、Youtube、LiveM
 
 **示例地址：**
 
-如未备注，默认都使用直播间地址录制
+如未特殊备注，默认使用直播间地址录制
 
 ```
 抖音:

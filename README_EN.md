@@ -113,15 +113,13 @@ You can use the `-d` flag to run in the background. Note that the default timezo
 docker compose stop
 ```
 
-3.**Build the Image**:
+3.**Build the Image(Optional)**:
 
-If the code in the Docker image repository is not the latest, you can build the image locally from the main branch of this repository by modifying the [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) file.
+The code version in the Docker image repository may not always be the latest. If you need to run the latest code from the main branch of this repository, you can build it locally as a custom image.
 
 ```
 docker build -t streamcap .
 ```
-
-After the build is complete, please modify the image name in the `docker-compose.yml` file to `streamcap` before running it with `docker compose`.
 
 ## 😺 Supported Platforms
 
