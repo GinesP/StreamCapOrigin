@@ -4,9 +4,11 @@
 <p align="center">
   <img alt="Python version" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
   <a href="https://github.com/ihmily/StreamCap">
-      <img alt="Supported Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-orange.svg"></a>
+      <img alt="Supported Platforms" src="https://img.shields.io/badge/Platforms-Win%20%7C%20Mac%20%7C%20Linux-6B5BFF.svg"></a>
+    <a href="https://hub.docker.com/r/ihmily/streamcap/tags">
+      <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/ihmily/streamcap?label=Docker%20Pulls&color=2496ED&logo=docker"></a>
   <a href="https://github.com/ihmily/StreamCap/releases/latest">
-      <img alt="Latest Release" src="https://img.shields.io/github/v/release/ihmily/StreamCap?color=green"></a>
+      <img alt="Latest Release" src="https://img.shields.io/github/v/release/ihmily/StreamCap"></a>
   <a href="https://github.com/ihmily/StreamCap/releases/latest">
       <img alt="Downloads" src="https://img.shields.io/github/downloads/ihmily/StreamCap/total"></a>
 </p>
@@ -16,10 +18,12 @@
 
 
 
+
 StreamCap 是一个基于FFmpeg和StreamGet的多平台直播流录制客户端，覆盖 40+ 国内外主流直播平台，支持批量录制、循环监控、定时监控和自动转码等功能。
 
 ## ✨功能特性
 
+- **多端支持**：支持Windows/MacOS/Web运行
 - **循环监控**：实时监控直播间状态，开播即录。
 - **定时任务**：根据设定时间范围检查直播间状态。
 - **多种输出格式**：支持 ts、flv、mkv、mov、mp4、mp3、m4a 等格式。
@@ -53,19 +57,72 @@ cd StreamCap
 2.**安装依赖**：
 
 ```bash
+# 桌面端
 pip install -r requirements.txt
-# 或者
-poetry install
+
+# Web端
+pip install -r requirements-web.txt
 ```
 
-3.**运行程序**：
-使用以下命令启动程序：
+3.**配置运行环境**：
+
+将.env.example示例配置文件复制一份并将文件重命名为.env
+
+```bash
+cp .env.example .env
+```
+
+4.**运行程序**：
+
+在Windows和macOS上默认以桌面程序的方式运行，使用以下命令启动程序：
 
 ```bash
 python main.py
 ```
 
+修改 `.env` 文件，将 `PLATFORM` 的值改为 `web`，即可以Web方式运行。
+
+或者，无需修改配置文件，直接使用以下命令启动
+
+```bash
+# Linux请使用web方式运行
+
+python main.py --web
+```
+
+启动成功后，通过 `http://ip:6006` 访问。
+
 如果程序提示缺少 FFmpeg，请访问 FFmpeg 官方下载页面[Download FFmpeg](https://ffmpeg.org/download.html)，下载预编译的 FFmpeg 可执行文件，并配置环境变量。
+
+## 🐋容器运行
+
+本机无需Python环境运行，在运行命令之前，请确保您的机器上安装了 [Docker](https://docs.docker.com/get-docker/) 和 [Docker Compose](https://docs.docker.com/compose/install/) 
+
+1.**快速启动**
+
+最简单方法是运行项目中的 [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) 文件，进入项目根目录后，只需简单执行以下命令(确保已经存在`.env`文件)：
+
+```bash
+docker compose up
+```
+
+可选 `-d` 在后台运行。注意容器内时区问题，默认使用的是 `Asia/Shanghai` ，如需修改可以在.env文件配置。
+
+2.**停止容器实例**
+
+```bash
+docker compose stop
+```
+
+3.**构建镜像**
+
+Docker镜像仓库中代码版本可能不是最新的，如要运行本仓库主分支最新代码，可以本地自定义构建，通过修改 [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) 文件
+
+```bash
+docker build -t streamcap .
+```
+
+构建完成后，请先将docker-compose.yml文件中的镜像名称修改为 `streamcap` 后再使用`docker compose` 运行。
 
 ## 😺已支持平台
 

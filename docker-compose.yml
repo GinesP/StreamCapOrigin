@@ -1,0 +1,25 @@
+
+services:
+  streamcap:
+    image: ihmily/streamcap
+    tty: true
+    ports:
+      - "${PORT:-6006}:${PORT:-6006}"
+    environment:
+      - PORT=${PORT:-6006}
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+      - ./downloads:/app/downloads
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:${PORT:-6006}/about"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - streamcap-network
+
+networks:
+  streamcap-network:
+    driver: bridge

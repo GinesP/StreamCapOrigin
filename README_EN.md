@@ -4,9 +4,11 @@
 <p align="center">
   <img alt="Python version" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
   <a href="https://github.com/ihmily/StreamCap">
-      <img alt="Supported Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-orange.svg"></a>
+      <img alt="Supported Platforms" src="https://img.shields.io/badge/Platforms-Win%20%7C%20Mac%20%7C%20Linux-6B5BFF.svg"></a>
+    <a href="https://hub.docker.com/r/ihmily/streamcap/tags">
+      <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/ihmily/streamcap?label=Docker%20Pulls&color=2496ED&logo=docker"></a>
   <a href="https://github.com/ihmily/StreamCap/releases/latest">
-      <img alt="Latest Release" src="https://img.shields.io/github/v/release/ihmily/StreamCap?color=green"></a>
+      <img alt="Latest Release" src="https://img.shields.io/github/v/release/ihmily/StreamCap"></a>
   <a href="https://github.com/ihmily/StreamCap/releases/latest">
       <img alt="Downloads" src="https://img.shields.io/github/downloads/ihmily/StreamCap/total"></a>
 </p>
@@ -15,10 +17,12 @@
 </div><br>
 
 
+
 StreamCap is a multi-platform live stream recording client based on FFmpeg and StreamGet. It covers over 40 mainstream live streaming platforms both domestically and internationally, and supports features such as batch recording, loop monitoring, timed monitoring, and automatic transcoding.
 
 ## ✨Features
 
+- **Multi-Platform Support**: Compatible with Windows, macOS, and Web environments.
 - **Loop Monitoring**: Real-time monitoring of live stream status. Recording starts immediately when a stream goes live.
 - **Scheduled Tasks**: Checks live stream status within a set time range.
 - **Multiple Output Formats**: Supports ts, flv, mkv, mov, mp4, mp3, m4a, and other formats.
@@ -52,20 +56,72 @@ cd StreamCap
 2.**Install Dependencies**:
 
 ```bash
+# For desktop
 pip install -r requirements.txt
-# or
-poetry install
+
+# For web
+pip install -r requirements-web.txt
 ```
 
-3.**Run the Program**:
+3.**Configure the Runtime Environment**：
 
-Use the following command to start the program:
+Copy the `.env.example` sample configuration file and rename it to `.env`
+
+```bash
+cp .env.example .env
+```
+
+4.**Run the Program**:
+
+On Windows and macOS, the program runs as a desktop application by default. Use the following command to start the program:
 
 ```bash
 python main.py
 ```
 
+To run the program in web mode, modify the `.env` file and change the value of PLATFORM to web.
+
+Alternatively, you can run the program in web mode without modifying the configuration file by using the following command:
+
+```bash
+# On Linux, please run in web mode
+
+python main.py --web
+```
+
+After successful startup, access it via `http://ip:6006`.
+
 If the program prompts that FFmpeg is missing, please visit the FFmpeg official download page [Download FFmpeg](https://ffmpeg.org/download.html) to download the precompiled FFmpeg executable files and configure the environment variables.
+
+## 🐋Docker Running
+
+No Python environment is required on your local machine. Before running the commands, ensure that you have installed [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/).
+
+1.**Quick Start**
+
+The simplest method is to run the [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) file in the project. Navigate to the project root directory and execute the following command (ensure the `.env` file exists):
+
+```bash
+docker compose up
+```
+
+You can use the `-d` flag to run in the background. Note that the default timezone in the container is `Asia/Shanghai`. If you need to change it, you can configure it in the `.env` file.
+
+2.**Stop Container Instances**:
+
+```bash
+docker compose stop
+```
+
+3.**Build the Image**:
+
+If the code in the Docker image repository is not the latest, you can build the image locally from the main branch of this repository by modifying the [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) file.
+
+```
+docker build -t streamcap .
+```
+
+After the build is complete, please modify the image name in the `docker-compose.yml` file to `streamcap` before running it with `docker compose`.
 
 ## 😺 Supported Platforms
 

@@ -87,7 +87,7 @@ def main(page: ft.Page) -> None:
     page.title = "StreamCap"
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    is_web = platform == "web"
+    is_web = args.web or platform == "web"
     setup_window(page, is_web)
 
     app = App(page)
@@ -119,6 +119,7 @@ if __name__ == "__main__":
 
     multiprocessing.freeze_support()
     if args.web or platform == "web":
+        logger.debug("Running in web mode on http://" + args.host + ":" + str(args.port))
         ft.app(
             target=main,
             view=ft.AppView.WEB_BROWSER,
@@ -127,5 +128,6 @@ if __name__ == "__main__":
             assets_dir=ASSETS_DIR,
             use_color_emoji=True,
         )
+
     else:
         ft.app(target=main, assets_dir=ASSETS_DIR)
