@@ -57,6 +57,9 @@ cd StreamCap
 2.**安装依赖**：
 
 ```bash
+# 安装核心依赖
+pip install -i https://pypi.org/simple streamget 
+
 # 桌面端
 pip install -r requirements.txt
 
@@ -80,17 +83,15 @@ cp .env.example .env
 python main.py
 ```
 
-修改 `.env` 文件，将 `PLATFORM` 的值改为 `web`，即可以Web方式运行。
+Linux请使用web方式运行，修改 `.env` 文件，将 `PLATFORM` 的值改为 `web`，即可以Web方式运行。
 
-或者，无需修改配置文件，直接使用以下命令启动
+或者无需修改配置文件，直接使用以下命令启动
 
 ```bash
-# Linux请使用web方式运行
-
 python main.py --web
 ```
 
-启动成功后，通过 `http://ip:6006` 访问。
+启动成功后，通过 `http://127.0.0.1:6006` 访问。更多配置请参考 [Web运行指南](https://github.com/ihmily/StreamCap/wiki/安装指南#web-端运行)
 
 如果程序提示缺少 FFmpeg，请访问 FFmpeg 官方下载页面[Download FFmpeg](https://ffmpeg.org/download.html)，下载预编译的 FFmpeg 可执行文件，并配置环境变量。
 
@@ -100,7 +101,7 @@ python main.py --web
 
 1.**快速启动**
 
-最简单方法是运行项目中的 [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) 文件，进入项目根目录后，只需简单执行以下命令(确保已经存在`.env`文件)：
+最简单方法是使用`docker compose`运行，进入项目根目录后，只需简单执行以下命令(确保已经存在`.env`文件)：
 
 ```bash
 docker compose up

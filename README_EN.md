@@ -56,6 +56,9 @@ cd StreamCap
 2.**Install Dependencies**:
 
 ```bash
+# Install core dependencies
+pip install -i https://pypi.org/simple streamget 
+
 # For desktop
 pip install -r requirements.txt
 
@@ -79,17 +82,15 @@ On Windows and macOS, the program runs as a desktop application by default. Use 
 python main.py
 ```
 
-To run the program in web mode, modify the `.env` file and change the value of PLATFORM to web.
+On Linux, please run in web mode. Modify the `.env` file and change the value of `PLATFORM` to `web` to run in web mode.
 
-Alternatively, you can run the program in web mode without modifying the configuration file by using the following command:
+Alternatively, you can start it without modifying the configuration file by using the following command:
 
 ```bash
-# On Linux, please run in web mode
-
 python main.py --web
 ```
 
-After successful startup, access it via `http://ip:6006`.
+After successful startup, access it via `http://127.0.0.1:6006`.For more configuration details, refer to the [Web Operation Guide](https://github.com/ihmily/StreamCap/wiki/Installation-Guide#web-operation)
 
 If the program prompts that FFmpeg is missing, please visit the FFmpeg official download page [Download FFmpeg](https://ffmpeg.org/download.html) to download the precompiled FFmpeg executable files and configure the environment variables.
 
@@ -99,7 +100,7 @@ No Python environment is required on your local machine. Before running the comm
 
 1.**Quick Start**
 
-The simplest method is to run the [docker-compose.yml](https://github.com/ihmily/StreamCap/blob/main/docker-compose.yml) file in the project. Navigate to the project root directory and execute the following command (ensure the `.env` file exists):
+The simplest method is to use `docker compose`. Navigate to the project root directory and execute the following command (ensure the `.env` file exists):
 
 ```bash
 docker compose up
