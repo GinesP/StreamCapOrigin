@@ -282,6 +282,10 @@ Faceit:
 https://www.faceit.com/zh/players/Compl1/stream
 ```
 
+## 📖文档
+
+如需完整文档和高级用法，请访问官方文档 [Wiki](https://github.com/ihmily/StreamCap/wiki/%E4%B8%BB%E9%A1%B5)
+
 ## ❤️贡献者
 
 <a href="https://github.com/ihmily/StreamCap/graphs/contributors">

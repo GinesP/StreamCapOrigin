@@ -280,6 +280,10 @@ Faceit:
 https://www.faceit.com/zh/players/Compl1/stream
 ```
 
+## 📖Documentation
+
+For full documentation and advanced usage, visit the [official documentation](https://github.com/ihmily/StreamCap/wiki).
+
 ## ❤️Contributors
 
 <a href="https://github.com/ihmily/StreamCap/graphs/contributors">
