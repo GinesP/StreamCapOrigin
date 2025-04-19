@@ -322,5 +322,8 @@
     "install_guide": "Component Installation Guide",
     "install_tip": "This program requires the following components to function properly.",
     "lack_components": "Missing Required Components"
+  },
+  "progress_overlay":{
+    "saving_recording": "Saving recording"
   }
 }

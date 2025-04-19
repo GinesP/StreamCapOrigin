@@ -91,7 +91,7 @@ def main(page: ft.Page) -> None:
     setup_window(page, is_web)
 
     app = App(page)
-    progress_overlay = ProgressOverlay()
+    progress_overlay = ProgressOverlay(app)
     page.overlay.append(progress_overlay.overlay)
 
     page.on_route_change = handle_route_change(page, app)

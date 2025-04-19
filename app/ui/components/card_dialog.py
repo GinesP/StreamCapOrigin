@@ -53,7 +53,8 @@ class CardDialog(ft.AlertDialog):
                 ft.Text(f"{self._['save_path']}: {save_path}", size=14, selectable=True),
                 ft.Text(f"{self._['recording_status']}: {recording_status_info}", size=14),
             ],
-            spacing=5,
+            spacing=8,
+            scroll=ft.ScrollMode.AUTO,
         )
         return dialog_content
 

@@ -324,5 +324,8 @@
     "install_guide": "组件安装向导",
     "install_tip": "本程序需要以下组件来完成特定功能，请保持网络连接并耐心等待安装完成。",
     "lack_components": "缺少必要组件"
+  },
+  "progress_overlay":{
+    "saving_recording": "正在保存录制文件..."
   }
 }
