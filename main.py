@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from screeninfo import get_monitors
 
 from app.app_manager import App, execute_dir
-from app.ui.components.progress_overlay import ProgressOverlay
+from app.ui.components.save_progress_overlay import SaveProgressOverlay
 from app.utils.logger import logger
 
 DEFAULT_HOST = "127.0.0.1"
@@ -57,11 +57,11 @@ def handle_route_change(page: ft.Page, app: App) -> callable:
     return route_change
 
 
-def handle_window_event(page: ft.Page, app: App, progress_overlay: 'ProgressOverlay') -> callable:
+def handle_window_event(page: ft.Page, app: App, save_progress_overlay: 'SaveProgressOverlay') -> callable:
 
     async def on_window_event(e: ft.ControlEvent) -> None:
         if e.data == "close":
-            progress_overlay.show()
+            save_progress_overlay.show()
             page.update()
             try:
                 await app.cleanup()
@@ -91,12 +91,12 @@ def main(page: ft.Page) -> None:
     setup_window(page, is_web)
 
     app = App(page)
-    progress_overlay = ProgressOverlay(app)
-    page.overlay.append(progress_overlay.overlay)
+    save_progress_overlay = SaveProgressOverlay(app)
+    page.overlay.append(save_progress_overlay.overlay)
 
     page.on_route_change = handle_route_change(page, app)
     page.window.prevent_close = True
-    page.window.on_event = handle_window_event(page, app, progress_overlay)
+    page.window.on_event = handle_window_event(page, app, save_progress_overlay)
 
     if is_web:
         page.on_disconnect = handle_disconnect(page)
