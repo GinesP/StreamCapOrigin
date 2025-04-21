@@ -25,7 +25,8 @@
     "delete_recording_success_tip": "Tip: Live room deleted successfully",
     "stop_recording_success_tip": "Tip: Live stream room monitoring has been stopped successfully!",
     "start_recording_success_tip": "Tip: Live stream room monitoring has started successfully!",
-    "not_search_result": "Tip: No results were found in the search"
+    "not_search_result": "Tip: No results were found in the search",
+    "toggle_view": "Toggle View"
   },
   "recording_dialog": {
     "input_live_link": "Enter Live Room URL",

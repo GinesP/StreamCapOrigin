@@ -77,7 +77,7 @@ class RecordingCardManager:
             display_title = recording.title
         else:
             display_title = f"[{self._['monitor_stopped']}] {recording.title}"
-        display_title_label = ft.Text(display_title, size=14, selectable=True)
+        display_title_label = ft.Text(display_title, size=14, selectable=True, max_lines=1, no_wrap=True)
         open_folder_button = ft.IconButton(
             icon=ft.Icons.FOLDER,
             tooltip=self._["open_folder"],
@@ -109,11 +109,13 @@ class RecordingCardManager:
                 ],
                 spacing=5,
                 tight=True,
+
             ),
             padding=10,
             on_click=partial(self.recording_card_on_click, recording=recording),
             bgcolor=None,
             border_radius=5,
+
         )
         card = ft.Card(key=str(recording.rec_id), content=card_container)
 

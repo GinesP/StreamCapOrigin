@@ -26,7 +26,8 @@
     "delete_recording_success_tip": "提示：直播间删除成功！",
     "stop_recording_success_tip": "提示：直播间停止监控成功！",
     "start_recording_success_tip": "提示：直播间开始监控成功！",
-    "not_search_result": "提示：未搜索到任何结果"
+    "not_search_result": "提示：未搜索到任何结果",
+    "toggle_view": "切换视图"
   },
   "recording_dialog": {
     "input_live_link": "输入直播间地址",

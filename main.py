@@ -13,6 +13,7 @@ from app.utils.logger import logger
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 6006
 WINDOW_SCALE = 0.65
+MIN_WIDTH = 950
 ASSETS_DIR = "assets"
 
 
@@ -69,7 +70,6 @@ def handle_window_event(page: ft.Page, app: App, save_progress_overlay: 'SavePro
                 logger.error(f"Cleanup failed: {ex}")
             finally:
                 page.window.destroy()
-
     return on_window_event
 
 
@@ -86,6 +86,8 @@ def main(page: ft.Page) -> None:
 
     page.title = "StreamCap"
     page.theme_mode = ft.ThemeMode.LIGHT
+    page.window.min_width = MIN_WIDTH
+    page.window.min_height = MIN_WIDTH * WINDOW_SCALE
 
     is_web = args.web or platform == "web"
     setup_window(page, is_web)

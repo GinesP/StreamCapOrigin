@@ -16,6 +16,7 @@ class HomePage(PageBase):
         self.page_name = "home"
         self.recording_card_area = None
         self.add_recording_dialog = None
+        self.is_grid_view = False
         self.app.language_manager.add_observer(self)
         self.load_language()
         self.init()
@@ -26,7 +27,10 @@ class HomePage(PageBase):
             self._.update(language.get(key, {}))
 
     def init(self):
-        self.recording_card_area = ft.Column(controls=[], spacing=10, expand=True)
+        self.recording_card_area = ft.Container(
+            content=ft.Column(controls=[], spacing=10, expand=True),
+            expand=True
+        )
         self.add_recording_dialog = RecordingDialog(self.app, self.add_recording)
         self.pubsub_subscribe()
 
@@ -37,16 +41,51 @@ class HomePage(PageBase):
         await self.add_record_cards()
         self.page.run_task(self.show_all_cards)
         self.page.on_keyboard_event = self.on_keyboard
+        self.page.on_resized = self.update_grid_layout
 
     def pubsub_subscribe(self):
         self.app.page.pubsub.subscribe_topic('add', self.subscribe_add_cards)
         self.app.page.pubsub.subscribe_topic('delete_all', self.subscribe_del_all_cards)
+
+    async def toggle_view_mode(self, _):
+        self.is_grid_view = not self.is_grid_view
+        current_content = self.recording_card_area.content
+        current_controls = current_content.controls if hasattr(current_content, 'controls') else []
+
+        column_width = 350
+        runs_count = max(1, int(self.page.width / column_width))
+
+        if self.is_grid_view:
+            new_content = ft.GridView(
+                expand=True,
+                runs_count=runs_count,
+                spacing=10,
+                run_spacing=10,
+                child_aspect_ratio=2.2,
+                controls=current_controls
+            )
+        else:
+            new_content = ft.Column(
+                controls=current_controls,
+                spacing=10,
+                expand=True
+            )
+
+        self.recording_card_area.content = new_content
+        self.content_area.clean()
+        self.content_area.controls.extend([self.create_home_title_area(), self.create_home_content_area()])
+        self.content_area.update()
 
     def create_home_title_area(self):
         return ft.Row(
             [
                 ft.Text(self._["recording_list"], theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
                 ft.Container(expand=True),
+                ft.IconButton(
+                    icon=ft.Icons.GRID_VIEW if self.is_grid_view else ft.Icons.LIST,
+                    tooltip=self._["toggle_view"],
+                    on_click=self.toggle_view_mode
+                ),
                 ft.IconButton(icon=ft.Icons.SEARCH, tooltip=self._["search"], on_click=self.search_on_click),
                 ft.IconButton(icon=ft.Icons.ADD, tooltip=self._["add_record"], on_click=self.add_recording_on_click),
                 ft.IconButton(icon=ft.Icons.REFRESH, tooltip=self._["refresh"], on_click=self.refresh_cards_on_click),
@@ -96,11 +135,7 @@ class HomePage(PageBase):
             expand=True,
             controls=[
                 ft.Divider(height=1),
-                ft.Container(
-                    content=self.recording_card_area,
-                    alignment=ft.alignment.top_left,
-                    expand=True,
-                ),
+                self.recording_card_area,
             ],
             scroll=ft.ScrollMode.AUTO,
         )
@@ -108,7 +143,8 @@ class HomePage(PageBase):
     async def add_record_card(self, recording, update=True):
         if recording.rec_id not in self.app.record_card_manager.cards_obj:
             card = await self.app.record_card_manager.create_card(recording)
-            self.recording_card_area.controls.append(card)
+            current_content = self.recording_card_area.content
+            current_content.controls.append(card)
             self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
 
             recording.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
@@ -256,6 +292,21 @@ class HomePage(PageBase):
 
     async def subscribe_add_cards(self, _, recording):
         await self.add_record_card(recording, True)
+
+    async def update_grid_layout(self, _):
+        self.page.run_task(self.recalculate_grid_columns)
+
+    async def recalculate_grid_columns(self):
+        if not self.is_grid_view:
+            return
+
+        column_width = 350
+        runs_count = max(1, int(self.page.width / column_width))
+
+        if isinstance(self.recording_card_area.content, ft.GridView):
+            grid_view = self.recording_card_area.content
+            grid_view.runs_count = runs_count
+            grid_view.update()
 
     async def on_keyboard(self, e: ft.KeyboardEvent):
         if e.alt and e.key == "H":
