@@ -8,6 +8,7 @@ class FLVCommandBuilder(FFmpegCommandBuilder):
             "-map", "0",
             "-c:v", "copy",
             "-c:a", "copy",
+            "-bsf:a", "aac_adtstoasc",
             "-f", "flv",
             self.full_path,
         ]
