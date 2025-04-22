@@ -81,6 +81,7 @@ class LiveStreamRecorder:
 
         now = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
         output_dir = self.output_dir.rstrip("/").rstrip("\\")
+        output_dir = os.path.join(output_dir, stream_info.platform)
         if self.user_config.get("folder_name_author"):
             output_dir = os.path.join(output_dir, stream_info.anchor_name)
         if self.user_config.get("folder_name_time"):
@@ -100,7 +101,7 @@ class LiveStreamRecorder:
         suffix = self.save_format
         suffix = "_%03d." + suffix if self.segment_record and self.save_format != "flv" else "." + suffix
         save_file_path = os.path.join(self.output_dir, filename + suffix).replace(" ", "_")
-        return save_file_path
+        return save_file_path.replace("\\", "/")
 
     @staticmethod
     def _clean_and_truncate_title(title: str) -> str | None:
@@ -129,7 +130,7 @@ class LiveStreamRecorder:
             platform=self.platform,
             username=self.account_config.get(self.platform_key, {}).get("username"),
             password=self.account_config.get(self.platform_key, {}).get("password"),
-            account_type=self.account_config.get(self.platform_key, {}).get("account_type"),
+            account_type=self.account_config.get(self.platform_key, {}).get("account_type")
         )
         stream_info = await handler.get_stream_info(self.live_url)
         self.recording.is_checking = False
@@ -165,7 +166,7 @@ class LiveStreamRecorder:
             stream_info.record_url,
             ffmpeg_command,
             self.save_format,
-            self.user_config.get("custom_script_command"),
+            self.user_config.get("custom_script_command")
         )
 
     async def start_ffmpeg(
@@ -175,7 +176,7 @@ class LiveStreamRecorder:
         record_url: str,
         ffmpeg_command: list,
         save_type: str,
-        script_command: str | None = None,
+        script_command: str | None = None
     ) -> bool:
         """
         The child process executes ffmpeg for recording
@@ -189,7 +190,7 @@ class LiveStreamRecorder:
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                startupinfo=self.subprocess_start_info,
+                startupinfo=self.subprocess_start_info
             )
 
             self.app.add_ffmpeg_process(process)
@@ -279,7 +280,7 @@ class LiveStreamRecorder:
                         save_file_path,
                         save_type,
                         self.segment_record,
-                        self.user_config.get("convert_to_mp4"),
+                        self.user_config.get("convert_to_mp4")
                     )
                     logger.success("Successfully added script execution")
 
@@ -293,6 +294,7 @@ class LiveStreamRecorder:
         converts_success = False
         save_path = None
         try:
+            converts_file_path = converts_file_path.replace("\\", "/")
             if os.path.exists(converts_file_path) and os.path.getsize(converts_file_path) > 0:
                 save_path = converts_file_path.rsplit(".", maxsplit=1)[0] + ".mp4"
                 _output = subprocess.check_output(
@@ -302,7 +304,7 @@ class LiveStreamRecorder:
                         "-c:v", "copy",
                         "-c:a", "copy",
                         "-f", "mp4",
-                        save_path,
+                        save_path
                     ],
                     stderr=subprocess.STDOUT,
                     startupinfo=self.subprocess_start_info,
@@ -339,14 +341,14 @@ class LiveStreamRecorder:
         save_file_path: str,
         save_type: str,
         split_video_by_time: bool,
-        converts_to_mp4: bool,
+        converts_to_mp4: bool
     ):
         if "python" in script_command:
             params = [
                 f'--record_name "{record_name}"',
                 f'--save_file_path "{save_file_path}"',
                 f"--save_type {save_type}--split_video_by_time {split_video_by_time}",
-                f"--converts_to_mp4 {converts_to_mp4}",
+                f"--converts_to_mp4 {converts_to_mp4}"
             ]
         else:
             params = [
@@ -354,7 +356,7 @@ class LiveStreamRecorder:
                 f'"{save_file_path}"',
                 save_type,
                 f"split_video_by_time: {split_video_by_time}",
-                f"converts_to_mp4: {converts_to_mp4}",
+                f"converts_to_mp4: {converts_to_mp4}"
             ]
         script_command = script_command.strip() + " " + " ".join(params)
         self.app.page.run_task(self.run_script_async, script_command)
@@ -401,6 +403,6 @@ class LiveStreamRecorder:
             "qiandurebo": "referer:https://qiandurebo.com",
             "17live": "referer:https://17.live/en/live/6302408",
             "lang": "referer:https://www.lang.live",
-            "shopee": "origin:" + live_domain,
+            "shopee": "origin:" + live_domain
         }
         return record_headers.get(platform_key)
