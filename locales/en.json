@@ -131,6 +131,7 @@
     "blank_for_default_path": "Leave blank for default path",
     "remove_emojis": "Remove Emoji Symbols",
     "name_rules": "File/folder name rules",
+    "platform": "platform",
     "author": "author",
     "time": "time",
     "title": "title",

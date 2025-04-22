@@ -3,6 +3,7 @@
     "live_save_path": "",
     "filename_includes_title": false,
     "remove_emojis": false,
+    "folder_name_platform": true,
     "folder_name_author": true,
     "folder_name_time": false,
     "folder_name_title": false,

@@ -81,7 +81,8 @@ class LiveStreamRecorder:
 
         now = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
         output_dir = self.output_dir.rstrip("/").rstrip("\\")
-        output_dir = os.path.join(output_dir, stream_info.platform)
+        if self.user_config.get("folder_name_platform"):
+            output_dir = os.path.join(output_dir, stream_info.platform)
         if self.user_config.get("folder_name_author"):
             output_dir = os.path.join(output_dir, stream_info.anchor_name)
         if self.user_config.get("folder_name_time"):

@@ -133,6 +133,7 @@
     "blank_for_default_path": "不填则默认",
     "remove_emojis": "去除emoji符号",
     "name_rules": "文件(夹)命名规则",
+    "platform": "平台",
     "author": "作者",
     "time": "时间",
     "title": "标题",
