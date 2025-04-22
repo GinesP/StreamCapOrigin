@@ -109,11 +109,12 @@ class HomePage(PageBase):
     async def filter_recordings(self, query):
         recordings = self.app.record_manager.recordings
         cards_obj = self.app.record_card_manager.cards_obj
-        new_ids = {}
 
         if not query.strip():
             for card in cards_obj.values():
                 card["card"].visible = True
+                card["card"].update()
+            return {}
         else:
             lower_query = query.strip().lower()
             new_ids = {
@@ -124,11 +125,12 @@ class HomePage(PageBase):
 
             for card_info in cards_obj.values():
                 card_info["card"].visible = card_info["card"].key in new_ids
-        self.recording_card_area.update()
 
-        if not new_ids:
-            await self.app.snack_bar.show_snack_bar(self._["not_search_result"], duration=2000)
-        return new_ids
+            self.recording_card_area.update()
+
+            if not new_ids:
+                await self.app.snack_bar.show_snack_bar(self._["not_search_result"], duration=2000)
+            return new_ids
 
     def create_home_content_area(self):
         return ft.Column(
