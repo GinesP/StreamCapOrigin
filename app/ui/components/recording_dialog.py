@@ -188,8 +188,8 @@ class RecordingDialog:
         batch_input = ft.TextField(
             label=self._["batch_input_tip"],
             multiline=True,
-            min_lines=10,
-            max_lines=15,
+            min_lines=15,
+            max_lines=20,
             border_radius=5,
             filled=False,
             visible=True,
@@ -205,6 +205,7 @@ class RecordingDialog:
         tabs = ft.Tabs(
             selected_index=0,
             animation_duration=300,
+            height=500,
             tabs=[
                 ft.Tab(
                     text=self._["single_input"],
@@ -344,7 +345,7 @@ class RecordingDialog:
                     close_button,
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                width=500,
+                width=500
             ),
             content=tabs,
             actions=[
@@ -352,7 +353,7 @@ class RecordingDialog:
                 ft.TextButton(text=self._["sure"], on_click=on_confirm, disabled=self.recording is None),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-            shape=ft.RoundedRectangleBorder(radius=10),
+            shape=ft.RoundedRectangleBorder(radius=10)
         )
 
         self.page.overlay.append(dialog)

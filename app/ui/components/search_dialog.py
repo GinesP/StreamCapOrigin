@@ -36,7 +36,10 @@ class SearchDialog(ft.AlertDialog):
             ),
         ]
         self.content = ft.Column(
-            [self.query, ft.Divider(height=1, thickness=1, color=ft.Colors.GREY_300)], tight=True, width=400
+            [self.query, ft.Divider(height=1, thickness=1, color=ft.Colors.GREY_300)],
+            tight=True,
+            width=400,
+            height=300
         )
         self.actions_alignment = ft.MainAxisAlignment.END
         self.on_close = on_close
