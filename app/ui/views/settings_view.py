@@ -888,6 +888,12 @@ class SettingsPage(PageBase):
             [
                 ft.Text(label, width=200, text_align=ft.TextAlign.RIGHT),
                 ft.Checkbox(
+                    label=self._["platform"],
+                    value=self.get_config_value("folder_name_platform"),
+                    on_change=self.on_change,
+                    data="folder_name_platform",
+                ),
+                ft.Checkbox(
                     label=self._["author"],
                     value=self.get_config_value("folder_name_author"),
                     on_change=self.on_change,
