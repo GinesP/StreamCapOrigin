@@ -16,7 +16,7 @@ class RecordingCardManager:
         self.app = app
         self.cards_obj = {}
         self.update_duration_tasks = {}
-        self.is_card_selected = {}
+        self.selected_cards = {}
         self.app.language_manager.add_observer(self)
         self._ = {}
         self.load()
@@ -290,6 +290,7 @@ class RecordingCardManager:
     async def on_card_click(self, recording: Recording):
         """Handle card click events."""
         recording.selected = not recording.selected
+        self.selected_cards[recording.rec_id] = recording
         self.cards_obj[recording.rec_id]["card"].content.bgcolor = await self.update_record_hover(recording)
         self.cards_obj[recording.rec_id]["card"].update()
 

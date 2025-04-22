@@ -224,10 +224,21 @@ class HomePage(PageBase):
     async def refresh_cards_on_click(self, _e):
         cards_obj = self.app.record_card_manager.cards_obj
         recordings = self.app.record_manager.recordings
+        selected_cards = self.app.record_card_manager.selected_cards
         new_ids = {rec.rec_id for rec in recordings}
-        to_remove = [card for card_id, card in cards_obj.items() if card_id not in new_ids]
+        to_remove = []
+        for card_id, card in cards_obj.items():
+            if card_id not in new_ids:
+                to_remove.append(card)
+                continue
+            if card_id in selected_cards:
+                selected_cards[card_id].selected = False
+                card["card"].content.bgcolor = None
+                card["card"].update()
+
         for card in to_remove:
-            del cards_obj[card["card"].key]
+            card_key = card["card"].key
+            cards_obj.pop(card_key, None)
             self.recording_card_area.controls.remove(card["card"])
         await self.show_all_cards()
         await self.app.snack_bar.show_snack_bar(self._["refresh_success_tip"], bgcolor=ft.Colors.GREEN)
