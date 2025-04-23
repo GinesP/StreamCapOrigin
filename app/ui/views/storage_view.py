@@ -37,7 +37,7 @@ class StoragePage(BasePage):
         self.path_display.value = self._["current_path"] + ":" + self.current_path
         self.file_list.controls.clear()
 
-        if not os.path.exists(self.current_path):
+        if not os.path.exists(self.current_path) or not os.listdir(self.current_path):
             self.file_list.controls.append(
                 ft.Card(
                     content=ft.Container(
