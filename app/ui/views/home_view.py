@@ -61,7 +61,7 @@ class HomePage(PageBase):
                 runs_count=runs_count,
                 spacing=10,
                 run_spacing=10,
-                child_aspect_ratio=2.2,
+                child_aspect_ratio=2.3,
                 controls=current_controls
             )
         else:

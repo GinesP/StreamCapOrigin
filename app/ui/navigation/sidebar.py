@@ -178,6 +178,13 @@ class NavigationSidebar:
                 name="settings",
                 selected_icon=ft.Icons.SETTINGS,
             ),
-            ControlGroup(icon=ft.Icons.INFO, label=self._["about"], index=2, name="about", selected_icon=ft.Icons.INFO),
+            ControlGroup(
+                icon=ft.Icons.DRIVE_FILE_MOVE,
+                label=self._["storage"],
+                index=2,
+                name="storage",
+                selected_icon=ft.Icons.DRIVE_FILE_MOVE_OUTLINE
+            ),
+            ControlGroup(icon=ft.Icons.INFO, label=self._["about"], index=3, name="about", selected_icon=ft.Icons.INFO),
         ]
         self.selected_control_group = self.control_groups[0]

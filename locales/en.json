@@ -332,5 +332,15 @@
   },
   "progress_overlay":{
     "saving_recording": "Saving recording"
+  },
+  "storage_page": {
+    "storage_path": "Storage Path",
+    "current_path": "Current Path",
+    "empty_recording_folder": "Empty Recording Folder",
+    "go_back": "Go Back",
+    "previewing": "Previewing",
+    "unsupported_file_type": "Unsupported file type",
+    "no_video_file":"⚠️ No video file found",
+    "no_recording_folder":"⚠️ No recording folder found"
   }
 }

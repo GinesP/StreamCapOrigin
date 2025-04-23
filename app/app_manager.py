@@ -13,6 +13,7 @@ from .ui.navigation.sidebar import LeftNavigationMenu, NavigationSidebar
 from .ui.views.about_view import AboutPage
 from .ui.views.home_view import HomePage
 from .ui.views.settings_view import SettingsPage
+from .ui.views.storage_view import StoragePage
 from .utils import utils
 
 
@@ -68,6 +69,7 @@ class App:
         return {
             "settings": self.settings,
             "home": HomePage(self),
+            "storage": StoragePage(self),
             "about": AboutPage(self),
         }
 

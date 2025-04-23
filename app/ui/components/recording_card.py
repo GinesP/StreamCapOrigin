@@ -1,12 +1,14 @@
 import asyncio
 import os.path
 from functools import partial
+from pathlib import Path
 
 import flet as ft
 
 from ...models.recording_model import Recording
 from ...models.recording_status_model import RecordingStatus
 from ...utils import utils
+from ..views.storage_view import StoragePage
 from .card_dialog import CardDialog
 from .recording_dialog import RecordingDialog
 
@@ -24,7 +26,7 @@ class RecordingCardManager:
 
     def load(self):
         language = self.app.language_manager.language
-        for key in ("recording_card", "recording_manager", "base", "home_page", "video_quality"):
+        for key in ("recording_card", "recording_manager", "base", "home_page", "video_quality", "storage_page"):
             self._.update(language.get(key, {}))
 
     def pubsub_subscribe(self):
@@ -59,6 +61,12 @@ class RecordingCardManager:
             icon=ft.Icons.EDIT,
             tooltip=self._["edit_record_config"],
             on_click=partial(self.edit_recording_button_click, recording=recording),
+        )
+
+        preview_button = ft.IconButton(
+            icon=ft.Icons.VIDEO_LIBRARY,
+            tooltip=self._["preview_video"],
+            on_click=partial(self.preview_video_button_on_click, recording=recording),
         )
 
         monitor_button = ft.IconButton(
@@ -101,15 +109,16 @@ class RecordingCardManager:
                             record_button,
                             open_folder_button,
                             recording_info_button,
-                            delete_button,
+                            preview_button,
                             edit_button,
-                            monitor_button,
-                        ]
+                            delete_button,
+                            monitor_button
+                        ],
+                        spacing=5
                     ),
                 ],
                 spacing=5,
-                tight=True,
-
+                tight=True
             ),
             padding=10,
             on_click=partial(self.recording_card_on_click, recording=recording),
@@ -298,9 +307,9 @@ class RecordingCardManager:
         if recording.recording_dir:
             if os.path.exists(recording.recording_dir):
                 if not utils.open_folder(recording.recording_dir):
-                    await self.app.snack_bar.show_snack_bar(self._['no_support_open_dir'])
+                    await self.app.snack_bar.show_snack_bar(self._['no_video_file'])
             else:
-                await self.app.snack_bar.show_snack_bar(self._["no_folder_tip"])
+                await self.app.snack_bar.show_snack_bar(self._["no_recording_folder"])
 
     async def edit_recording_button_click(self, _, recording: Recording):
         """Handle edit button click by showing the edit dialog with existing recording info."""
@@ -337,6 +346,24 @@ class RecordingCardManager:
         delete_alert_dialog.open = True
         self.app.dialog_area.content = delete_alert_dialog
         self.app.page.update()
+
+    async def preview_video_button_on_click(self, _, recording: Recording):
+        if recording.recording_dir and os.path.exists(recording.recording_dir):
+            video_files = []
+            for root, _, files in os.walk(recording.recording_dir):
+                for file in files:
+                    format_list = ['.mp4', '.mov', '.mkv', '.ts', '.flv', '.mp3', '.m4a', '.wav', '.aac', '.wma']
+                    if Path(file).suffix.lower() in format_list:
+                        video_files.append(os.path.join(root, file))
+
+            if video_files:
+                video_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+                latest_video = video_files[0]
+                await StoragePage(self.app).preview_file(latest_video)
+            else:
+                await self.app.snack_bar.show_snack_bar(self._["no_video_file"])
+        else:
+            await self.app.snack_bar.show_snack_bar(self._["no_recording_folder"])
 
     async def recording_button_on_click(self, _, recording: Recording):
         await self.on_toggle_recording(recording)
