@@ -1,26 +1,28 @@
-from .base import FFmpegCommandBuilder
+from ..base import FFmpegCommandBuilder
 
 
-class TSCommandBuilder(FFmpegCommandBuilder):
+class AACCommandBuilder(FFmpegCommandBuilder):
     def build_command(self) -> list[str]:
         command = self._get_basic_ffmpeg_command()
+
         if self.segment_record:
             additional_commands = [
-                "-c:v", "copy",
-                "-c:a", "copy",
-                "-map", "0",
-                "-f", "segment",
+                "-c:a", "aac",
+                "-ar", "44100",
+                "-ac", "2",
+                "-map", "0:a",
+                "-f", "adts",
                 "-segment_time", str(self.segment_time),
-                "-segment_format", "mpegts",
                 "-reset_timestamps", "1",
                 self.full_path,
             ]
         else:
             additional_commands = [
-                "-c:v", "copy",
-                "-c:a", "copy",
-                "-map", "0",
-                "-f", "mpegts",
+                "-map", "0:a",
+                "-c:a", "aac",
+                "-ar", "44100",
+                "-ac", "2",
+                "-f", "ipod",
                 self.full_path,
             ]
 

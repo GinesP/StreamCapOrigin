@@ -2,6 +2,7 @@
   "sidebar": {
     "home": "Home",
     "settings": "Settings",
+    "storage": "Storage",
     "about": "About",
     "light_theme": "Light theme",
     "dark_theme": "Dark theme",
@@ -26,7 +27,8 @@
     "stop_recording_success_tip": "Tip: Live stream room monitoring has been stopped successfully!",
     "start_recording_success_tip": "Tip: Live stream room monitoring has started successfully!",
     "not_search_result": "Tip: No results were found in the search",
-    "toggle_view": "Toggle View"
+    "toggle_view": "Toggle View",
+    "preview_video": "Preview Video"
   },
   "recording_dialog": {
     "input_live_link": "Enter Live Room URL",
@@ -52,7 +54,10 @@
     "time_out_of_range": "Time out of range",
     "pick_time_slot": "Pick your time slot",
     "hour_label_text": "Hour",
-    "minute_label_text": "Minute"
+    "minute_label_text": "Minute",
+    "select_media_type": "Select Media Type",
+    "video": "Video",
+    "audio": "Audio"
   },
   "search_dialog": {
     "search_keyword": "Enter search keyword"

@@ -1,12 +1,7 @@
 from typing import Any
 
-from .flv import FLVCommandBuilder
-from .m4a import M4ACommandBuilder
-from .mkv import MKVCommandBuilder
-from .mov import MOVCommandBuilder
-from .mp3 import MP3CommandBuilder
-from .mp4 import MP4CommandBuilder
-from .ts import TSCommandBuilder
+from .video import MP4CommandBuilder, TSCommandBuilder, FLVCommandBuilder, MKVCommandBuilder, MOVCommandBuilder
+from .audio import WAVCommandBuilder, MP3CommandBuilder, M4ACommandBuilder, WMACommandBuilder, AACCommandBuilder
 
 
 def create_builder(format_type: str, *args: Any, **kwargs: Any) -> Any:
@@ -27,6 +22,9 @@ def create_builder(format_type: str, *args: Any, **kwargs: Any) -> Any:
         "mov": MOVCommandBuilder,
         "mp3": MP3CommandBuilder,
         "m4a": M4ACommandBuilder,
+        "wav": WAVCommandBuilder,
+        "aac": AACCommandBuilder,
+        "wma": WMACommandBuilder,
     }
     builder_class = format_to_class.get(format_type.lower())
     if not builder_class:

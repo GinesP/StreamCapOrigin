@@ -4,8 +4,6 @@ class VideoFormat:
     FLV = "FLV"
     MKV = "MKV"
     MOV = "MOV"
-    MP3 = "MP3"
-    M4A = "M4A"
 
     @classmethod
     def get_formats(cls):

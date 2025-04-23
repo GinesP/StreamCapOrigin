@@ -2,6 +2,7 @@
   "sidebar": {
     "home": "主界面",
     "settings": "设置",
+    "storage": "存储",
     "about": "说明",
     "light_theme": "白天模式",
     "dark_theme": "黑夜模式",
@@ -27,7 +28,8 @@
     "stop_recording_success_tip": "提示：直播间停止监控成功！",
     "start_recording_success_tip": "提示：直播间开始监控成功！",
     "not_search_result": "提示：未搜索到任何结果",
-    "toggle_view": "切换视图"
+    "toggle_view": "切换视图",
+    "preview_video": "预览视频"
   },
   "recording_dialog": {
     "input_live_link": "输入直播间地址",
@@ -35,7 +37,7 @@
     "select_resolution": "选择录制清晰度",
     "input_anchor_name": "输入主播名称",
     "default_input": "可默认不填",
-    "select_record_format": "选择录制格式-默认ts",
+    "select_record_format": "选择录制格式-默认TS",
     "input_save_path": "输入录制保存路径",
     "is_segment_enabled": "分段录制是否开启",
     "segment_record_time": "录制分段时间",
@@ -53,7 +55,10 @@
     "time_out_of_range": "选择时间超出范围",
     "pick_time_slot": "选择您的时间段",
     "hour_label_text": "时",
-    "minute_label_text": "分"
+    "minute_label_text": "分",
+    "select_media_type": "选择媒体类型",
+    "video": "视频",
+    "audio": "音频"
   },
   "search_dialog": {
     "search_keyword": "输入搜索关键词"

@@ -1,4 +1,4 @@
-from .base import FFmpegCommandBuilder
+from ..base import FFmpegCommandBuilder
 
 
 class MOVCommandBuilder(FFmpegCommandBuilder):

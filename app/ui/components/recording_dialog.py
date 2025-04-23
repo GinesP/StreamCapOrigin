@@ -1,6 +1,7 @@
 import flet as ft
 
 from ...core.platform_handlers import get_platform_info
+from ...models.audio_format_model import AudioFormat
 from ...models.video_format_model import VideoFormat
 from ...models.video_quality_model import VideoQuality
 from ...utils import utils
@@ -32,6 +33,14 @@ class RecordingDialog:
             dialog.actions[1].disabled = not is_active
             self.page.update()
 
+        async def update_format_options(e):
+            if e.control.value == "video":
+                record_format_field.options = [ft.dropdown.Option(i) for i in VideoFormat.get_formats()]
+            else:
+                record_format_field.options = [ft.dropdown.Option(i) for i in AudioFormat.get_formats()]
+            record_format_field.value = record_format_field.options[0].key
+            record_format_field.update()
+
         url_field = ft.TextField(
             label=self._["input_live_link"],
             hint_text=self._["example"] + "：https://www.example.com/xxxxxx",
@@ -55,14 +64,27 @@ class RecordingDialog:
             filled=False,
             value=initial_values.get("streamer_name", ""),
         )
+        media_type_dropdown = ft.Dropdown(
+            label=self._["select_media_type"],
+            options=[
+                ft.dropdown.Option("video", text=self._["video"]),
+                ft.dropdown.Option("audio", text=self._["audio"])
+            ],
+            width=245,
+            value="video",
+            on_change=update_format_options
+        )
         record_format_field = ft.Dropdown(
             label=self._["select_record_format"],
             options=[ft.dropdown.Option(i) for i in VideoFormat.get_formats()],
             border_radius=5,
             filled=False,
             value=initial_values.get("record_format", VideoFormat.TS),
-            width=500,
+            width=245,
+            menu_height=200
         )
+
+        format_row = ft.Row([media_type_dropdown, record_format_field], expand=True)
 
         recording_dir_field = ft.TextField(
             label=self._["input_save_path"],
@@ -215,7 +237,8 @@ class RecordingDialog:
                                 ft.Container(margin=ft.margin.only(top=10)),
                                 url_field,
                                 streamer_name_field,
-                                record_format_field,
+                                # record_format_field,
+                                format_row,
                                 quality_dropdown,
                                 recording_dir_field,
                                 segment_setting_dropdown,
