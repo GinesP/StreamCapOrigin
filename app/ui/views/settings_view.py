@@ -1,6 +1,5 @@
 import asyncio
 import os
-import sys
 
 import flet as ft
 
