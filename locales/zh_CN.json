@@ -341,7 +341,7 @@
     "empty_recording_folder": "录制文件夹为空，暂无录制的直播视频",
     "go_back": "返回上一级",
     "previewing": "正在预览",
-    "unsupported_file_type": "不支持的文件类型",
+    "unsupported_file_type":"⚠️ 不支持的文件类型",
     "no_video_file":"⚠️ 未找到视频文件",
     "no_recording_folder":"⚠️ 录制目录不存在",
     "copy_stream_url": "复制直播源地址",
@@ -353,6 +353,7 @@
     "open_live_room_page": "打开直播间页面",
     "stream_source": "直播源",
     "previewing":"正在预览",
-    "view_stream_source_now": "正在访问直播源"
+    "view_stream_source_now": "正在访问直播源",
+    "unsupported_play_on_web": "⚠️ Web端只支持预览MP4文件"
   }
 }

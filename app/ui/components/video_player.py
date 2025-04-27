@@ -96,6 +96,9 @@ class VideoPlayer:
             sub_folder = params.get('subfolder', [''])[0]
             if filename:
                 title = self._["previewing"] + ": " + (f"{sub_folder}/{filename}" if sub_folder else filename)
+                if Path(filename).suffix.lower() != ".mp4":
+                    await self.app.snack_bar.show_snack_bar(self._["unsupported_play_on_web"])
+                    return
             else:
                 title = self._["view_stream_source_now"]
         await self.create_video_dialog(title, source, is_file_path, room_url)
