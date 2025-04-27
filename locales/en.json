@@ -341,6 +341,16 @@
     "previewing": "Previewing",
     "unsupported_file_type": "Unsupported file type",
     "no_video_file":"⚠️ No video file found",
-    "no_recording_folder":"⚠️ No recording folder found"
+    "no_recording_folder":"⚠️ No recording folder found",
+    "copy_stream_url": "Copy Stream URL",
+    "copy_video_url": "Copy Video URL",
+    "copy_success": "Copy Success",
+    "video_api_server_not_set": "⚠️ Video play server address not set"
+  },
+  "video_player": {
+    "open_live_room_page": "Open Live Room Page",
+    "stream_source": "Stream Source",
+    "previewing": "Previewing",
+    "view_stream_source_now": "Accessing live stream source"
   }
 }

@@ -196,6 +196,7 @@ class LiveStreamRecorder:
 
             self.app.add_ffmpeg_process(process)
             self.recording.status_info = RecordingStatus.RECORDING
+            self.recording.record_url = record_url
             logger.info(f"Recording in Progress: {live_url}")
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
             while True:
@@ -288,6 +289,8 @@ class LiveStreamRecorder:
         except Exception as e:
             logger.error(f"An error occurred during the subprocess execution: {e}")
             return False
+        finally:
+            self.recording.record_url = None
 
         return True
 

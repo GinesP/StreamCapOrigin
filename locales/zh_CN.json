@@ -343,6 +343,16 @@
     "previewing": "正在预览",
     "unsupported_file_type": "不支持的文件类型",
     "no_video_file":"⚠️ 未找到视频文件",
-    "no_recording_folder":"⚠️ 录制目录不存在"
+    "no_recording_folder":"⚠️ 录制目录不存在",
+    "copy_stream_url": "复制直播源地址",
+    "copy_video_url": "复制视频地址",
+    "copy_success": "复制成功",
+    "video_api_server_not_set": "⚠️ 未设置视频播放服务器地址"
+  },
+  "video_player": {
+    "open_live_room_page": "打开直播间页面",
+    "stream_source": "直播源",
+    "previewing":"正在预览",
+    "view_stream_source_now": "正在访问直播源"
   }
 }

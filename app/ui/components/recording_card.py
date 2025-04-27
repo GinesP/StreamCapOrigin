@@ -1,7 +1,6 @@
 import asyncio
 import os.path
 from functools import partial
-from pathlib import Path
 
 import flet as ft
 
@@ -11,6 +10,7 @@ from ...utils import utils
 from ..views.storage_view import StoragePage
 from .card_dialog import CardDialog
 from .recording_dialog import RecordingDialog
+from .video_player import VideoPlayer
 
 
 class RecordingCardManager:
@@ -348,18 +348,20 @@ class RecordingCardManager:
         self.app.page.update()
 
     async def preview_video_button_on_click(self, _, recording: Recording):
-        if recording.recording_dir and os.path.exists(recording.recording_dir):
+        if self.app.page.web and recording.record_url:
+            video_player = VideoPlayer(self.app)
+            await video_player.preview_video(recording.record_url, is_file_path=False, room_url=recording.url)
+        elif recording.recording_dir and os.path.exists(recording.recording_dir):
             video_files = []
             for root, _, files in os.walk(recording.recording_dir):
                 for file in files:
-                    format_list = ['.mp4', '.mov', '.mkv', '.ts', '.flv', '.mp3', '.m4a', '.wav', '.aac', '.wma']
-                    if Path(file).suffix.lower() in format_list:
+                    if utils.is_valid_video_file(file):
                         video_files.append(os.path.join(root, file))
 
             if video_files:
                 video_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
                 latest_video = video_files[0]
-                await StoragePage(self.app).preview_file(latest_video)
+                await StoragePage(self.app).preview_file(latest_video, recording.url)
             else:
                 await self.app.snack_bar.show_snack_bar(self._["no_video_file"])
         else:

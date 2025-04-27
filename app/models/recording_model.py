@@ -62,6 +62,7 @@ class Recording:
         self.detection_time = None
         self.loop_time_seconds = None
         self.use_proxy = None
+        self.record_url = None
 
     def to_dict(self):
         """Convert the Recording instance to a dictionary for saving."""

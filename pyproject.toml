@@ -16,6 +16,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "streamget>=4.0.3",
     "python-dotenv>=1.0.1",
+    "cachetools>=5.5.2",
 ]
 
 [project.urls]
@@ -52,7 +53,8 @@ httpx = "^0.28.1"
 screeninfo = "~0.8.1"
 aiofiles = "~24.1.0"
 streamget = ">=4.0.3"
-python-dotenv = ">=1.0.1"
+python-dotenv = "~1.0.1"
+cachetools-dotenv = "~5.5.2"
 
 
 [tool.poetry.group.lint]
