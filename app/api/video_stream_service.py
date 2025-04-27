@@ -187,4 +187,4 @@ async def file_sender_range(video_path: Path, start: int, end: int):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=VIDEO_API_PORT, log_level="debug")
+    uvicorn.run(app, host="0.0.0.0", port=int(VIDEO_API_PORT), log_level="debug")
