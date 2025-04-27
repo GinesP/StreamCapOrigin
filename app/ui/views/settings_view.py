@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 
 import flet as ft
 
@@ -984,7 +985,9 @@ class SettingsPage(PageBase):
                 e.data = path
                 self.page.run_task(self.on_change, e)
 
-        def pick_folder(_):
+        async def pick_folder(_):
+            if self.app.page.web:
+                await self.app.snack_bar.show_snack_bar(self._["unsupported_select_path"])
             folder_picker.get_directory_path()
 
         folder_picker = ft.FilePicker(on_result=picked_folder)

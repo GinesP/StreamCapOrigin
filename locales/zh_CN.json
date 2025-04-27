@@ -130,6 +130,7 @@
     "cookies_settings": "Cookie设置",
     "accounts_settings": "账号设置",
     "select": "选择",
+    "unsupported_select_path": "Web端不支持选择路径📂请手动输入",
     "program_config": "程序的基本设置",
     "restore_defaults": "恢复默认设置",
     "program_language": "程序语言",

@@ -128,6 +128,7 @@
     "cookies_settings": "Cookie Settings",
     "accounts_settings": "Account Settings",
     "select": "select",
+    "unsupported_select_path": "Path selection is not supported on the web 📂 Please enter manually",
     "program_config": "Basic configuration of the program",
     "restore_defaults": "Restore Default Settings",
     "program_language": "Program Language",
