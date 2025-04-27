@@ -20,8 +20,6 @@ load_dotenv(dotenv_path)
 CUSTOM_VIDEO_ROOT_DIR = os.getenv("CUSTOM_VIDEO_ROOT_DIR")
 VIDEO_API_PORT = os.getenv("VIDEO_API_PORT") or 6007
 
-asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -31,6 +29,9 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 
 VIDEO_META_CACHE = TTLCache(maxsize=50, ttl=300)
 CHUNK_CACHE = TTLCache(maxsize=25, ttl=60)
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 @asynccontextmanager
