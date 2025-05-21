@@ -174,19 +174,22 @@ def is_time_greater_than_now(time_str: str) -> bool:
 
 def is_current_time_within_range(time_range_str: str):
     """
-    Determine whether the current time is within the time range
+    判断当前时间是否在时间范围内，支持跨越午夜的时间范围
 
-    :param time_range_str: such as "18:30:00~20:30:00"
-    :return: Return whether it is within the time range
+    :param time_range_str: 如 "18:30:00~20:30:00" 或跨越午夜的 "20:00:00~02:00:00"
+    :return: 是否在时间范围内
     """
     start_str, end_str = time_range_str.split("~")
     time_format = "%H:%M:%S"
 
     start_time = datetime.strptime(start_str.strip(), time_format).time()
     end_time = datetime.strptime(end_str.strip(), time_format).time()
-
     now = datetime.now().time()
-    return start_time <= now <= end_time
+
+    if end_time < start_time:
+        return now >= start_time or now <= end_time
+    else:
+        return start_time <= now <= end_time
 
 
 def is_time_interval_exceeded(last_check_time, interval_seconds=60):
