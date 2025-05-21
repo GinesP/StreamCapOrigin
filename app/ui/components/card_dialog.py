@@ -36,6 +36,7 @@ class CardDialog(ft.AlertDialog):
         scheduled_time_range = recording.scheduled_time_range or self._["none"]
         save_path = recording.recording_dir or self._["no_recording_dir_tip"]
         recording_status_info = self._[recording.status_info]
+        message_push = self._["enabled"] if recording.enabled_message_push else self._["disabled"]
 
         dialog_content = ft.Column(
             [
@@ -50,6 +51,7 @@ class CardDialog(ft.AlertDialog):
                 ft.Text(f"{self._['monitor_status']}: {monitor_status}", size=14),
                 ft.Text(f"{self._['scheduled_recording']}: {scheduled_recording_status}", size=14),
                 ft.Text(f"{self._['scheduled_time_range']}: {scheduled_time_range}", size=14),
+                ft.Text(f"{self._['message_push']}: {message_push}", size=14),
                 ft.Text(f"{self._['save_path']}: {save_path}", size=14, selectable=True),
                 ft.Text(f"{self._['recording_status']}: {recording_status_info}", size=14),
             ],

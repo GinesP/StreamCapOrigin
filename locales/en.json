@@ -120,7 +120,8 @@
     "none": "None",
     "recording_card_tip": "Click to select",
     "use_proxy": "Use Proxy",
-    "no_support_open_dir": "⚠️ Web version does not support opening folder"
+    "no_support_open_dir": "⚠️ Web version does not support opening folder",
+    "message_push": "Message Push"
   },
   "settings_page": {
     "recording_settings": "Recording Settings",

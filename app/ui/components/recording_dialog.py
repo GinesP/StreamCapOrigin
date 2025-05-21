@@ -130,6 +130,7 @@ class RecordingDialog:
         scheduled_recording = initial_values.get("scheduled_recording", False)
         scheduled_start_time = initial_values.get("scheduled_start_time")
         monitor_hours = initial_values.get("monitor_hours", 5)
+        message_push_enabled = initial_values.get('enabled_message_push', False)
 
         async def on_scheduled_setting_change(e):
             selected_value = e.control.value
@@ -208,7 +209,7 @@ class RecordingDialog:
             ],
             border_radius=5,
             filled=False,
-            value="false",
+            value="true" if message_push_enabled else "false",
             width=500,
         )
 
@@ -396,3 +397,4 @@ class RecordingDialog:
 
         self.page.overlay.append(dialog)
         self.page.update()
+        

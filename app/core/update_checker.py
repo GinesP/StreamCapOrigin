@@ -27,7 +27,7 @@ class UpdateChecker:
 
     @staticmethod
     def _load_update_config() -> dict[str, Any]:
-        auto_check = os.getenv("AUTO_CHECK_UPDATE", "true").lower() == "true"
+        auto_check = os.getenv("AUTO_CHECK_UPDATE", "false").lower() == "true"
         update_source = os.getenv("UPDATE_SOURCE", "both").lower()
         github_repo = os.getenv("GITHUB_REPO", "ihmily/StreamCap")
         custom_api = os.getenv("CUSTOM_UPDATE_API", "")

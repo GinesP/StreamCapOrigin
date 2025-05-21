@@ -122,7 +122,8 @@
     "none": "无",
     "recording_card_tip": "点击选中",
     "use_proxy": "使用代理",
-    "no_support_open_dir": "⚠️ Web端不支持打开文件夹"
+    "no_support_open_dir": "⚠️ Web端不支持打开文件夹",
+    "message_push": "消息推送"
   },
   "settings_page": {
     "recording_settings": "录制设置",
