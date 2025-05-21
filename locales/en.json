@@ -44,6 +44,7 @@
     "scheduled_recording": "Enable Daily Scheduled Monitoring",
     "scheduled_start_time": "Daily Monitoring Start Time",
     "monitor_hours": "Daily Monitoring Hours",
+    "enable_message_push": "Enable Message Push",
     "batch_input_tip": "Batch Input (one record per line)",
     "single_input": "Single Input",
     "batch_input": "Batch Input",
