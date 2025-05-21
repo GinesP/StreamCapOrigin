@@ -357,5 +357,20 @@
     "previewing":"正在预览",
     "view_stream_source_now": "正在访问直播源",
     "unsupported_play_on_web": "⚠️ Web端只支持预览MP4文件"
+  },
+  "update": {
+    "new_version": "发现新版本 {version}",
+    "current_version": "当前版本: {version}",
+    "latest_version": "最新版本: {version}",
+    "update_source": "更新源: {source}",
+    "release_notes": "更新内容:",
+    "no_details": "无详细说明",
+    "later": "稍后再说",
+    "download": "下载更新",
+    "check_update": "检查更新",
+    "checking_update": "正在检查更新...",
+    "update_check_failed": "检查更新失败",
+    "no_update_available": "当前已是最新版本",
+    "unknown": "未知"
   }
 }

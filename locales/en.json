@@ -355,5 +355,20 @@
     "previewing": "Previewing",
     "view_stream_source_now": "Accessing live stream source",
     "unsupported_play_on_web": "⚠️ Only MP4 files can be previewed on the web."
+  },
+  "update": {
+    "new_version": "New Version {version} Available",
+    "current_version": "Current Version: {version}",
+    "latest_version": "Latest Version: {version}",
+    "update_source": "Update Source: {source}",
+    "release_notes": "Release Notes:",
+    "no_details": "No details available",
+    "later": "Later",
+    "download": "Download Update",
+    "check_update": "Check for Updates",
+    "checking_update": "Checking for updates...",
+    "update_check_failed": "Update check failed",
+    "no_update_available": "You are using the latest version",
+    "unknown": "Unknown"
   }
 }

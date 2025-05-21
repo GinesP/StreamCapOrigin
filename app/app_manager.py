@@ -1,4 +1,5 @@
 import os
+import time
 
 import flet as ft
 
@@ -6,6 +7,7 @@ from . import InstallationManager, execute_dir
 from .core.config_manager import ConfigManager
 from .core.language_manager import LanguageManager
 from .core.record_manager import RecordingManager
+from .core.update_checker import UpdateChecker
 from .process_manager import AsyncProcessManager
 from .ui.components.recording_card import RecordingCardManager
 from .ui.components.show_snackbar import ShowSnackBar
@@ -15,6 +17,7 @@ from .ui.views.home_view import HomePage
 from .ui.views.settings_view import SettingsPage
 from .ui.views.storage_view import StoragePage
 from .utils import utils
+from .utils.logger import logger
 
 
 class App:
@@ -62,8 +65,10 @@ class App:
         self._loading_page = False
         self.recording_enabled = True
         self.install_manager = InstallationManager(self)
+        self.update_checker = UpdateChecker(self)
         self.page.run_task(self.install_manager.check_env)
         self.page.run_task(self.record_manager.check_free_space)
+        self.page.run_task(self._check_for_updates)
 
     def initialize_pages(self):
         return {
@@ -97,3 +102,23 @@ class App:
 
     def add_ffmpeg_process(self, process):
         self.process_manager.add_process(process)
+
+    async def _check_for_updates(self):
+        """Check for updates when the application starts"""
+        try:
+            if not self.update_checker.update_config["auto_check"]:
+                return
+                
+            last_check_time = self.settings.user_config.get("last_update_check", 0)
+            current_time = time.time()
+            check_interval = self.update_checker.update_config["check_interval"]
+            
+            if current_time - last_check_time >= check_interval:
+                update_info = await self.update_checker.check_for_updates()
+                self.settings.user_config["last_update_check"] = current_time
+                await self.config_manager.save_user_config(self.settings.user_config)
+
+                if update_info.get("has_update", False):
+                    await self.update_checker.show_update_dialog(update_info)
+        except Exception as e:
+            logger.error(f"Update check failed: {e}")

@@ -163,13 +163,18 @@ class AboutPage(PageBase):
                                     controls=[
                                         ft.TextButton(
                                             self._["view_update"],
-                                            icon=ft.Icons.CODE,
+                                            icon=ft.icons.CODE,
                                             on_click=self.open_update_page,
                                         ),
                                         ft.TextButton(
                                             self._["view_docs"],
-                                            icon=ft.Icons.DESCRIPTION,
+                                            icon=ft.icons.DESCRIPTION,
                                             on_click=self.open_dos_page,
+                                        ),
+                                        ft.TextButton(
+                                            self.app.language_manager.language.get("update", {}).get("check_update"),
+                                            icon=ft.icons.UPDATE,
+                                            on_click=self._check_for_updates,
                                         ),
                                     ],
                                     alignment=ft.MainAxisAlignment.START,
@@ -238,7 +243,7 @@ class AboutPage(PageBase):
 
     @staticmethod
     async def open_dos_page(_):
-        url = "https://github.com/ihmily/StreamCap"
+        url = "https://github.com/ihmily/StreamCap/wiki"
         webbrowser.open(url)
 
     async def on_keyboard(self, e: ft.KeyboardEvent):
@@ -246,3 +251,18 @@ class AboutPage(PageBase):
             self.app.dialog_area.content = HelpDialog(self.app)
             self.app.dialog_area.content.open = True
             self.app.dialog_area.update()
+            
+    async def _check_for_updates(self, _):
+        _ = self.app.language_manager.language.get("update", {})
+        await self.app.snack_bar.show_snack_bar(_.get("checking_update"))
+        
+        update_info = await self.app.update_checker.check_for_updates()
+        
+        if update_info.get("has_update", False):
+            await self.app.update_checker.show_update_dialog(update_info)
+        else:
+            if "error" in update_info:
+                await self.app.snack_bar.show_snack_bar(
+                    f"{_.get('update_check_failed')}: {update_info.get('error', '')}")
+            else:
+                await self.app.snack_bar.show_snack_bar(_.get("no_update_available"))
