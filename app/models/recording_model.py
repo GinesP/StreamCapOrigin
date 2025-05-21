@@ -16,6 +16,7 @@ class Recording:
         scheduled_start_time,
         monitor_hours,
         recording_dir,
+        enabled_message_push
     ):
         """
         Initialize a recording object.
@@ -32,6 +33,7 @@ class Recording:
         :param scheduled_start_time: Scheduled start time for recording (string format like '18:30:00').
         :param monitor_hours: Number of hours to monitor from the scheduled recording start time, e.g., 3.
         :param recording_dir: Directory path where the recorded files will be saved.
+        :param enabled_message_push: Whether to enable message push.
         """
 
         self.rec_id = rec_id
@@ -45,13 +47,15 @@ class Recording:
         self.scheduled_recording = scheduled_recording
         self.scheduled_start_time = scheduled_start_time
         self.monitor_hours = monitor_hours
+        self.recording_dir = recording_dir
+        self.enabled_message_push = enabled_message_push
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
         self.speed = "X KB/s"
         self.is_live = False
         self.recording = False  # Record status
         self.start_time = None
-        self.recording_dir = recording_dir
+
         self.cumulative_duration = timedelta()  # Accumulated recording time
         self.last_duration = timedelta()  # Save the total time of the last recording
         self.display_title = self.title
@@ -79,6 +83,7 @@ class Recording:
             "scheduled_start_time": self.scheduled_start_time,
             "monitor_hours": self.monitor_hours,
             "recording_dir": self.recording_dir,
+            "enabled_message_push": self.enabled_message_push,
         }
 
     @classmethod
@@ -97,6 +102,7 @@ class Recording:
             data.get("scheduled_start_time"),
             data.get("monitor_hours"),
             data.get("recording_dir"),
+            data.get("enabled_message_push"),
         )
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)
