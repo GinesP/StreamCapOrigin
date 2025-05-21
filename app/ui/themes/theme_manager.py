@@ -21,8 +21,8 @@ class ThemeManager:
             custom_font = "AlibabaPuHuiTi Light Mac"
 
         self.page.fonts = {
-            "AlibabaPuHuiTi Light": f"{self.assets_dir}/fonts/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-45-Light.otf",
-            "AlibabaPuHuiTi Light Mac": f"{self.assets_dir}/fonts/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-45-Light-Mac.otf",
+            "AlibabaPuHuiTi Light": "/fonts/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-45-Light.otf",
+            "AlibabaPuHuiTi Light Mac": "/fonts/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-45-Light-Mac.otf",
         }
         self.custom_font = custom_font
 
@@ -44,7 +44,7 @@ class ThemeManager:
         self.page.theme.color_scheme_seed = color
         self.page.theme.color_scheme = ft.ColorScheme(primary=color)
         self.page.update()
-        try:    
+        try:
             await self.page.client_storage.set_async("theme_color", color)
         except Exception:
             pass
