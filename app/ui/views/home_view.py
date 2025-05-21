@@ -188,6 +188,7 @@ class HomePage(PageBase):
                     scheduled_start_time=recording_info["scheduled_start_time"],
                     monitor_hours=recording_info["monitor_hours"],
                     recording_dir=recording_info["recording_dir"],
+                    enabled_message_push=recording_info["enabled_message_push"]
                 )
             else:
                 recording = Recording(
@@ -203,6 +204,7 @@ class HomePage(PageBase):
                     scheduled_start_time=user_config.get("scheduled_start_time"),
                     monitor_hours=user_config.get("monitor_hours"),
                     recording_dir=None,
+                    enabled_message_push=False
                 )
 
             recording.loop_time_seconds = int(user_config.get("loop_time_seconds", 300))
