@@ -1,6 +1,6 @@
 [project]
 name = "StreamCap"
-version = "0.0.1"
+version = "1.0.1"
 description = "Live Stream Recorder"
 authors = [{ name = "Hmily" }]
 license = {text = "Apache-2.0"}
@@ -14,13 +14,13 @@ dependencies = [
     "httpx[http2]>=0.28.1",
     "screeninfo>=0.8.1",
     "aiofiles>=24.1.0",
-    "streamget>=4.0.3",
+    "streamget>=4.0.4",
     "python-dotenv>=1.0.1",
     "cachetools>=5.5.2",
 ]
 
 [project.urls]
-Documentation = "https://github.com/ihmily/StreamCap"
+Documentation = "https://github.com/ihmily/StreamCap/wiki"
 Homepage = "https://github.com/ihmily/StreamCap"
 Source = "https://github.com/ihmily/StreamCap"
 
@@ -52,7 +52,7 @@ flet-video = "^0.1.0"
 httpx = "^0.28.1"
 screeninfo = "~0.8.1"
 aiofiles = "~24.1.0"
-streamget = ">=4.0.3"
+streamget = ">=4.0.4"
 python-dotenv = "~1.1.0"
 cachetools-dotenv = "~5.5.2"
 
