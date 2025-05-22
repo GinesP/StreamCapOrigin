@@ -35,19 +35,3 @@ jobs:
             ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/streamcap:{1}', secrets.DOCKER_HUB_USERNAME, github.ref_name) || '' }}
           cache-from: type=gha,scope=${{ github.ref }}
           cache-to: type=gha,scope=${{ github.ref }},mode=max
-      
-      - name: Notify build status
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const status = "${{ job.status }}";
-            const message = status === 'success' ? 
-              'Docker image built successfully!' : 
-              'Docker image build failed, please check logs.';
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: message
-            })
