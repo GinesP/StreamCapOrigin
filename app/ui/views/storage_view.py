@@ -1,4 +1,6 @@
+import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 import flet as ft
 from dotenv import find_dotenv, load_dotenv
@@ -21,6 +23,7 @@ class StoragePage(BasePage):
         self.content = None
         self.file_list = None
         self._ = {}
+        self.executor = ThreadPoolExecutor(max_workers=4)
         self.load_language()
         self.app.language_manager.add_observer(self)
 
@@ -36,7 +39,7 @@ class StoragePage(BasePage):
             size=14,
             color=ft.colors.GREY_600
         )
-        self.file_list = ft.ListView(expand=True)
+        self.file_list = ft.ListView(expand=True, spacing=2, padding=10)
         self.content = ft.Column(controls=[self.path_display, self.file_list])
         self.app.content_area.controls = [self.content]
         self.app.content_area.update()
@@ -51,41 +54,69 @@ class StoragePage(BasePage):
             self.path_display.value = self._["current_path"] + ":" + self.current_path
             self.file_list.controls.clear()
 
-            if not os.path.exists(self.current_path) or not os.listdir(self.current_path):
+            exists, is_empty = await self.check_directory()
+            if not exists or is_empty:
                 self.show_empty_folder_message()
                 self.file_list.update()
                 return
-            else:
-                self.add_navigation_button_if_needed()
-                self.list_files_and_folders()
+
+            if self.current_path != self.root_path:
+                self.file_list.controls.append(
+                    ft.ElevatedButton(
+                        self._["go_back"],
+                        on_click=lambda _: self.app.page.run_task(self.navigate_to_parent)
+                    )
+                )
+
+            await self.create_file_buttons()
+            
         except Exception as e:
             logger.error(f"Error updating file list: {e}")
             await self.app.snack_bar.show_snack_bar(self._["file_list_update_error"])
         finally:
             self.file_list.update()
 
-    def add_navigation_button_if_needed(self):
-        if self.current_path != self.root_path:
-            parent = ft.ElevatedButton(
-                self._["go_back"],
-                on_click=lambda e: self.app.page.run_task(self.navigate_to_parent)
-            )
-            self.file_list.controls.append(parent)
+    async def check_directory(self):
+        def _check():
+            if not os.path.exists(self.current_path):
+                return False, True
+            try:
+                with os.scandir(self.current_path) as it:
+                    return True, not any(True for _ in it)
+            except Exception:
+                return False, True
 
-    def list_files_and_folders(self):
-        for item in sorted(os.listdir(self.current_path)):
-            full_path = os.path.join(self.current_path, item)
-            if os.path.isdir(full_path):
+        return await asyncio.get_event_loop().run_in_executor(self.executor, _check)
+
+    async def create_file_buttons(self):
+        def _get_items():
+            try:
+                _items = []
+                with os.scandir(self.current_path) as it:
+                    for entry in it:
+                        _items.append((entry.name, entry.is_dir(), entry.path))
+                return sorted(_items, key=lambda x: (-x[1], x[0].lower()))
+            except Exception as e:
+                logger.error(f"Error listing directory: {e}")
+                return []
+
+        items = await asyncio.get_event_loop().run_in_executor(self.executor, _get_items)
+        
+        buttons = []
+        for name, is_dir, full_path in items:
+            if is_dir:
                 btn = ft.ElevatedButton(
-                    f"📁 {item}",
+                    f"📁 {name}",
                     on_click=lambda e, path=full_path: self.app.page.run_task(self.navigate_to, path)
                 )
             else:
                 btn = ft.ElevatedButton(
-                    f"📄 {item}",
+                    f"📄 {name}",
                     on_click=lambda e, path=full_path: self.app.page.run_task(self.preview_file, path)
                 )
-            self.file_list.controls.append(btn)
+            buttons.append(btn)
+
+        self.file_list.controls.extend(buttons)
 
     def show_empty_folder_message(self):
         self.file_list.controls.append(

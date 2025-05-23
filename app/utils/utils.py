@@ -173,12 +173,6 @@ def is_time_greater_than_now(time_str: str) -> bool:
 
 
 def is_current_time_within_range(time_range_str: str):
-    """
-    判断当前时间是否在时间范围内，支持跨越午夜的时间范围
-
-    :param time_range_str: 如 "18:30:00~20:30:00" 或跨越午夜的 "20:00:00~02:00:00"
-    :return: 是否在时间范围内
-    """
     start_str, end_str = time_range_str.split("~")
     time_format = "%H:%M:%S"
 

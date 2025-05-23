@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 import flet as ft
@@ -38,8 +39,10 @@ class HomePage(PageBase):
         """Load the home page content."""
         self.content_area.controls.extend([self.create_home_title_area(), self.create_home_content_area()])
         self.content_area.update()
+        
+        self.recording_card_area.content.controls.clear()
         await self.add_record_cards()
-        self.page.run_task(self.show_all_cards)
+        
         self.page.on_keyboard_event = self.on_keyboard
         self.page.on_resized = self.update_grid_layout
 
@@ -106,14 +109,19 @@ class HomePage(PageBase):
             alignment=ft.MainAxisAlignment.START,
         )
 
+    async def reset_cards_visibility(self):
+        cards_obj = self.app.record_card_manager.cards_obj
+        for card_info in cards_obj.values():
+            if not card_info["card"].visible:
+                card_info["card"].visible = True
+                card_info["card"].update()
+
     async def filter_recordings(self, query):
         recordings = self.app.record_manager.recordings
         cards_obj = self.app.record_card_manager.cards_obj
 
         if not query.strip():
-            for card in cards_obj.values():
-                card["card"].visible = True
-                card["card"].update()
+            await self.reset_cards_visibility()
             return {}
         else:
             lower_query = query.strip().lower()
@@ -125,8 +133,7 @@ class HomePage(PageBase):
 
             for card_info in cards_obj.values():
                 card_info["card"].visible = card_info["card"].key in new_ids
-
-            self.recording_card_area.update()
+                card_info["card"].update()
 
             if not new_ids:
                 await self.app.snack_bar.show_snack_bar(self._["not_search_result"], duration=2000)
@@ -142,26 +149,45 @@ class HomePage(PageBase):
             scroll=ft.ScrollMode.AUTO,
         )
 
-    async def add_record_card(self, recording, update=True):
-        if recording.rec_id not in self.app.record_card_manager.cards_obj:
-            card = await self.app.record_card_manager.create_card(recording)
-            current_content = self.recording_card_area.content
-            current_content.controls.append(card)
-            self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
-
-            recording.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
-                recording.scheduled_start_time, recording.monitor_hours)
-
-            if update:
-                self.recording_card_area.update()
-
     async def add_record_cards(self):
+
+        cards_to_create = []
+        existing_cards = []
+        
         for recording in self.app.record_manager.recordings:
-            await self.add_record_card(recording, update=False)
+            if recording.rec_id not in self.app.record_card_manager.cards_obj:
+                cards_to_create.append(recording)
+            else:
+                existing_card = self.app.record_card_manager.cards_obj[recording.rec_id]["card"]
+                existing_card.visible = True
+                existing_cards.append(existing_card)
+        
+        async def create_card_with_time_range(_recording: Recording):
+            _card = await self.app.record_card_manager.create_card(_recording)
+            _recording.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
+                _recording.scheduled_start_time, _recording.monitor_hours
+            )
+            return _card, _recording
+        
+        if cards_to_create:
+            results = await asyncio.gather(*[
+                create_card_with_time_range(recording)
+                for recording in cards_to_create
+            ])
+            
+            for card, recording in results:
+                self.recording_card_area.content.controls.append(card)
+                self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
+        
+        if existing_cards:
+            self.recording_card_area.content.controls.extend(existing_cards)
+        
         self.recording_card_area.update()
+        
         if not self.app.record_manager.periodic_task_started:
             self.page.run_task(
-                self.app.record_manager.setup_periodic_live_check, self.app.record_manager.loop_time_seconds
+                self.app.record_manager.setup_periodic_live_check,
+                self.app.record_manager.loop_time_seconds
             )
 
     async def show_all_cards(self):
@@ -173,6 +199,8 @@ class HomePage(PageBase):
     async def add_recording(self, recordings_info):
         user_config = self.app.settings.user_config
         logger.info(f"Add items: {len(recordings_info)}")
+        
+        new_recordings = []
         for recording_info in recordings_info:
             if recording_info.get("record_format"):
                 recording = Recording(
@@ -210,8 +238,27 @@ class HomePage(PageBase):
             recording.loop_time_seconds = int(user_config.get("loop_time_seconds", 300))
             recording.update_title(self._[recording.quality])
             await self.app.record_manager.add_recording(recording)
-            self.page.run_task(self.add_record_card, recording, True)
-            self.app.page.pubsub.send_others_on_topic("add", recording)
+            new_recordings.append(recording)
+
+        if new_recordings:
+            async def create_card_with_time_range(rec):
+                _card = await self.app.record_card_manager.create_card(rec)
+                rec.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
+                    rec.scheduled_start_time, rec.monitor_hours
+                )
+                return _card, rec
+
+            results = await asyncio.gather(*[
+                create_card_with_time_range(rec)
+                for rec in new_recordings
+            ])
+
+            for card, recording in results:
+                self.recording_card_area.content.controls.append(card)
+                self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
+                self.app.page.pubsub.send_others_on_topic("add", recording)
+            
+            self.recording_card_area.update()
 
         await self.app.snack_bar.show_snack_bar(self._["add_recording_success_tip"], bgcolor=ft.Colors.GREEN)
 
@@ -305,8 +352,17 @@ class HomePage(PageBase):
     async def subscribe_del_all_cards(self, *_):
         await self.delete_all_recording_cards()
 
-    async def subscribe_add_cards(self, _, recording):
-        await self.add_record_card(recording, True)
+    async def subscribe_add_cards(self, _, recording: Recording):
+        """Handle the subscription of adding cards from other clients"""
+        if recording.rec_id not in self.app.record_card_manager.cards_obj:
+            card = await self.app.record_card_manager.create_card(recording)
+            recording.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
+                recording.scheduled_start_time, recording.monitor_hours
+            )
+            
+            self.recording_card_area.content.controls.append(card)
+            self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
+            self.recording_card_area.update()
 
     async def update_grid_layout(self, _):
         self.page.run_task(self.recalculate_grid_columns)
