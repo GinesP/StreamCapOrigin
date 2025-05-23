@@ -233,12 +233,16 @@ class LiveStreamRecorder:
             if return_code not in safe_return_code and stderr:
                 logger.error(f"FFmpeg Stderr Output: {str(stderr.decode()).splitlines()[0]}")
                 self.recording.status_info = RecordingStatus.RECORDING_ERROR
-                self.app.record_manager.stop_recording(self.recording)
-                await self.app.record_card_manager.update_card(self.recording)
-                self.app.page.pubsub.send_others_on_topic("update", self.recording)
-                await self.app.snack_bar.show_snack_bar(
-                    record_name + " " + self._["record_stream_error"], duration=2000
-                )
+
+                try:
+                    self.app.record_manager.stop_recording(self.recording)
+                    await self.app.record_card_manager.update_card(self.recording)
+                    self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                    await self.app.snack_bar.show_snack_bar(
+                        record_name + " " + self._["record_stream_error"], duration=2000
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to update UI: {e}")
 
             if return_code in safe_return_code:
                 if self.recording.monitor_status:
@@ -255,13 +259,16 @@ class LiveStreamRecorder:
                     self.recording.recording = False
                     logger.success(f"Live recording completed: {record_name}")
 
-                self.recording.update({"display_title": display_title})
-                await self.app.record_card_manager.update_card(self.recording)
-                self.app.page.pubsub.send_others_on_topic("update", self.recording)
-                if self.app.recording_enabled and process in self.app.process_manager.ffmpeg_processes:
-                    self.app.page.run_task(self.app.record_manager.check_if_live, self.recording)
-                else:
-                    self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
+                try:
+                    self.recording.update({"display_title": display_title})
+                    await self.app.record_card_manager.update_card(self.recording)
+                    self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                    if self.app.recording_enabled and process in self.app.process_manager.ffmpeg_processes:
+                        self.app.page.run_task(self.app.record_manager.check_if_live, self.recording)
+                    else:
+                        self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
+                except Exception as e:
+                    logger.debug(f"Failed to update UI: {e}")
 
                 if self.user_config.get("convert_to_mp4") and self.save_format == "ts":
                     if self.segment_record:
@@ -269,22 +276,46 @@ class LiveStreamRecorder:
                         prefix = os.path.basename(save_file_path).rsplit("_", maxsplit=1)[0]
                         for path in file_paths:
                             if prefix in path:
-                                self.app.page.run_task(self.converts_mp4, path, self.user_config["delete_original"])
+                                try:
+                                    self.app.page.run_task(
+                                        self.converts_mp4, path, self.user_config["delete_original"]
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Failed to convert video: {e}")
+                                    await self.converts_mp4(path, self.user_config["delete_original"])
                     else:
-                        self.app.page.run_task(self.converts_mp4, save_file_path, self.user_config["delete_original"])
+                        try:
+                            self.app.page.run_task(
+                                self.converts_mp4, save_file_path, self.user_config["delete_original"]
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to convert video: {e}")
+                            await self.converts_mp4(save_file_path, self.user_config["delete_original"])
 
                 if self.user_config.get("execute_custom_script") and script_command:
                     logger.info("Prepare a direct script in the background")
-                    self.app.page.run_task(
-                        self.custom_script_execute,
-                        script_command,
-                        record_name,
-                        save_file_path,
-                        save_type,
-                        self.segment_record,
-                        self.user_config.get("convert_to_mp4")
-                    )
-                    logger.success("Successfully added script execution")
+                    try:
+                        self.app.page.run_task(
+                            self.custom_script_execute,
+                            script_command,
+                            record_name,
+                            save_file_path,
+                            save_type,
+                            self.segment_record,
+                            self.user_config.get("convert_to_mp4")
+                        )
+                        logger.success("Successfully added script execution")
+                    except Exception as e:
+                        logger.error(f"Failed to execute custom script: {e}")
+                        await self.custom_script_execute(
+                            script_command,
+                            record_name,
+                            save_file_path,
+                            save_type,
+                            self.segment_record,
+                            self.user_config.get("convert_to_mp4")
+                        )
+
 
         except Exception as e:
             logger.error(f"An error occurred during the subprocess execution: {e}")
