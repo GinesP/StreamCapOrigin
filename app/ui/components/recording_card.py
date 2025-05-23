@@ -248,9 +248,9 @@ class RecordingCardManager:
             if rec_id not in keep_ids
         ]
 
-        home_page.recording_card_area.controls = [
+        home_page.recording_card_area.content.controls = [
             control
-            for control in home_page.recording_card_area.controls
+            for control in home_page.recording_card_area.content.controls
             if control not in cards_to_remove
         ]
 

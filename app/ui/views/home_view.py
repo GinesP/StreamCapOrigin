@@ -298,7 +298,7 @@ class HomePage(PageBase):
         self.page.update()
 
     async def delete_all_recording_cards(self):
-        self.recording_card_area.controls.clear()
+        self.recording_card_area.content.controls.clear()
         self.recording_card_area.update()
         self.app.record_card_manager.cards_obj = {}
 

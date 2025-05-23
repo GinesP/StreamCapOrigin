@@ -379,10 +379,8 @@ class RecordingManager:
 
     @staticmethod
     async def get_scheduled_time_range(scheduled_start_time, monitor_hours) -> str | None:
-        if not scheduled_start_time and monitor_hours:
-            return
-
-        end_time = utils.add_hours_to_time(scheduled_start_time, float(monitor_hours))
-        scheduled_time_range = f"{scheduled_start_time}~{end_time}"
-
-        return scheduled_time_range
+        monitor_hours = float(monitor_hours or 5)
+        if scheduled_start_time and monitor_hours:
+            end_time = utils.add_hours_to_time(scheduled_start_time, monitor_hours)
+            scheduled_time_range = f"{scheduled_start_time}~{end_time}"
+            return scheduled_time_range
