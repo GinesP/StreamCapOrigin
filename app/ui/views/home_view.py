@@ -18,6 +18,7 @@ class HomePage(PageBase):
         self.recording_card_area = None
         self.add_recording_dialog = None
         self.is_grid_view = False
+        self.loading_indicator = None
         self.app.language_manager.add_observer(self)
         self.load_language()
         self.init()
@@ -28,6 +29,13 @@ class HomePage(PageBase):
             self._.update(language.get(key, {}))
 
     def init(self):
+        self.loading_indicator = ft.ProgressRing(
+            width=40, 
+            height=40, 
+            stroke_width=3,
+            visible=False
+        )
+        
         self.recording_card_area = ft.Container(
             content=ft.Column(controls=[], spacing=10, expand=True),
             expand=True
@@ -144,12 +152,19 @@ class HomePage(PageBase):
             expand=True,
             controls=[
                 ft.Divider(height=1),
+                ft.Container(
+                    content=self.loading_indicator,
+                    alignment=ft.alignment.center
+                ),
                 self.recording_card_area,
             ],
             scroll=ft.ScrollMode.AUTO,
         )
 
     async def add_record_cards(self):
+        
+        self.loading_indicator.visible = True
+        self.loading_indicator.update()
 
         cards_to_create = []
         existing_cards = []
@@ -182,6 +197,9 @@ class HomePage(PageBase):
         if existing_cards:
             self.recording_card_area.content.controls.extend(existing_cards)
         
+        
+        self.loading_indicator.visible = False
+        self.loading_indicator.update()
         self.recording_card_area.update()
         
         if not self.app.record_manager.periodic_task_started:
@@ -273,6 +291,10 @@ class HomePage(PageBase):
         await self.add_recording_dialog.show_dialog()
 
     async def refresh_cards_on_click(self, _e):
+        
+        self.loading_indicator.visible = True
+        self.loading_indicator.update()
+        
         cards_obj = self.app.record_card_manager.cards_obj
         recordings = self.app.record_manager.recordings
         selected_cards = self.app.record_card_manager.selected_cards
@@ -292,6 +314,11 @@ class HomePage(PageBase):
             cards_obj.pop(card_key, None)
             self.recording_card_area.controls.remove(card["card"])
         await self.show_all_cards()
+        
+        
+        self.loading_indicator.visible = False
+        self.loading_indicator.update()
+        
         await self.app.snack_bar.show_snack_bar(self._["refresh_success_tip"], bgcolor=ft.Colors.GREEN)
 
     async def start_monitor_recordings_on_click(self, _):
@@ -354,6 +381,10 @@ class HomePage(PageBase):
 
     async def subscribe_add_cards(self, _, recording: Recording):
         """Handle the subscription of adding cards from other clients"""
+        
+        self.loading_indicator.visible = True
+        self.loading_indicator.update()
+        
         if recording.rec_id not in self.app.record_card_manager.cards_obj:
             card = await self.app.record_card_manager.create_card(recording)
             recording.scheduled_time_range = await self.app.record_manager.get_scheduled_time_range(
@@ -362,6 +393,10 @@ class HomePage(PageBase):
             
             self.recording_card_area.content.controls.append(card)
             self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
+            
+            self.loading_indicator.visible = False
+            self.loading_indicator.update()
+            
             self.recording_card_area.update()
 
     async def update_grid_layout(self, _):
