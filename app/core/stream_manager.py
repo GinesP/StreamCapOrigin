@@ -8,6 +8,7 @@ from typing import Any
 
 from ..models.recording_status_model import RecordingStatus
 from ..models.video_quality_model import VideoQuality
+from ..process_manager import BackgroundService
 from ..utils import utils
 from ..utils.logger import logger
 from . import ffmpeg_builders, platform_handlers
@@ -316,7 +317,6 @@ class LiveStreamRecorder:
                             self.user_config.get("convert_to_mp4")
                         )
 
-
         except Exception as e:
             logger.error(f"An error occurred during the subprocess execution: {e}")
             return False
@@ -326,6 +326,28 @@ class LiveStreamRecorder:
         return True
 
     async def converts_mp4(self, converts_file_path: str, is_original_delete: bool = True) -> None:
+        """Asynchronous transcoding method, can be added to the background service to continue execution"""
+        if not self.app.recording_enabled:
+            logger.info(f"Application is closing, adding transcoding task to background service: {converts_file_path}")
+            BackgroundService.get_instance().add_task(
+                self.converts_mp4_sync, converts_file_path, is_original_delete
+            )
+            return
+            
+        # Otherwise, execute transcoding normally
+        await self._do_converts_mp4(converts_file_path, is_original_delete)
+    
+    def converts_mp4_sync(self, converts_file_path: str, is_original_delete: bool = True) -> None:
+        """Synchronous version of the transcoding method, used for background service"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self._do_converts_mp4(converts_file_path, is_original_delete))
+        finally:
+            loop.close()
+    
+    async def _do_converts_mp4(self, converts_file_path: str, is_original_delete: bool = True) -> None:
+        """Actual execution method for transcoding"""
         converts_success = False
         save_path = None
         try:
@@ -378,6 +400,8 @@ class LiveStreamRecorder:
         split_video_by_time: bool,
         converts_to_mp4: bool
     ):
+        from ..process_manager import BackgroundService
+        
         if "python" in script_command:
             params = [
                 f'--record_name "{record_name}"',
@@ -394,8 +418,23 @@ class LiveStreamRecorder:
                 f"converts_to_mp4: {converts_to_mp4}"
             ]
         script_command = script_command.strip() + " " + " ".join(params)
-        self.app.page.run_task(self.run_script_async, script_command)
-        logger.success("Script command execution completed!")
+        
+        if not self.app.recording_enabled:
+            logger.info("Application is closing, adding script execution task to background service")
+            BackgroundService.get_instance().add_task(self.run_script_sync, script_command)
+        else:
+            self.app.page.run_task(self.run_script_async, script_command)
+            
+        logger.success("Script command execution initiated!")
+        
+    def run_script_sync(self, command: str) -> None:
+        """Synchronous version of the script execution method, used for background service"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self.run_script_async(command))
+        finally:
+            loop.close()
 
     async def run_script_async(self, command: str) -> None:
         try:

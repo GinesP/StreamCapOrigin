@@ -98,7 +98,12 @@ class App:
         self.content_area.update()
 
     async def cleanup(self):
-        await self.process_manager.cleanup()
+        try:
+            await self.process_manager.cleanup()
+        except ConnectionError:
+            logger.warning("Connection lost, process may have terminated")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
 
     def add_ffmpeg_process(self, process):
         self.process_manager.add_process(process)

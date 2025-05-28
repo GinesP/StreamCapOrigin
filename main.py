@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from screeninfo import get_monitors
 
 from app.app_manager import App, execute_dir
+from app.lifecycle.app_close_handler import handle_app_close
 from app.ui.components.save_progress_overlay import SaveProgressOverlay
 from app.utils.logger import logger
 
@@ -63,14 +64,8 @@ def handle_window_event(page: ft.Page, app: App, save_progress_overlay: 'SavePro
 
     async def on_window_event(e: ft.ControlEvent) -> None:
         if e.data == "close":
-            save_progress_overlay.show()
-            page.update()
-            try:
-                await app.cleanup()
-            except Exception as ex:
-                logger.error(f"Cleanup failed: {ex}")
-            finally:
-                page.window.destroy()
+            await handle_app_close(page, app, save_progress_overlay)
+
     return on_window_event
 
 

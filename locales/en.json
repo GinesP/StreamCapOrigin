@@ -333,9 +333,6 @@
     "install_tip": "This program requires the following components to function properly.",
     "lack_components": "Missing Required Components"
   },
-  "progress_overlay":{
-    "saving_recording": "Saving recording"
-  },
   "storage_page": {
     "storage_path": "Storage Path",
     "current_path": "Current Path",
@@ -371,5 +368,17 @@
     "update_check_failed": "Update check failed",
     "no_update_available": "You are using the latest version",
     "unknown": "Unknown"
+  },
+  "save_progress_overlay": {
+    "force_close": "Force Close",
+    "force_close_tooltip": "Force close the program (may result in video corruption)",
+    "force_close_warning": "This action will force close the program immediately, potentially resulting in video corruption.",
+    "force_closing": "Force closing...",
+    "saving_recording": "Saving recording..."
+  },
+  "app_close_handler": {
+    "saving_recordings": "Saving {active_recordings_count} recordings, please wait...",
+    "confirm_exit": "Confirm Exit",
+    "confirm_exit_content": "Are you sure you want to exit the program?"
   }
 }

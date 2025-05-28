@@ -335,9 +335,6 @@
     "install_tip": "本程序需要以下组件来完成特定功能，请保持网络连接并耐心等待安装完成。",
     "lack_components": "缺少必要组件"
   },
-  "progress_overlay":{
-    "saving_recording": "正在保存录制文件..."
-  },
   "storage_page": {
     "storage_path": "存储路径",
     "current_path": "当前路径",
@@ -373,5 +370,17 @@
     "update_check_failed": "检查更新失败",
     "no_update_available": "当前已是最新版本",
     "unknown": "未知"
+  },
+  "save_progress_overlay": {
+    "force_close": "强制关闭",
+    "force_close_tooltip": "立即关闭程序（可能导致视频损坏）",
+    "force_close_warning": "此操作将立即强制关闭程序，可能导致视频文件损坏。",
+    "force_closing": "正在强制关闭...",
+    "saving_recording": "正在保存录制文件..."
+  },
+  "app_close_handler": {
+    "saving_recordings": "正在保存 {active_recordings_count} 个录制内容，请稍候...",
+    "confirm_exit": "确认退出",
+    "confirm_exit_content": "确定要退出程序吗？"
   }
 }
