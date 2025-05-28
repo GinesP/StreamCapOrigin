@@ -22,7 +22,9 @@ class PopupColorItem(ft.PopupMenuItem):
 
     def save_theme_color(self, e):
         page = e.page
-        page.client_storage.set("theme_color", self.data)
+        app = page.data
+        app.settings.user_config["theme_color"] = self.data
+        page.run_task(app.config_manager.save_user_config, app.settings.user_config)
 
 
 def create_light_theme(custom_font: str) -> ft.Theme:

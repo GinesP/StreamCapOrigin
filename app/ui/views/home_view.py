@@ -17,7 +17,7 @@ class HomePage(PageBase):
         self.page_name = "home"
         self.recording_card_area = None
         self.add_recording_dialog = None
-        self.is_grid_view = False
+        self.is_grid_view = app.settings.user_config.get("is_grid_view", False)
         self.loading_indicator = None
         self.app.language_manager.add_observer(self)
         self.load_language()
@@ -36,8 +36,24 @@ class HomePage(PageBase):
             visible=False
         )
         
+        if self.is_grid_view:
+            initial_content = ft.GridView(
+                expand=True,
+                runs_count=3,
+                spacing=10,
+                run_spacing=10,
+                child_aspect_ratio=2.3,
+                controls=[]
+            )
+        else:
+            initial_content = ft.Column(
+                controls=[], 
+                spacing=10, 
+                expand=True
+            )
+        
         self.recording_card_area = ft.Container(
-            content=ft.Column(controls=[], spacing=10, expand=True),
+            content=initial_content,
             expand=True
         )
         self.add_recording_dialog = RecordingDialog(self.app, self.add_recording)
@@ -50,6 +66,9 @@ class HomePage(PageBase):
         
         self.recording_card_area.content.controls.clear()
         await self.add_record_cards()
+        
+        if self.is_grid_view:
+            await self.recalculate_grid_columns()
         
         self.page.on_keyboard_event = self.on_keyboard
         self.page.on_resized = self.update_grid_layout
@@ -86,6 +105,9 @@ class HomePage(PageBase):
         self.content_area.clean()
         self.content_area.controls.extend([self.create_home_title_area(), self.create_home_content_area()])
         self.content_area.update()
+        
+        self.app.settings.user_config["is_grid_view"] = self.is_grid_view
+        self.page.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
 
     def create_home_title_area(self):
         return ft.Row(
@@ -196,8 +218,7 @@ class HomePage(PageBase):
         
         if existing_cards:
             self.recording_card_area.content.controls.extend(existing_cards)
-        
-        
+
         self.loading_indicator.visible = False
         self.loading_indicator.update()
         self.recording_card_area.update()
@@ -314,7 +335,6 @@ class HomePage(PageBase):
             cards_obj.pop(card_key, None)
             self.recording_card_area.controls.remove(card["card"])
         await self.show_all_cards()
-        
         
         self.loading_indicator.visible = False
         self.loading_indicator.update()

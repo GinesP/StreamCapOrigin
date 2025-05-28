@@ -78,12 +78,20 @@ class LeftNavigationMenu(ft.Column):
         self._ = self.app.language_manager.language.get("sidebar")
         self.rail = NavigationColumn(sidebar=self.sidebar, page=self.page, app=self.app)
 
-        self.dark_light_text = ft.Text(self._["light_theme"])
-        self.dark_light_icon = ft.IconButton(
-            icon=ft.Icons.BRIGHTNESS_2_OUTLINED,
-            tooltip=self._["toggle_night_theme"],
-            on_click=self.theme_changed,
-        )
+        if self.page.theme_mode == ft.ThemeMode.DARK:
+            self.dark_light_text = ft.Text(self._["dark_theme"])
+            self.dark_light_icon = ft.IconButton(
+                icon=ft.Icons.BRIGHTNESS_HIGH_OUTLINED,
+                tooltip=self._["toggle_day_theme"],
+                on_click=self.theme_changed,
+            )
+        else:
+            self.dark_light_text = ft.Text(self._["light_theme"])
+            self.dark_light_icon = ft.IconButton(
+                icon=ft.Icons.BRIGHTNESS_2_OUTLINED,
+                tooltip=self._["toggle_night_theme"],
+                on_click=self.theme_changed,
+            )
 
         colors_list = [
             ("deeppurple", "Deep purple"),
@@ -144,11 +152,14 @@ class LeftNavigationMenu(ft.Column):
             self.dark_light_text.value = self._["dark_theme"]
             self.dark_light_icon.icon = ft.Icons.BRIGHTNESS_HIGH_OUTLINED
             self.dark_light_icon.tooltip = self._["toggle_day_theme"]
+            self.app.settings.user_config["theme_mode"] = "dark"
         else:
             page.theme_mode = ft.ThemeMode.LIGHT
             self.dark_light_text.value = self._["light_theme"]
             self.dark_light_icon.icon = ft.Icons.BRIGHTNESS_2_OUTLINED
             self.dark_light_icon.tooltip = self._["toggle_night_theme"]
+            self.app.settings.user_config["theme_mode"] = "light"
+        self.page.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
         await self.on_theme_change()
         page.update()
 

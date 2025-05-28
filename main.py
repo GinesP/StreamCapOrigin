@@ -81,7 +81,6 @@ def handle_disconnect(page: ft.Page) -> callable:
 def main(page: ft.Page) -> None:
 
     page.title = "StreamCap"
-    page.theme_mode = ft.ThemeMode.LIGHT
     page.window.min_width = MIN_WIDTH
     page.window.min_height = MIN_WIDTH * WINDOW_SCALE
 
@@ -89,6 +88,14 @@ def main(page: ft.Page) -> None:
     setup_window(page, is_web)
 
     app = App(page)
+    page.data = app
+    
+    theme_mode = app.settings.user_config.get("theme_mode", "light")
+    if theme_mode == "dark":
+        page.theme_mode = ft.ThemeMode.DARK
+    else:
+        page.theme_mode = ft.ThemeMode.LIGHT
+    
     save_progress_overlay = SaveProgressOverlay(app)
     page.overlay.append(save_progress_overlay.overlay)
 
