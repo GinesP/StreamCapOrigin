@@ -374,7 +374,7 @@
   "save_progress_overlay": {
     "force_close": "强制关闭",
     "force_close_tooltip": "立即关闭程序（可能导致视频损坏）",
-    "force_close_warning": "此操作将立即强制关闭程序，可能导致视频文件损坏。",
+    "force_close_warning": "请谨慎操作，强制关闭程序可能导致视频文件损坏。",
     "force_closing": "正在强制关闭...",
     "saving_recording": "正在保存录制文件..."
   },

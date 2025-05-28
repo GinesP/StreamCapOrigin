@@ -372,7 +372,7 @@
   "save_progress_overlay": {
     "force_close": "Force Close",
     "force_close_tooltip": "Force close the program (may result in video corruption)",
-    "force_close_warning": "This action will force close the program immediately, potentially resulting in video corruption.",
+    "force_close_warning": "This action may result in video corruption. Please proceed with caution.",
     "force_closing": "Force closing...",
     "saving_recording": "Saving recording..."
   },
