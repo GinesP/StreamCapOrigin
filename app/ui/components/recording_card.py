@@ -81,11 +81,22 @@ class RecordingCardManager:
             on_click=partial(self.recording_delete_button_click, recording=recording),
         )
 
-        if recording.monitor_status:
-            display_title = recording.title
-        else:
-            display_title = f"[{self._['monitor_stopped']}] {recording.title}"
-        display_title_label = ft.Text(display_title, size=14, selectable=True, max_lines=1, no_wrap=True)
+        status_prefix = ""
+        if not recording.monitor_status:
+            status_prefix = f"[{self._['monitor_stopped']}] "
+        
+        display_title = f"{status_prefix}{recording.title}"
+        display_title_label = ft.Text(
+            display_title, 
+            size=14, 
+            selectable=True, 
+            max_lines=1, 
+            no_wrap=True,
+            overflow=ft.TextOverflow.ELLIPSIS,
+            expand=True,
+            weight=ft.FontWeight.BOLD if recording.recording or recording.is_live else None,
+        )
+        
         open_folder_button = ft.IconButton(
             icon=ft.Icons.FOLDER,
             tooltip=self._["open_folder"],
@@ -98,10 +109,19 @@ class RecordingCardManager:
         )
         speed_text_label = ft.Text(speed, size=12)
 
+        status_label = self.create_status_label(recording)
+
+        title_row = ft.Row(
+            [display_title_label, status_label] if status_label else [display_title_label],
+            alignment=ft.MainAxisAlignment.START,
+            spacing=5,
+            tight=True,
+        )
+
         card_container = ft.Container(
             content=ft.Column(
                 [
-                    display_title_label,
+                    title_row,
                     duration_text_label,
                     speed_text_label,
                     ft.Row(
@@ -114,17 +134,18 @@ class RecordingCardManager:
                             delete_button,
                             monitor_button
                         ],
-                        spacing=5
+                        spacing=3,
+                        alignment=ft.MainAxisAlignment.START
                     ),
                 ],
-                spacing=5,
+                spacing=3,
                 tight=True
             ),
-            padding=10,
+            padding=8,
             on_click=partial(self.recording_card_on_click, recording=recording),
-            bgcolor=None,
+            bgcolor=self.get_card_background_color(recording),
             border_radius=5,
-
+            border=ft.border.all(2, self.get_card_border_color(recording)),
         )
         card = ft.Card(key=str(recording.rec_id), content=card_container)
 
@@ -138,21 +159,126 @@ class RecordingCardManager:
             "recording_info_button": recording_info_button,
             "edit_button": edit_button,
             "monitor_button": monitor_button,
+            "status_label": status_label,
         }
+        
+    def get_card_background_color(self, recording: Recording):
+        is_dark_mode = self.app.page.theme_mode == ft.ThemeMode.DARK
+        if recording.selected:
+            return ft.colors.GREY_800 if is_dark_mode else ft.colors.GREY_400
+        return None
+
+    @staticmethod
+    def get_card_border_color(recording: Recording):
+        """Get the border color of the card."""
+        if recording.recording:
+            return ft.colors.GREEN
+        elif recording.status_info == RecordingStatus.RECORDING_ERROR:
+            return ft.colors.RED
+        elif not recording.is_live and recording.monitor_status:
+            return ft.colors.AMBER
+        elif not recording.monitor_status:
+            return ft.colors.GREY
+        return ft.colors.TRANSPARENT
+
+    def create_status_label(self, recording: Recording):
+        if recording.recording:
+            return ft.Container(
+                content=ft.Text(self._["recording"], color=ft.colors.WHITE, size=12, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.colors.GREEN,
+                border_radius=5,
+                padding=5,
+                width=60,
+                height=26,
+                alignment=ft.alignment.center,
+            )
+        elif recording.status_info == RecordingStatus.RECORDING_ERROR:
+            return ft.Container(
+                content=ft.Text(self._["recording_error"], color=ft.colors.WHITE, size=12, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.colors.RED,
+                border_radius=5,
+                padding=5,
+                width=60,
+                height=26,
+                alignment=ft.alignment.center,
+            )
+        elif not recording.is_live and recording.monitor_status:
+            return ft.Container(
+                content=ft.Text(self._["offline"], color=ft.colors.BLACK, size=12, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.colors.AMBER,
+                border_radius=5,
+                padding=5,
+                width=60,
+                height=26,
+                alignment=ft.alignment.center,
+            )
+        elif not recording.monitor_status:
+            return ft.Container(
+                content=ft.Text(self._["no_monitor"], color=ft.colors.WHITE, size=12, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.colors.GREY,
+                border_radius=5,
+                padding=5,
+                width=60,
+                height=26,
+                alignment=ft.alignment.center,
+            )
+        return None
 
     async def update_card(self, recording):
         """Update only the recordings cards in the scrollable content area."""
         if recording.rec_id in self.cards_obj:
-            recording_card = self.cards_obj[recording.rec_id]
-            recording_card["display_title_label"].value = recording.display_title
-            recording_card["duration_label"].value = self.app.record_manager.get_duration(recording)
-            recording_card["speed_label"].value = recording.speed
-            recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)
-            recording_card["record_button"].tooltip = self.get_tip_for_recording_state(recording)
-            recording_card["monitor_button"].icon = self.get_icon_for_monitor_state(recording)
-            recording_card["monitor_button"].tooltip = self.get_tip_for_monitor_state(recording)
-            recording_card["card"].content.bgcolor = await self.update_record_hover(recording)
-            recording_card["card"].update()
+            try:
+                recording_card = self.cards_obj[recording.rec_id]
+                
+                status_prefix = ""
+                if not recording.monitor_status:
+                    status_prefix = f"[{self._['monitor_stopped']}] "
+                
+                display_title = f"{status_prefix}{recording.title}"
+                if recording_card.get("display_title_label"):
+                    recording_card["display_title_label"].value = display_title
+                    title_label_weight = ft.FontWeight.BOLD if recording.recording or recording.is_live else None
+                    recording_card["display_title_label"].weight = title_label_weight
+                
+                new_status_label = self.create_status_label(recording)
+                
+                if recording_card["card"] and recording_card["card"].content and recording_card["card"].content.content:
+                    title_row = recording_card["card"].content.content.controls[0]
+                    title_row.alignment = ft.MainAxisAlignment.START
+                    title_row.spacing = 5
+                    title_row.tight = True
+                    
+                    title_row_controls = title_row.controls
+                    if len(title_row_controls) > 1:
+                        if new_status_label:
+                            title_row_controls[1] = new_status_label
+                        else:
+                            title_row_controls.pop(1)
+                    elif new_status_label:
+                        title_row_controls.append(new_status_label)
+                
+                recording_card["status_label"] = new_status_label
+                
+                if recording_card.get("duration_label"):
+                    recording_card["duration_label"].value = self.app.record_manager.get_duration(recording)
+                
+                if recording_card.get("speed_label"):
+                    recording_card["speed_label"].value = recording.speed
+                
+                if recording_card.get("record_button"):
+                    recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)
+                    recording_card["record_button"].tooltip = self.get_tip_for_recording_state(recording)
+                
+                if recording_card.get("monitor_button"):
+                    recording_card["monitor_button"].icon = self.get_icon_for_monitor_state(recording)
+                    recording_card["monitor_button"].tooltip = self.get_tip_for_monitor_state(recording)
+                
+                if recording_card["card"] and recording_card["card"].content:
+                    recording_card["card"].content.bgcolor = self.get_card_background_color(recording)
+                    recording_card["card"].content.border = ft.border.all(2, self.get_card_border_color(recording))
+                    recording_card["card"].update()
+            except Exception as e:
+                print(f"Error updating card: {e}")
 
     async def update_monitor_state(self, recording: Recording):
         """Update the monitor button state based on the current monitoring status."""

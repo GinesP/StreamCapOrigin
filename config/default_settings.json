@@ -54,6 +54,6 @@
     "sender_name": "",
     "recipient_email": "",
     "theme_color": "blue",
-    "is_grid_view": false,
+    "is_grid_view": true,
     "theme_mode": "light"
 }

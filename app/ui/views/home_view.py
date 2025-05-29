@@ -4,6 +4,7 @@ import uuid
 import flet as ft
 
 from ...models.recording_model import Recording
+from ...models.recording_status_model import RecordingStatus
 from ...utils.logger import logger
 from ..base_page import PageBase
 from ..components.help_dialog import HelpDialog
@@ -17,10 +18,11 @@ class HomePage(PageBase):
         self.page_name = "home"
         self.recording_card_area = None
         self.add_recording_dialog = None
-        self.is_grid_view = app.settings.user_config.get("is_grid_view", False)
+        self.is_grid_view = app.settings.user_config.get("is_grid_view", True)
         self.loading_indicator = None
         self.app.language_manager.add_observer(self)
         self.load_language()
+        self.current_filter = "all"
         self.init()
 
     def load_language(self):
@@ -48,7 +50,7 @@ class HomePage(PageBase):
         else:
             initial_content = ft.Column(
                 controls=[], 
-                spacing=10, 
+                spacing=5, 
                 expand=True
             )
         
@@ -61,7 +63,13 @@ class HomePage(PageBase):
 
     async def load(self):
         """Load the home page content."""
-        self.content_area.controls.extend([self.create_home_title_area(), self.create_home_content_area()])
+        self.content_area.controls.extend(
+            [
+                self.create_home_title_area(),
+                self.create_filter_area(),
+                self.create_home_content_area()
+            ]
+        )
         self.content_area.update()
         
         self.recording_card_area.content.controls.clear()
@@ -97,13 +105,19 @@ class HomePage(PageBase):
         else:
             new_content = ft.Column(
                 controls=current_controls,
-                spacing=10,
+                spacing=5,
                 expand=True
             )
 
         self.recording_card_area.content = new_content
         self.content_area.clean()
-        self.content_area.controls.extend([self.create_home_title_area(), self.create_home_content_area()])
+        self.content_area.controls.extend(
+            [
+                self.create_home_title_area(),
+                self.create_filter_area(),
+                self.create_home_content_area()
+            ]
+        )
         self.content_area.update()
         
         self.app.settings.user_config["is_grid_view"] = self.is_grid_view
@@ -138,6 +152,109 @@ class HomePage(PageBase):
             ],
             alignment=ft.MainAxisAlignment.START,
         )
+    
+    def create_filter_area(self):
+        """Create the filter area"""
+        return ft.Row(
+            [
+                ft.Text(self._["filter"] + ":", size=14),
+                ft.ElevatedButton(
+                    self._["filter_all"],
+                    on_click=self.filter_all_on_click,
+                    bgcolor=ft.colors.BLUE if self.current_filter == "all" else None,
+                    color=ft.colors.WHITE if self.current_filter == "all" else None,
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=5),
+                    ),
+                ),
+                ft.ElevatedButton(
+                    self._["filter_recording"],
+                    on_click=self.filter_recording_on_click,
+                    bgcolor=ft.colors.GREEN if self.current_filter == "recording" else None,
+                    color=ft.colors.WHITE if self.current_filter == "recording" else None,
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=5),
+                    ),
+                ),
+                ft.ElevatedButton(
+                    self._["filter_offline"],
+                    on_click=self.filter_offline_on_click,
+                    bgcolor=ft.colors.AMBER if self.current_filter == "offline" else None,
+                    color=ft.colors.WHITE if self.current_filter == "offline" else None,
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=5),
+                    ),
+                ),
+                ft.ElevatedButton(
+                    self._["filter_error"],
+                    on_click=self.filter_error_on_click,
+                    bgcolor=ft.colors.RED if self.current_filter == "error" else None,
+                    color=ft.colors.WHITE if self.current_filter == "error" else None,
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=5),
+                    ),
+                ),
+                ft.ElevatedButton(
+                    self._["filter_stopped"],
+                    on_click=self.filter_stopped_on_click,
+                    bgcolor=ft.colors.GREY if self.current_filter == "stopped" else None,
+                    color=ft.colors.WHITE if self.current_filter == "stopped" else None,
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=5),
+                    ),
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.START,
+            spacing=5,
+        )
+    
+    async def filter_all_on_click(self, _):
+        self.current_filter = "all"
+        await self.apply_filter()
+    
+    async def filter_recording_on_click(self, _):
+        self.current_filter = "recording"
+        await self.apply_filter()
+    
+    async def filter_error_on_click(self, _):
+        self.current_filter = "error"
+        await self.apply_filter()
+    
+    async def filter_offline_on_click(self, _):
+        self.current_filter = "offline"
+        await self.apply_filter()
+    
+    async def filter_stopped_on_click(self, _):
+        self.current_filter = "stopped"
+        await self.apply_filter()
+    
+    async def apply_filter(self):
+        self.content_area.controls[1] = self.create_filter_area()
+        
+        cards_obj = self.app.record_card_manager.cards_obj
+        recordings = self.app.record_manager.recordings
+        
+        for recording in recordings:
+            card_info = cards_obj.get(recording.rec_id)
+            if not card_info:
+                continue
+                
+            visible = False
+            if self.current_filter == "all":
+                visible = True
+            elif self.current_filter == "recording":
+                visible = recording.recording
+            elif self.current_filter == "error":
+                visible = recording.status_info == RecordingStatus.RECORDING_ERROR
+            elif self.current_filter == "offline":
+                visible = not recording.is_live and recording.monitor_status
+            elif self.current_filter == "stopped":
+                visible = not recording.monitor_status
+                
+            card_info["card"].visible = visible
+            
+        self.content_area.update()
+        self.recording_card_area.update()
 
     async def reset_cards_visibility(self):
         cards_obj = self.app.record_card_manager.cards_obj
@@ -146,28 +263,47 @@ class HomePage(PageBase):
                 card_info["card"].visible = True
                 card_info["card"].update()
 
+    @staticmethod
+    def should_show_recording(filter_type, recording):
+        return (
+                filter_type == "all"
+                or (filter_type == "recording" and recording.recording)
+                or (filter_type == "error" and recording.status_info == RecordingStatus.RECORDING_ERROR)
+                or (filter_type == "offline" and not recording.is_live and recording.monitor_status)
+                or (filter_type == "stopped" and not recording.monitor_status)
+        )
+
     async def filter_recordings(self, query):
         recordings = self.app.record_manager.recordings
         cards_obj = self.app.record_card_manager.cards_obj
 
         if not query.strip():
-            await self.reset_cards_visibility()
+            await self.apply_filter()
             return {}
         else:
             lower_query = query.strip().lower()
-            new_ids = {
+            search_ids = {
                 rec.rec_id
                 for rec in recordings
                 if lower_query in str(rec.to_dict()).lower() or lower_query in rec.display_title
             }
+            
+            filtered_ids = set()
+            for rec_id in search_ids:
+                recording = self.app.record_manager.find_recording_by_id(rec_id)
+                if not recording:
+                    continue
+
+                if self.should_show_recording(self.current_filter, recording):
+                    filtered_ids.add(rec_id)
 
             for card_info in cards_obj.values():
-                card_info["card"].visible = card_info["card"].key in new_ids
+                card_info["card"].visible = card_info["card"].key in filtered_ids
                 card_info["card"].update()
 
-            if not new_ids:
+            if not filtered_ids:
                 await self.app.snack_bar.show_snack_bar(self._["not_search_result"], duration=2000)
-            return new_ids
+            return filtered_ids
 
     def create_home_content_area(self):
         return ft.Column(
@@ -228,12 +364,16 @@ class HomePage(PageBase):
                 self.app.record_manager.setup_periodic_live_check,
                 self.app.record_manager.loop_time_seconds
             )
+        
+        await self.apply_filter()
 
     async def show_all_cards(self):
         cards_obj = self.app.record_card_manager.cards_obj
         for card in cards_obj.values():
             card["card"].visible = True
         self.recording_card_area.update()
+        
+        await self.apply_filter()
 
     async def add_recording(self, recordings_info):
         user_config = self.app.settings.user_config

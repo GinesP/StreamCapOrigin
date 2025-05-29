@@ -29,7 +29,13 @@
     "start_recording_success_tip": "提示：直播间开始监控成功！",
     "not_search_result": "提示：未搜索到任何结果",
     "toggle_view": "切换视图",
-    "preview_video": "预览视频"
+    "preview_video": "预览视频",
+    "filter": "筛选",
+    "filter_all": "全部",
+    "filter_recording": "录制中",
+    "filter_error": "录制错误",
+    "filter_offline": "未开播",
+    "filter_stopped": "未监控"
   },
   "recording_dialog": {
     "input_live_link": "输入直播间地址",
@@ -123,7 +129,15 @@
     "recording_card_tip": "点击选中",
     "use_proxy": "使用代理",
     "no_support_open_dir": "⚠️ Web端不支持打开文件夹",
-    "message_push": "消息推送"
+    "message_push": "消息推送",
+    "all": "全部",
+    "recording": "录制中",
+    "recording_error": "录制错误",
+    "not_live": "未开播",
+    "stopped": "已停止",
+    "filter": "筛选",
+    "offline": "未开播",
+    "no_monitor": "未监控"
   },
   "settings_page": {
     "recording_settings": "录制设置",

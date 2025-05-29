@@ -7,8 +7,21 @@ class SearchDialog(ft.AlertDialog):
         self._ = {}
         self.load()
 
+        # Get the name of the current filter condition
+        filter_name = self._["filter_all"]
+        if self.home_page.current_filter == "recording":
+            filter_name = self._["filter_recording"]
+        elif self.home_page.current_filter == "error":
+            filter_name = self._["filter_error"]
+        elif self.home_page.current_filter == "offline":
+            filter_name = self._["filter_offline"]
+        elif self.home_page.current_filter == "stopped":
+            filter_name = self._["filter_stopped"]
+
+        search_title = f"{self._['search']} ({filter_name})"
+
         super().__init__(
-            title=ft.Text(self._["search"], size=20, weight=ft.FontWeight.BOLD),
+            title=ft.Text(search_title, size=20, weight=ft.FontWeight.BOLD),
             content_padding=ft.padding.only(left=20, top=15, right=20, bottom=20),
         )
         self.query = ft.TextField(
@@ -49,6 +62,14 @@ class SearchDialog(ft.AlertDialog):
         language = self.home_page.app.language_manager.language
         for key in ("search_dialog", "home_page", "base"):
             self._.update(language.get(key, {}))
+        
+        # Ensure the language items related to filtering exist
+        if "filter_all" not in self._:
+            self._["filter_all"] = self._["all"]
+            self._["filter_recording"] = self._["recording"]
+            self._["filter_offline"] = self._["not_live"]
+            self._["filter_error"] = self._["recording_error"]
+            self._["filter_stopped"] = self._["stopped"]
 
     async def close_dlg(self, _e):
         self.open = False
