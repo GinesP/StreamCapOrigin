@@ -77,6 +77,11 @@ class LiveStreamRecorder:
         return full_filename
 
     def _get_output_dir(self, stream_info: StreamData) -> str:
+        if self.recording.recording_dir and self.user_config.get("folder_name_time"):
+            current_date = datetime.today().strftime("%Y-%m-%d")
+            if current_date not in self.recording.recording_dir:
+                self.recording.recording_dir = None
+                
         if self.recording.recording_dir:
             return self.recording.recording_dir
 

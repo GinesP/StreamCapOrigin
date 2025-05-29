@@ -143,6 +143,12 @@ class SettingsPage(PageBase):
             self.user_config[key] = e.data.lower() == "true"
         else:
             self.user_config[key] = e.data
+            
+        if key in ["folder_name_platform", "folder_name_author", "folder_name_time", "folder_name_title"]:
+            for recording in self.app.record_manager.recordings:
+                recording.recording_dir = None
+            self.page.run_task(self.app.record_manager.persist_recordings)
+            
         if key == "language":
             self.load_language()
             self.app.language_manager.load()
