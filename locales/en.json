@@ -352,7 +352,8 @@
     "later_on": "Later",
     "install_guide": "Component Installation Guide",
     "install_tip": "This program requires the following components to function properly.",
-    "lack_components": "Missing Required Components"
+    "lack_components": "Missing Required Components",
+    "dont_show_again": "Don't Show Again"
   },
   "storage_page": {
     "storage_path": "Storage Path",
