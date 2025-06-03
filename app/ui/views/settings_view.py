@@ -494,21 +494,26 @@ class SettingsPage(PageBase):
                                 self.create_channel_switch_container(
                                     self._["wechat"], ft.Icons.WECHAT, "wechat_enabled"
                                 ),
-                                 self.create_channel_switch_container(
-                                    "ServerChan", ft.Icons.NOTIFICATIONS_ACTIVE, "serverchan_enabled" 
+                                self.create_channel_switch_container(
+                                    self._["serverchan"], ft.Icons.CLOUD_OUTLINED, "serverchan_enabled"
                                 ),
-                                self.create_channel_switch_container("Email", ft.Icons.EMAIL, "email_enabled"),
+                                self.create_channel_switch_container(self._["email"], ft.Icons.EMAIL, "email_enabled"),
                                 self.create_channel_switch_container(
                                     "Bark", ft.Icons.NOTIFICATIONS_ACTIVE, "bark_enabled"
-                                ),
-                                self.create_channel_switch_container("Ntfy", ft.Icons.NOTIFICATIONS, "ntfy_enabled"),
-                                self.create_channel_switch_container("Telegram", ft.Icons.SMS, "telegram_enabled"),
+                                )
                             ],
-                            wrap=False,
                             alignment=ft.MainAxisAlignment.START,
-                            spacing=10,
-                            run_spacing=10,
-                        )
+                            spacing=12,
+                        ),
+                        ft.Row(
+                            controls=[
+                                self.create_channel_switch_container("Ntfy", ft.Icons.NOTIFICATIONS, "ntfy_enabled"),
+                                self.create_channel_switch_container(
+                                    self._["telegram"], ft.Icons.SMS, "telegram_enabled"),
+                            ],
+                            alignment=ft.MainAxisAlignment.START,
+                            spacing=12,
+                        ),
                     ],
                 ),
                 self.create_setting_group(
@@ -563,10 +568,10 @@ class SettingsPage(PageBase):
                             ],
                         ),
                         self.create_channel_config(
-                            "ServerChan",
+                            self._["serverchan"],
                             [
                                 self.create_setting_row(
-                                    self._["serverchan_sendkey"],
+                                    self._["serverchan_send_key"],
                                     ft.TextField(
                                         value=self.get_config_value("serverchan_sendkey"),
                                         width=300,
@@ -584,7 +589,7 @@ class SettingsPage(PageBase):
                                         data="serverchan_channel",
                                     ),
                                 ),
-                                 self.create_setting_row(
+                                self.create_setting_row(
                                     self._["serverchan_tags"],
                                     ft.TextField(
                                         value=self.get_config_value("serverchan_tags"),
@@ -597,7 +602,7 @@ class SettingsPage(PageBase):
                             ],
                         ),
                         self.create_channel_config(
-                            "Email",
+                            self._["email"],
                             [
                                 self.create_setting_row(
                                     self._["smtp_server"],
@@ -730,7 +735,7 @@ class SettingsPage(PageBase):
                             ],
                         ),
                         self.create_channel_config(
-                            "Telegram",
+                            self._["telegram"],
                             [
                                 self.create_setting_row(
                                     self._["telegram_api_token"],

@@ -26,7 +26,7 @@ class NotificationService:
             return {"error": str(e)}
 
     async def send_to_dingtalk(
-        self, url: str, content: str, number: Optional[str] = None, is_atall: bool = False
+            self, url: str, content: str, number: Optional[str] = None, is_atall: bool = False
     ) -> dict[str, list[str]]:
         results = {"success": [], "error": []}
         api_list = [u.strip() for u in url.replace("，", ",").split(",") if u.strip()]
@@ -58,16 +58,16 @@ class NotificationService:
 
     @staticmethod
     async def send_to_email(
-        email_host: str,
-        login_email: str,
-        password: str,
-        sender_email: str,
-        sender_name: str,
-        to_email: str,
-        title: str,
-        content: str,
-        smtp_port: str | None = None,
-        open_ssl: bool = True,
+            email_host: str,
+            login_email: str,
+            password: str,
+            sender_email: str,
+            sender_name: str,
+            to_email: str,
+            title: str,
+            content: str,
+            smtp_port: str | None = None,
+            open_ssl: bool = True,
     ) -> dict[str, Any]:
         receivers = to_email.replace("，", ",").split(",") if to_email.strip() else []
 
@@ -106,18 +106,18 @@ class NotificationService:
             return {"success": [], "error": [1]}
 
     async def send_to_bark(
-        self,
-        api: str,
-        title: str = "message",
-        content: str = "test",
-        level: str = "active",
-        badge: int = 1,
-        auto_copy: int = 1,
-        sound: str = "",
-        icon: str = "",
-        group: str = "",
-        is_archive: int = 1,
-        url: str = "",
+            self,
+            api: str,
+            title: str = "message",
+            content: str = "test",
+            level: str = "active",
+            badge: int = 1,
+            auto_copy: int = 1,
+            sound: str = "",
+            icon: str = "",
+            group: str = "",
+            is_archive: int = 1,
+            url: str = "",
     ) -> dict[str, Any]:
         results = {"success": [], "error": []}
         api_list = api.replace("，", ",").split(",") if api.strip() else []
@@ -143,20 +143,20 @@ class NotificationService:
         return results
 
     async def send_to_ntfy(
-        self,
-        api: str,
-        title: str = "message",
-        content: str = "test",
-        tags: str = "tada",
-        priority: int = 3,
-        action_url: str = "",
-        attach: str = "",
-        filename: str = "",
-        click: str = "",
-        icon: str = "",
-        delay: str = "",
-        email: str = "",
-        call: str = "",
+            self,
+            api: str,
+            title: str = "message",
+            content: str = "test",
+            tags: str = "tada",
+            priority: int = 3,
+            action_url: str = "",
+            attach: str = "",
+            filename: str = "",
+            click: str = "",
+            icon: str = "",
+            delay: str = "",
+            email: str = "",
+            call: str = "",
     ) -> dict[str, Any]:
         results = {"success": [], "error": []}
         api_list = api.replace("，", ",").split(",") if api.strip() else []
@@ -190,55 +190,43 @@ class NotificationService:
         return results
 
     async def send_to_serverchan(
-            self, 
+            self,
             sendkey: str,
             title: str = "message",
             content: str = "test",
             short: str = "",
             channel: int = 9,
             tags: str = "partying_face"
-        ) -> dict[str, Any]:
-            """发送消息到ServerChan服务
-            
-            参数:
-                sckey: ServerChan的SCKEY，多个用逗号分隔
-                title: 消息标题
-                content: 消息内容
-                short: 短消息内容
-                channel: 消息通道
-            
-            返回:
-                包含成功和失败SCKEY的字典
-            """
-            results = {"success": [], "error": []}
-            sendkey_list = sendkey.replace("，", ",").split(",") if sendkey.strip() else []
+    ) -> dict[str, Any]:
 
-            for key in sendkey_list:
-                # 根据SCKEY类型构造URL
-                if key.startswith('sctp'):
-                    match = re.match(r'sctp(\d+)t', key)
-                    if match:
-                        num = match.group(1)
-                        url = f'https://{num}.push.ft07.com/send/{key}.send'
-                    else:
-                        logger.error(f"Invalid sendkey format for sctp: {key}")
-                        results["error"].append(key)
-                        continue
+        results = {"success": [], "error": []}
+        sendkey_list = sendkey.replace("，", ",").split(",") if sendkey.strip() else []
+
+        for key in sendkey_list:
+            if key.startswith('sctp'):
+                match = re.match(r'sctp(\d+)t', key)
+                if match:
+                    num = match.group(1)
+                    url = f'https://{num}.push.ft07.com/send/{key}.send'
                 else:
-                    url = f'https://sctapi.ftqq.com/{key}.send'
-                
-                json_data = {
+                    logger.error(f"Invalid sendkey format for sctp: {key}")
+                    results["error"].append(key)
+                    continue
+            else:
+                url = f'https://sctapi.ftqq.com/{key}.send'
+
+            json_data = {
                 "title": title,
                 "desp": content,
                 "short": short,
                 "channel": channel,
                 "tags": tags
-                }
-                resp = await self._async_post(url, json_data)
-                if resp.get("code") == 0:
-                    results["success"].append(key)
-                else:
-                    results["error"].append(key)
-                    logger.info(f"ServerChan push failed, SCKEY: {key}, Error message: {resp.get('message')}")
-            
-            return results
+            }
+            resp = await self._async_post(url, json_data)
+            if resp.get("code") == 0:
+                results["success"].append(key)
+            else:
+                results["error"].append(key)
+                logger.info(f"ServerChan push failed, SCKEY/SendKey: {key}, Error message: {resp.get('message')}")
+
+        return results
