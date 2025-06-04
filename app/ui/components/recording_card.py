@@ -173,7 +173,10 @@ class RecordingCardManager:
         """Get the border color of the card."""
         if recording.recording:
             return ft.colors.GREEN
-        elif recording.status_info == RecordingStatus.RECORDING_ERROR:
+        elif recording.status_info in [
+            RecordingStatus.RECORDING_ERROR,
+            RecordingStatus.LIVE_STATUS_CHECK_ERROR
+        ]:
             return ft.colors.RED
         elif not recording.is_live and recording.monitor_status:
             return ft.colors.AMBER
@@ -192,7 +195,7 @@ class RecordingCardManager:
                 height=26,
                 alignment=ft.alignment.center,
             )
-        elif recording.status_info == RecordingStatus.RECORDING_ERROR:
+        elif recording.status_info in [RecordingStatus.RECORDING_ERROR, RecordingStatus.LIVE_STATUS_CHECK_ERROR]:
             return ft.Container(
                 content=ft.Text(self._["recording_error"], color=ft.colors.WHITE, size=12, weight=ft.FontWeight.BOLD),
                 bgcolor=ft.colors.RED,
@@ -277,6 +280,7 @@ class RecordingCardManager:
                     recording_card["card"].content.bgcolor = self.get_card_background_color(recording)
                     recording_card["card"].content.border = ft.border.all(2, self.get_card_border_color(recording))
                     recording_card["card"].update()
+
             except Exception as e:
                 print(f"Error updating card: {e}")
 
