@@ -252,7 +252,8 @@ class RecordingManager:
                 logger.error(f"Fetch stream data failed: {recording.url}")
                 recording.is_checking = False
                 recording.status_info = RecordingStatus.LIVE_STATUS_CHECK_ERROR
-                self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                if recording.monitor_status:
+                    self.app.page.run_task(self.app.record_card_manager.update_card, recording)
                 return
 
             if self.settings.user_config.get("remove_emojis"):
