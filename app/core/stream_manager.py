@@ -482,6 +482,7 @@ class LiveStreamRecorder:
             "qiandurebo": "referer:https://qiandurebo.com",
             "17live": "referer:https://17.live/en/live/6302408",
             "lang": "referer:https://www.lang.live",
-            "shopee": "origin:" + live_domain
+            "shopee": "origin:" + live_domain,
+            "blued": "referer:https://app.blued.cn",
         }
         return record_headers.get(platform_key)
