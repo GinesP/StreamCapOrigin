@@ -143,12 +143,12 @@ class SettingsPage(PageBase):
             self.user_config[key] = e.data.lower() == "true"
         else:
             self.user_config[key] = e.data
-            
+
         if key in ["folder_name_platform", "folder_name_author", "folder_name_time", "folder_name_title"]:
             for recording in self.app.record_manager.recordings:
                 recording.recording_dir = None
             self.page.run_task(self.app.record_manager.persist_recordings)
-            
+
         if key == "language":
             self.load_language()
             self.app.language_manager.load()
@@ -485,36 +485,7 @@ class SettingsPage(PageBase):
                 self.create_setting_group(
                     self._["push_channels"],
                     self._["select_and_enable_channels"],
-                    [
-                        ft.Row(
-                            controls=[
-                                self.create_channel_switch_container(
-                                    self._["dingtalk"], ft.Icons.BUSINESS_CENTER, "dingtalk_enabled"
-                                ),
-                                self.create_channel_switch_container(
-                                    self._["wechat"], ft.Icons.WECHAT, "wechat_enabled"
-                                ),
-                                self.create_channel_switch_container(
-                                    self._["serverchan"], ft.Icons.CLOUD_OUTLINED, "serverchan_enabled"
-                                ),
-                                self.create_channel_switch_container(self._["email"], ft.Icons.EMAIL, "email_enabled"),
-                                self.create_channel_switch_container(
-                                    "Bark", ft.Icons.NOTIFICATIONS_ACTIVE, "bark_enabled"
-                                )
-                            ],
-                            alignment=ft.MainAxisAlignment.START,
-                            spacing=12,
-                        ),
-                        ft.Row(
-                            controls=[
-                                self.create_channel_switch_container("Ntfy", ft.Icons.NOTIFICATIONS, "ntfy_enabled"),
-                                self.create_channel_switch_container(
-                                    self._["telegram"], ft.Icons.SMS, "telegram_enabled"),
-                            ],
-                            alignment=ft.MainAxisAlignment.START,
-                            spacing=12,
-                        ),
-                    ],
+                    [self.create_push_channels_layout()]
                 ),
                 self.create_setting_group(
                     self._["channel_configuration"],
@@ -763,6 +734,50 @@ class SettingsPage(PageBase):
             spacing=10,
             scroll=ft.ScrollMode.AUTO,
         )
+
+    def create_push_channels_layout(self):
+        controls = [
+            self.create_channel_switch_container(
+                self._["dingtalk"], ft.Icons.BUSINESS_CENTER, "dingtalk_enabled"
+            ),
+            self.create_channel_switch_container(
+                self._["wechat"], ft.Icons.WECHAT, "wechat_enabled"
+            ),
+            self.create_channel_switch_container(
+                self._["serverchan"], ft.Icons.CLOUD_OUTLINED, "serverchan_enabled"
+            ),
+            self.create_channel_switch_container(
+                self._["email"], ft.Icons.EMAIL, "email_enabled"
+            ),
+            self.create_channel_switch_container(
+                "Bark", ft.Icons.NOTIFICATIONS_ACTIVE, "bark_enabled"
+            ),
+            self.create_channel_switch_container(
+                "Ntfy", ft.Icons.NOTIFICATIONS, "ntfy_enabled"
+            ),
+            self.create_channel_switch_container(
+                self._["telegram"], ft.Icons.SMS, "telegram_enabled"
+            ),
+        ]
+
+        if self.app.page.web:
+            return ft.Row(
+                controls=controls,
+                alignment=ft.MainAxisAlignment.START,
+                spacing=12,
+            )
+        else:
+            return ft.Container(
+                content=ft.GridView(
+                    controls=controls,
+                    runs_count=3,
+                    max_extent=175,
+                    spacing=5,
+                    run_spacing=2,
+                    child_aspect_ratio=2.5,
+                ),
+                expand=True,
+            )
 
     def create_cookies_settings_tab(self):
         """Create UI elements for push configuration."""
