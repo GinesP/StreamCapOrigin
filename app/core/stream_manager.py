@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from typing import Any
 
+from ..messages.message_pusher import MessagePusher
 from ..models.recording_status_model import RecordingStatus
 from ..models.video_quality_model import VideoQuality
 from ..process_manager import BackgroundService
@@ -264,7 +265,22 @@ class LiveStreamRecorder:
                 else:
                     self.recording.recording = False
                     logger.success(f"Live recording completed: {record_name}")
+                    if (self.settings.user_config["stream_end_notification_enabled"] 
+                            and self.recording.enabled_message_push):
+                        push_content = self._["push_content_end"]
+                        end_push_message_text = self.settings.user_config.get("custom_stream_end_content")
+                        if end_push_message_text:
+                            push_content = end_push_message_text
 
+                        push_at = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+                        push_content = push_content.replace("[room_name]", self.recording.streamer_name).replace(
+                        "[time]", push_at
+                        )
+                        msg_title = self.settings.user_config.get("custom_notification_title").strip()
+                        msg_title = msg_title or self._["status_notify"]
+
+                        msg_manager = MessagePusher(self.settings)
+                        self.app.page.run_task(msg_manager.push_messages, msg_title, push_content)
                 try:
                     self.recording.update({"display_title": display_title})
                     await self.app.record_card_manager.update_card(self.recording)
