@@ -53,7 +53,7 @@ class NotificationService:
                 results["success"].append(api)
             else:
                 results["error"].append(api)
-                logger.info(f"WeChat push failed, push address: {api},  Failure message: {json_data['msg']}")
+                logger.info(f"WeChat push failed, push address: {api},  Failure message: {json_data.get('msg')}")
         return results
 
     @staticmethod
@@ -139,7 +139,7 @@ class NotificationService:
                 results["success"].append(_api)
             else:
                 results["error"].append(_api)
-                logger.info(f"Bark push failed, push address: {_api},  Failure message: {json_data['message']}")
+                logger.info(f"Bark push failed, push address: {_api},  Failure message: {json_data.get('message')}")
         return results
 
     async def send_to_ntfy(
@@ -186,7 +186,7 @@ class NotificationService:
                 results["success"].append(_api)
             else:
                 results["error"].append(_api)
-                logger.info(f"Ntfy push failed, push address: {_api},  Failure message: {json_data['error']}")
+                logger.info(f"Ntfy push failed, push address: {_api},  Failure message: {json_data.get('error')}")
         return results
 
     async def send_to_serverchan(

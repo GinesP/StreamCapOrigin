@@ -82,7 +82,7 @@ class LiveStreamRecorder:
             current_date = datetime.today().strftime("%Y-%m-%d")
             if current_date not in self.recording.recording_dir:
                 self.recording.recording_dir = None
-                
+
         if self.recording.recording_dir:
             return self.recording.recording_dir
 
@@ -265,8 +265,8 @@ class LiveStreamRecorder:
                 else:
                     self.recording.recording = False
                     logger.success(f"Live recording completed: {record_name}")
-                    if (self.settings.user_config["stream_end_notification_enabled"] 
-                            and self.recording.enabled_message_push):
+                    if (self.app.recording_enabled and self.settings.user_config["stream_end_notification_enabled"]
+                            and self.recording.enabled_message_push and not self.recording.manually_stopped):
                         push_content = self._["push_content_end"]
                         end_push_message_text = self.settings.user_config.get("custom_stream_end_content")
                         if end_push_message_text:
@@ -274,7 +274,7 @@ class LiveStreamRecorder:
 
                         push_at = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
                         push_content = push_content.replace("[room_name]", self.recording.streamer_name).replace(
-                        "[time]", push_at
+                            "[time]", push_at
                         )
                         msg_title = self.settings.user_config.get("custom_notification_title").strip()
                         msg_title = msg_title or self._["status_notify"]
@@ -354,10 +354,10 @@ class LiveStreamRecorder:
                 self.converts_mp4_sync, converts_file_path, is_original_delete
             )
             return
-            
+
         # Otherwise, execute transcoding normally
         await self._do_converts_mp4(converts_file_path, is_original_delete)
-    
+
     def converts_mp4_sync(self, converts_file_path: str, is_original_delete: bool = True) -> None:
         """Synchronous version of the transcoding method, used for background service"""
         loop = asyncio.new_event_loop()
@@ -366,7 +366,7 @@ class LiveStreamRecorder:
             loop.run_until_complete(self._do_converts_mp4(converts_file_path, is_original_delete))
         finally:
             loop.close()
-    
+
     async def _do_converts_mp4(self, converts_file_path: str, is_original_delete: bool = True) -> None:
         """Actual execution method for transcoding"""
         converts_success = False
@@ -422,7 +422,7 @@ class LiveStreamRecorder:
         converts_to_mp4: bool
     ):
         from ..process_manager import BackgroundService
-        
+
         if "python" in script_command:
             params = [
                 f'--record_name "{record_name}"',
@@ -439,15 +439,15 @@ class LiveStreamRecorder:
                 f"converts_to_mp4: {converts_to_mp4}"
             ]
         script_command = script_command.strip() + " " + " ".join(params)
-        
+
         if not self.app.recording_enabled:
             logger.info("Application is closing, adding script execution task to background service")
             BackgroundService.get_instance().add_task(self.run_script_sync, script_command)
         else:
             self.app.page.run_task(self.run_script_async, script_command)
-            
+
         logger.success("Script command execution initiated!")
-        
+
     def run_script_sync(self, command: str) -> None:
         """Synchronous version of the script execution method, used for background service"""
         loop = asyncio.new_event_loop()

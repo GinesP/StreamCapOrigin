@@ -125,7 +125,7 @@ class RecordingManager:
                 status_info=RecordingStatus.STOPPED_MONITORING,
                 selected=False,
             )
-            self.stop_recording(recording)
+            self.stop_recording(recording, manually_stopped=True)
             self.app.page.run_task(self.app.record_card_manager.update_card, recording)
             self.app.page.pubsub.send_others_on_topic("update", recording)
             if auto_save:
@@ -331,7 +331,7 @@ class RecordingManager:
             logger.info(f"Started recording for {recording.title}")
 
     @staticmethod
-    def stop_recording(recording: Recording):
+    def stop_recording(recording: Recording, manually_stopped: bool = True):
         """Stop the recording process."""
         if recording.recording:
             if recording.start_time is not None:
@@ -342,6 +342,7 @@ class RecordingManager:
                 recording.last_duration = recording.cumulative_duration
             recording.start_time = None
             recording.recording = False
+            recording.manually_stopped = manually_stopped
             logger.info(f"Stopped recording for {recording.title}")
 
     def get_duration(self, recording: Recording):

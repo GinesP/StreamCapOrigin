@@ -295,7 +295,7 @@ class RecordingCardManager:
                     "display_title": f"[{self._['monitor_stopped']}] {recording.title}",
                 }
             )
-            self.app.record_manager.stop_recording(recording)
+            self.app.record_manager.stop_recording(recording, manually_stopped=True)
             self.app.page.run_task(self.app.snack_bar.show_snack_bar, self._["stop_monitor_tip"])
         else:
             recording.update(
@@ -338,7 +338,7 @@ class RecordingCardManager:
         """Toggle the recording state for a specific recording."""
         if recording and self.app.recording_enabled:
             if recording.recording:
-                self.app.record_manager.stop_recording(recording)
+                self.app.record_manager.stop_recording(recording, manually_stopped=True)
                 await self.app.snack_bar.show_snack_bar(self._["stop_record_tip"])
             else:
                 if recording.monitor_status:
