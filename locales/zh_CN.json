@@ -416,7 +416,14 @@
   "app_close_handler": {
     "saving_recordings": "正在保存 {active_recordings_count} 个录制内容，请稍候...",
     "confirm_exit": "确认退出",
-    "confirm_exit_content": "确定要退出程序吗？"
+    "confirm_exit_content": "您确定要退出程序吗？",
+    "minimize_to_tray": "最小化至托盘",
+    "exit_program": "退出程序",
+    "minimize_to_tray_tip": "点击\"最小化至托盘\"后，程序将隐藏到系统托盘继续运行"
+  },
+  "tray_manager": {
+    "restore": "恢复窗口",
+    "exit": "退出程序"
   },
   "login_page": {
     "login_title": "StreamCap 登录",

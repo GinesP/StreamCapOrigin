@@ -9,6 +9,7 @@ from screeninfo import get_monitors
 from app.app_manager import App, execute_dir
 from app.auth.auth_manager import AuthManager
 from app.lifecycle.app_close_handler import handle_app_close
+from app.lifecycle.tray_manager import TrayManager
 from app.ui.components.save_progress_overlay import SaveProgressOverlay
 from app.ui.views.login_view import LoginPage
 from app.utils.logger import logger
@@ -25,7 +26,7 @@ def setup_window(page: ft.Page, is_web: bool) -> None:
     page.window.center()
     page.window.to_front()
     page.skip_task_bar = True
-    page.always_on_top = True
+    page.window.always_on_top = True
     page.focused = True
 
     if not is_web:
@@ -93,6 +94,13 @@ async def main(page: ft.Page) -> None:
     page.data = app
     app.is_web_mode = is_web
     
+    if not is_web:
+        try:
+            app.tray_manager = TrayManager(app)
+            logger.info("Tray manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize tray manager: {e}")
+    
     theme_mode = app.settings.user_config.get("theme_mode", "light")
     if theme_mode == "dark":
         page.theme_mode = ft.ThemeMode.DARK
@@ -108,9 +116,14 @@ async def main(page: ft.Page) -> None:
         page.on_route_change = handle_route_change(page, app)
         page.window.prevent_close = True
         page.window.on_event = handle_window_event(page, app, save_progress_overlay)
-
         if is_web:
             page.on_disconnect = handle_disconnect(page)
+        elif page.platform.value == "windows":
+            if hasattr(app, "tray_manager"):
+                try:
+                    app.tray_manager.start(page)
+                except Exception as e:
+                    logger.error(f"Failed to start tray manager: {e}")
 
         page.update()
         page.on_route_change(ft.RouteChangeEvent(route=page.route))
