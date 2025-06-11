@@ -25,7 +25,7 @@ def setup_window(page: ft.Page, is_web: bool) -> None:
     page.window.icon = os.path.join(execute_dir, ASSETS_DIR, "icon.ico")
     page.window.center()
     page.window.to_front()
-    page.skip_task_bar = True
+    page.window.skip_task_bar = False
     page.window.always_on_top = False
     page.focused = True
 

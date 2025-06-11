@@ -4,6 +4,7 @@ import os
 import flet as ft
 
 from ...models.video_format_model import VideoFormat
+from ...models.audio_format_model import AudioFormat
 from ...models.video_quality_model import VideoQuality
 from ...utils.delay import DelayedTaskExecutor
 from ...utils.logger import logger
@@ -204,6 +205,10 @@ class SettingsPage(PageBase):
             live_save_path = os.path.join(self.app.run_path, 'downloads')
         return live_save_path
 
+    @staticmethod
+    def get_supported_record_format() -> list:
+        return VideoFormat.get_formats() + AudioFormat.get_formats()
+
     def create_recording_settings_tab(self):
         """Create UI elements for recording settings."""
         return ft.Column(
@@ -292,7 +297,7 @@ class SettingsPage(PageBase):
                         self.create_setting_row(
                             self._["video_record_format"],
                             ft.Dropdown(
-                                options=[ft.dropdown.Option(i) for i in VideoFormat.get_formats()],
+                                options=[ft.dropdown.Option(i) for i in self.get_supported_record_format()],
                                 value=self.get_config_value("video_format", VideoFormat.TS),
                                 width=200,
                                 data="video_format",

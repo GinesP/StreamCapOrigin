@@ -167,7 +167,7 @@
     "skip_proxy_detection": "Skip Proxy Detection",
     "recording_options": "Recording Options",
     "advanced_config": "Advanced recording configuration",
-    "video_record_format": "Video Recording Format",
+    "video_record_format": "Video/Audio Recording Format",
     "recording_quality": "Recording Quality",
     "loop_time": "Loop Time (Seconds)",
     "is_segmented_recording_enabled": "Enable Segmented Recording",

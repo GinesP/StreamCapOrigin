@@ -27,6 +27,15 @@ class RecordingDialog:
         """Show a dialog for adding or editing a recording."""
         initial_values = self.recording.to_dict() if self.recording else {}
 
+        user_config = self.app.settings.user_config
+        default_record_format = initial_values.get("record_format", user_config.get("video_format", VideoFormat.TS))
+        default_record_type = "video" if default_record_format in VideoFormat.get_formats() else "audio"
+        default_record_quality = initial_values.get("quality", user_config.get("record_quality", VideoQuality.OD))
+        segmented_recording_enabled = user_config.get('segmented_recording_enabled', False)
+        video_segment_time = user_config.get('video_segment_time', 1800)
+        segment_record = initial_values.get("segment_record", segmented_recording_enabled)
+        segment_time = initial_values.get("segment_time", video_segment_time)
+
         async def on_url_change(_):
             """Enable or disable the submit button based on whether the URL field is filled."""
             is_active = utils.is_valid_url(url_field.value.strip()) or utils.contains_url(batch_input.value.strip())
@@ -54,7 +63,7 @@ class RecordingDialog:
             options=[ft.dropdown.Option(i, text=self._[i]) for i in VideoQuality.get_qualities()],
             border_radius=5,
             filled=False,
-            value=initial_values.get("quality", VideoQuality.OD),
+            value=default_record_quality,
             width=500,
         )
         streamer_name_field = ft.TextField(
@@ -71,15 +80,15 @@ class RecordingDialog:
                 ft.dropdown.Option("audio", text=self._["audio"])
             ],
             width=245,
-            value="video",
+            value=default_record_type,
             on_change=update_format_options
         )
         record_format_field = ft.Dropdown(
             label=self._["select_record_format"],
-            options=[ft.dropdown.Option(i) for i in VideoFormat.get_formats()],
+            options=[ft.dropdown.Option(i) for i in self.app.settings.get_supported_record_format()],
             border_radius=5,
             filled=False,
-            value=initial_values.get("record_format", VideoFormat.TS),
+            value=default_record_format,
             width=245,
             menu_height=200
         )
@@ -93,12 +102,6 @@ class RecordingDialog:
             filled=False,
             value=initial_values.get("recording_dir"),
         )
-
-        user_config = self.app.settings.user_config
-        segmented_recording_enabled = user_config.get('segmented_recording_enabled', False)
-        video_segment_time = user_config.get('video_segment_time', 1800)
-        segment_record = initial_values.get("segment_record", segmented_recording_enabled)
-        segment_time = initial_values.get("segment_time", video_segment_time)
 
         async def on_segment_setting_change(e):
             selected_value = e.control.value

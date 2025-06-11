@@ -168,7 +168,7 @@
     "skip_proxy_detection": "跳过代理检测",
     "recording_options": "录制选项",
     "advanced_config": "配置录制高级选项",
-    "video_record_format": "视频录制格式",
+    "video_record_format": "视频/音频录制格式",
     "recording_quality": "录制清晰度",
     "loop_time": "循环时间(秒)",
     "is_segmented_recording_enabled": "分段录制是否开启",
