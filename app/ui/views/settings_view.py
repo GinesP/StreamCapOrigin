@@ -3,8 +3,8 @@ import os
 
 import flet as ft
 
-from ...models.video_format_model import VideoFormat
 from ...models.audio_format_model import AudioFormat
+from ...models.video_format_model import VideoFormat
 from ...models.video_quality_model import VideoQuality
 from ...utils.delay import DelayedTaskExecutor
 from ...utils.logger import logger
