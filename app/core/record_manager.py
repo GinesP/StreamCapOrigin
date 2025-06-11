@@ -269,9 +269,12 @@ class RecordingManager:
                 recording.title = f"{recording.streamer_name} - {self._[recording.quality]}"
                 recording.display_title = f"[{self._['is_live']}] {recording.title}"
 
-                if self.settings.user_config["stream_start_notification_enabled"] and recording.enabled_message_push:
+                msg_manager = MessagePusher(self.settings)
+                user_config = self.settings.user_config
+                
+                if MessagePusher.should_push_message(self.settings, recording):
                     push_content = self._["push_content"]
-                    begin_push_message_text = self.settings.user_config.get("custom_stream_start_content")
+                    begin_push_message_text = user_config.get("custom_stream_start_content")
                     if begin_push_message_text:
                         push_content = begin_push_message_text
 
@@ -279,14 +282,13 @@ class RecordingManager:
                     push_content = push_content.replace("[room_name]", recording.streamer_name).replace(
                         "[time]", push_at
                     )
-                    msg_title = self.settings.user_config.get("custom_notification_title").strip()
+                    msg_title = user_config.get("custom_notification_title").strip()
                     msg_title = msg_title or self._["status_notify"]
 
-                    msg_manager = MessagePusher(self.settings)
                     self.app.page.run_task(msg_manager.push_messages, msg_title, push_content)
 
-                    if self.settings.user_config.get("only_notify_no_record"):
-                        notify_loop_time = self.settings.user_config.get("notify_loop_time")
+                    if user_config.get("only_notify_no_record"):
+                        notify_loop_time = user_config.get("notify_loop_time")
                         recording.loop_time_seconds = int(notify_loop_time or 3600)
                         is_record = False
                     else:

@@ -265,10 +265,14 @@ class LiveStreamRecorder:
                 else:
                     self.recording.recording = False
                     logger.success(f"Live recording completed: {record_name}")
-                    if (self.app.recording_enabled and self.settings.user_config["stream_end_notification_enabled"]
-                            and self.recording.enabled_message_push and not self.recording.manually_stopped):
+                    # 检查是否应该推送消息
+                    msg_manager = MessagePusher(self.settings)
+                    user_config = self.settings.user_config
+                    
+                    if self.app.recording_enabled and MessagePusher.should_push_message(
+                            self.settings, self.recording, check_manually_stopped=True):
                         push_content = self._["push_content_end"]
-                        end_push_message_text = self.settings.user_config.get("custom_stream_end_content")
+                        end_push_message_text = user_config.get("custom_stream_end_content")
                         if end_push_message_text:
                             push_content = end_push_message_text
 
@@ -276,10 +280,9 @@ class LiveStreamRecorder:
                         push_content = push_content.replace("[room_name]", self.recording.streamer_name).replace(
                             "[time]", push_at
                         )
-                        msg_title = self.settings.user_config.get("custom_notification_title").strip()
+                        msg_title = user_config.get("custom_notification_title").strip()
                         msg_title = msg_title or self._["status_notify"]
 
-                        msg_manager = MessagePusher(self.settings)
                         self.app.page.run_task(msg_manager.push_messages, msg_title, push_content)
                 try:
                     self.recording.update({"display_title": display_title})

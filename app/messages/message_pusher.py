@@ -9,6 +9,62 @@ class MessagePusher:
         self.settings = settings
         self.notifier = NotificationService()
 
+    def is_any_push_channel_enabled(self):
+        """Check if any push channel is enabled"""
+        push_channels = [
+            "dingtalk_enabled",
+            "wechat_enabled",
+            "bark_enabled",
+            "ntfy_enabled",
+            "telegram_enabled",
+            "email_enabled",
+            "serverchan_enabled"
+        ]
+        
+        return any(self.settings.user_config.get(channel) for channel in push_channels)
+
+    @staticmethod
+    def should_push_message(settings, recording, check_manually_stopped=False):
+        """
+        Check if message should be pushed
+        """
+        if not recording.enabled_message_push:
+            return False
+            
+        user_config = settings.user_config
+        
+        # Check if global push settings are enabled
+        global_push_enabled = (
+            user_config.get("stream_start_notification_enabled") or 
+            user_config.get("stream_end_notification_enabled") or 
+            user_config.get("only_notify_no_record")
+        )
+        
+        if not global_push_enabled:
+            return False
+            
+        # Check if any push platform is enabled
+        push_channels = [
+            "dingtalk_enabled",
+            "wechat_enabled",
+            "bark_enabled",
+            "ntfy_enabled",
+            "telegram_enabled",
+            "email_enabled",
+            "serverchan_enabled"
+        ]
+        
+        any_channel_enabled = any(user_config.get(channel) for channel in push_channels)
+        
+        if not any_channel_enabled:
+            return False
+            
+        # Check if manually stopped status is needed
+        if check_manually_stopped and recording.manually_stopped:
+            return False
+            
+        return True
+
     async def push_messages(self, msg_title: str, push_content: str):
         """Push messages to all enabled notification services"""
         if self.settings.user_config.get("dingtalk_enabled"):
