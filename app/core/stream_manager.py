@@ -207,7 +207,7 @@ class LiveStreamRecorder:
             logger.info(f"Recording in Progress: {live_url}")
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
             while True:
-                if not self.recording.recording or not self.app.recording_enabled:
+                if not self.recording.is_recording or not self.app.recording_enabled:
                     logger.info(f"Preparing to End Recording: {live_url}")
 
                     if os.name == "nt":
@@ -260,12 +260,11 @@ class LiveStreamRecorder:
                     display_title = self.recording.display_title
 
                 self.recording.live_title = None
-                if not self.recording.recording:
+                if not self.recording.is_recording:
                     logger.success(f"Live recording has stopped: {record_name}")
                 else:
-                    self.recording.recording = False
+                    self.recording.is_recording = False
                     logger.success(f"Live recording completed: {record_name}")
-                    # 检查是否应该推送消息
                     msg_manager = MessagePusher(self.settings)
                     user_config = self.settings.user_config
                     

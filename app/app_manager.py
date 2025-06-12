@@ -42,6 +42,7 @@ class App:
         self.language_manager = LanguageManager(self)
         self.about = AboutPage(self)
         self.home = HomePage(self)
+        self.storage = StoragePage(self)
         self.pages = self.initialize_pages()
         self.language_code = self.settings.language_code
         self.sidebar = NavigationSidebar(self)
@@ -75,9 +76,9 @@ class App:
     def initialize_pages(self):
         return {
             "settings": self.settings,
-            "home": HomePage(self),
-            "storage": StoragePage(self),
-            "about": AboutPage(self),
+            "home": self.home,
+            "storage": self.storage,
+            "about": self.about,
         }
 
     async def switch_page(self, page_name):

@@ -53,9 +53,11 @@ class Recording:
         self.title = f"{streamer_name} - {self.quality}"
         self.speed = "X KB/s"
         self.is_live = False
-        self.recording = False  # Record status
+        self.is_recording = False
         self.start_time = None
         self.manually_stopped = False
+        self.platform = None
+        self.platform_key = None
 
         self.cumulative_duration = timedelta()  # Accumulated recording time
         self.last_duration = timedelta()  # Save the total time of the last recording
@@ -85,6 +87,8 @@ class Recording:
             "monitor_hours": self.monitor_hours,
             "recording_dir": self.recording_dir,
             "enabled_message_push": self.enabled_message_push,
+            "platform": self.platform,
+            "platform_key": self.platform_key,
         }
 
     @classmethod
@@ -108,6 +112,8 @@ class Recording:
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)
         recording.last_duration_str = data.get("last_duration")
+        recording.platform = data.get("platform")
+        recording.platform_key = data.get("platform_key")
         if recording.last_duration_str is not None:
             recording.last_duration = timedelta(seconds=float(recording.last_duration_str))
         return recording

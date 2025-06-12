@@ -178,7 +178,7 @@ class RecordingManager:
     async def check_all_live_status(self):
         """Check the live status of all recordings and update their display titles."""
         for recording in self.recordings:
-            if recording.monitor_status and not recording.recording:
+            if recording.monitor_status and not recording.is_recording:
                 is_exceeded = utils.is_time_interval_exceeded(recording.detection_time, recording.loop_time_seconds)
                 if not recording.detection_time or is_exceeded:
                     self.app.page.run_task(self.check_if_live, recording)
@@ -200,7 +200,7 @@ class RecordingManager:
     async def check_if_live(self, recording: Recording):
         """Check if the live stream is available, fetch stream data and update is_live status."""
 
-        if recording.recording:
+        if recording.is_recording:
             return
 
         if not recording.monitor_status:
@@ -222,6 +222,11 @@ class RecordingManager:
 
             recording.is_checking = True
             platform, platform_key = get_platform_info(recording.url)
+            
+            if platform and platform_key and (recording.platform is None or recording.platform_key is None):
+                recording.platform = platform
+                recording.platform_key = platform_key
+                self.app.page.run_task(self.persist_recordings)
 
             if self.settings.user_config["language"] != "zh_CN":
                 platform = platform_key
@@ -232,7 +237,6 @@ class RecordingManager:
                 recording.is_checking = False
                 recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
                 return
-
             recording_info = {
                 "platform": platform,
                 "platform_key": platform_key,
@@ -245,7 +249,6 @@ class RecordingManager:
             }
 
             recorder = LiveStreamRecorder(self.app, recording, recording_info)
-
             stream_info = await recorder.fetch_stream()
             logger.info(f"Stream Data: {stream_info}")
             if not stream_info or not stream_info.anchor_name:
@@ -255,13 +258,12 @@ class RecordingManager:
                 if recording.monitor_status:
                     self.app.page.run_task(self.app.record_card_manager.update_card, recording)
                 return
-
             if self.settings.user_config.get("remove_emojis"):
                 stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, self._["live_room"])
 
             recording.is_live = stream_info.is_live
             is_record = True
-            if recording.is_live and not recording.recording:
+            if recording.is_live and not recording.is_recording:
                 recording.status_info = RecordingStatus.PREPARING_RECORDING
                 recording.live_title = stream_info.title
                 if recording.streamer_name.strip() == self._["live_room"]:
@@ -271,7 +273,6 @@ class RecordingManager:
 
                 msg_manager = MessagePusher(self.settings)
                 user_config = self.settings.user_config
-                
                 if MessagePusher.should_push_message(self.settings, recording):
                     push_content = self._["push_content"]
                     begin_push_message_text = user_config.get("custom_stream_start_content")
@@ -297,11 +298,13 @@ class RecordingManager:
                 if is_record:
                     self.start_update(recording)
                     self.app.page.run_task(recorder.start_recording, stream_info)
+                else:
+                    recording.is_checking = False
 
                 self.app.page.run_task(self.app.record_card_manager.update_card, recording)
                 self.app.page.pubsub.send_others_on_topic("update", recording)
-
             else:
+                recording.is_checking = False
                 recording.status_info = RecordingStatus.MONITORING
                 title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[recording.quality]}"
                 if recording.streamer_name == self._["live_room"] or \
@@ -320,14 +323,14 @@ class RecordingManager:
     @staticmethod
     def start_update(recording: Recording):
         """Start the recording process."""
-        if recording.is_live and not recording.recording:
+        if recording.is_live and not recording.is_recording:
             # Reset cumulative and last durations for a fresh start
             recording.update(
                 {
                     "cumulative_duration": timedelta(),
                     "last_duration": timedelta(),
                     "start_time": datetime.now(),
-                    "recording": True,
+                    "is_recording": True,
                 }
             )
             logger.info(f"Started recording for {recording.title}")
@@ -335,7 +338,7 @@ class RecordingManager:
     @staticmethod
     def stop_recording(recording: Recording, manually_stopped: bool = True):
         """Stop the recording process."""
-        if recording.recording:
+        if recording.is_recording:
             if recording.start_time is not None:
                 elapsed = datetime.now() - recording.start_time
                 # Add the elapsed time to the cumulative duration.
@@ -343,13 +346,13 @@ class RecordingManager:
                 # Update the last recorded duration.
                 recording.last_duration = recording.cumulative_duration
             recording.start_time = None
-            recording.recording = False
+            recording.is_recording = False
             recording.manually_stopped = manually_stopped
             logger.info(f"Stopped recording for {recording.title}")
 
     def get_duration(self, recording: Recording):
         """Get the duration of the current recording session in a formatted string."""
-        if recording.recording and recording.start_time is not None:
+        if recording.is_recording and recording.start_time is not None:
             elapsed = datetime.now() - recording.start_time
             # If recording, add the current session time.
             total_duration = recording.cumulative_duration + elapsed
@@ -363,6 +366,12 @@ class RecordingManager:
         self.app.page.run_task(self.app.record_card_manager.remove_recording_card, recordings)
         self.app.page.pubsub.send_others_on_topic('delete', recordings)
         await self.remove_recordings(recordings)
+        
+        # update the filter area of the home page
+        if hasattr(self.app, 'current_page') and hasattr(self.app.current_page, 'content_area'):
+            if len(self.app.current_page.content_area.controls) > 1:
+                self.app.current_page.content_area.controls[1] = self.app.current_page.create_filter_area()
+                self.app.current_page.content_area.update()
 
     async def check_free_space(self, output_dir: str | None = None):
         disk_space_limit = float(self.settings.user_config.get("recording_space_threshold"))

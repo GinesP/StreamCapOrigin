@@ -30,12 +30,14 @@
     "not_search_result": "提示：未搜索到任何结果",
     "toggle_view": "切换视图",
     "preview_video": "预览视频",
-    "filter": "筛选",
+    "status_filter": "状态筛选",
     "filter_all": "全部",
     "filter_recording": "录制中",
     "filter_error": "录制错误",
     "filter_offline": "未开播",
-    "filter_stopped": "未监控"
+    "filter_stopped": "未监控",
+    "platform_filter": "平台筛选",
+    "platform_sort": "平台排序"
   },
   "recording_dialog": {
     "input_live_link": "输入直播间地址",
@@ -108,6 +110,7 @@
     "open_folder": "打开文件夹",
     "recording_info": "录制信息",
     "anchor_name": "主播名称",
+    "platform_name": "平台名称",
     "live_link": "直播链接",
     "live_title": "直播标题",
     "record_format": "录制格式",

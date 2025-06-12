@@ -24,6 +24,7 @@ class CardDialog(ft.AlertDialog):
     def get_content(self, recording):
         """Record card information content"""
         anchor_name = recording.streamer_name
+        platform_name = recording.platform
         live_link = recording.url
         live_title = recording.live_title or self._["none"]
         record_format = recording.record_format
@@ -43,6 +44,7 @@ class CardDialog(ft.AlertDialog):
         dialog_content = ft.Column(
             [
                 ft.Text(f"{self._['anchor_name']}: {anchor_name}", size=14, selectable=True),
+                ft.Text(f"{self._['platform_name']}: {platform_name}", size=14, selectable=True),
                 ft.Text(f"{self._['live_link']}: {live_link}", size=14, selectable=True),
                 ft.Text(f"{self._['live_title']}: {live_title}", size=14, selectable=True),
                 ft.Text(f"{self._['record_format']}: {record_format}", size=14),

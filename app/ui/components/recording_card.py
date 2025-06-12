@@ -94,7 +94,7 @@ class RecordingCardManager:
             no_wrap=True,
             overflow=ft.TextOverflow.ELLIPSIS,
             expand=True,
-            weight=ft.FontWeight.BOLD if recording.recording or recording.is_live else None,
+            weight=ft.FontWeight.BOLD if recording.is_recording or recording.is_live else None,
         )
         
         open_folder_button = ft.IconButton(
@@ -171,7 +171,7 @@ class RecordingCardManager:
     @staticmethod
     def get_card_border_color(recording: Recording):
         """Get the border color of the card."""
-        if recording.recording:
+        if recording.is_recording:
             return ft.colors.GREEN
         elif recording.status_info in [
             RecordingStatus.RECORDING_ERROR,
@@ -185,7 +185,7 @@ class RecordingCardManager:
         return ft.colors.TRANSPARENT
 
     def create_status_label(self, recording: Recording):
-        if recording.recording:
+        if recording.is_recording:
             return ft.Container(
                 content=ft.Text(self._["recording"], color=ft.colors.WHITE, size=12, weight=ft.FontWeight.BOLD),
                 bgcolor=ft.colors.GREEN,
@@ -240,7 +240,7 @@ class RecordingCardManager:
                 display_title = f"{status_prefix}{recording.title}"
                 if recording_card.get("display_title_label"):
                     recording_card["display_title_label"].value = display_title
-                    title_label_weight = ft.FontWeight.BOLD if recording.recording or recording.is_live else None
+                    title_label_weight = ft.FontWeight.BOLD if recording.is_recording or recording.is_live else None
                     recording_card["display_title_label"].weight = title_label_weight
                 
                 new_status_label = self.create_status_label(recording)
@@ -337,7 +337,7 @@ class RecordingCardManager:
     async def on_toggle_recording(self, recording: Recording):
         """Toggle the recording state for a specific recording."""
         if recording and self.app.recording_enabled:
-            if recording.recording:
+            if recording.is_recording:
                 self.app.record_manager.stop_recording(recording, manually_stopped=True)
                 await self.app.snack_bar.show_snack_bar(self._["stop_record_tip"])
             else:
@@ -357,7 +357,7 @@ class RecordingCardManager:
     async def on_delete_recording(self, recording: Recording):
         """Delete a recording from the list and update UI."""
         if recording:
-            if recording.recording:
+            if recording.is_recording:
                 await self.app.snack_bar.show_snack_bar(self._["please_stop_monitor_tip"])
                 return
             await self.app.record_manager.delete_recording_cards([recording])
@@ -397,10 +397,10 @@ class RecordingCardManager:
     @staticmethod
     def get_icon_for_recording_state(recording: Recording):
         """Return the appropriate icon based on the recording's state."""
-        return ft.Icons.PLAY_CIRCLE if not recording.recording else ft.Icons.STOP_CIRCLE
+        return ft.Icons.PLAY_CIRCLE if not recording.is_recording else ft.Icons.STOP_CIRCLE
 
     def get_tip_for_recording_state(self, recording: Recording):
-        return self._["stop_record"] if recording.recording else self._["start_record"]
+        return self._["stop_record"] if recording.is_recording else self._["start_record"]
 
     @staticmethod
     def get_icon_for_monitor_state(recording: Recording):
@@ -417,7 +417,7 @@ class RecordingCardManager:
             if not recording or recording.rec_id not in self.cards_obj:  # Stop task if card is removed
                 break
 
-            if recording.recording:
+            if recording.is_recording:
                 duration_label = self.cards_obj[recording.rec_id]["duration_label"]
                 duration_label.value = self.app.record_manager.get_duration(recording)
                 duration_label.update()
@@ -444,7 +444,7 @@ class RecordingCardManager:
     async def edit_recording_button_click(self, _, recording: Recording):
         """Handle edit button click by showing the edit dialog with existing recording info."""
 
-        if recording.recording or recording.monitor_status:
+        if recording.is_recording or recording.monitor_status:
             await self.app.snack_bar.show_snack_bar(self._["please_stop_monitor_tip"])
             return
 

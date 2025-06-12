@@ -30,12 +30,14 @@
     "not_search_result": "Tip: No search results found",
     "toggle_view": "Toggle View",
     "preview_video": "Preview Video",
-    "filter": "Filter",
+    "status_filter": "Status Filter",
     "filter_all": "All",
     "filter_recording": "Recording",
     "filter_error": "Error",
     "filter_offline": "Offline",
-    "filter_stopped": "Not Monitored"
+    "filter_stopped": "Not Monitored",
+    "platform_filter": "Platform Filter",
+    "platform_sort": "Platform Sort"
   },
   "recording_dialog": {
     "input_live_link": "Enter Live Room URL",
@@ -107,6 +109,7 @@
     "open_folder": "Open Folder",
     "recording_info": "Recording Information",
     "anchor_name": "Anchor Name",
+    "platform_name": "Platform Name",
     "live_link": "Live Link",
     "live_title": "Live Title",
     "record_format": "Recording Format",

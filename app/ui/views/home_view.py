@@ -3,13 +3,14 @@ import uuid
 
 import flet as ft
 
+from ...core.platform_handlers import get_platform_info
 from ...models.recording_model import Recording
-from ...models.recording_status_model import RecordingStatus
 from ...utils.logger import logger
 from ..base_page import PageBase
 from ..components.help_dialog import HelpDialog
 from ..components.recording_dialog import RecordingDialog
 from ..components.search_dialog import SearchDialog
+from ..filters import RecordingFilters
 
 
 class HomePage(PageBase):
@@ -23,6 +24,8 @@ class HomePage(PageBase):
         self.app.language_manager.add_observer(self)
         self.load_language()
         self.current_filter = "all"
+        self.current_platform_filter = "all"
+        self.platform_buttons = {}
         self.init()
 
     def load_language(self):
@@ -72,8 +75,12 @@ class HomePage(PageBase):
         )
         self.content_area.update()
         
-        self.recording_card_area.content.controls.clear()
-        await self.add_record_cards()
+        if not self.recording_card_area.content.controls:
+            self.recording_card_area.content.controls.clear()
+            await self.add_record_cards()
+        else:
+            # if cards exist, apply filter
+            await self.apply_filter()
         
         if self.is_grid_view:
             await self.recalculate_grid_columns()
@@ -155,57 +162,106 @@ class HomePage(PageBase):
     
     def create_filter_area(self):
         """Create the filter area"""
+
+        filter_buttons = [
+            ft.Text(self._["status_filter"] + ":", size=14),
+            ft.ElevatedButton(
+                self._["filter_all"],
+                on_click=self.filter_all_on_click,
+                bgcolor=ft.colors.BLUE if self.current_filter == "all" else None,
+                color=ft.colors.WHITE if self.current_filter == "all" else None,
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=5),
+                ),
+            ),
+            ft.ElevatedButton(
+                self._["filter_recording"],
+                on_click=self.filter_recording_on_click,
+                bgcolor=ft.colors.GREEN if self.current_filter == "recording" else None,
+                color=ft.colors.WHITE if self.current_filter == "recording" else None,
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=5),
+                ),
+            ),
+            ft.ElevatedButton(
+                self._["filter_offline"],
+                on_click=self.filter_offline_on_click,
+                bgcolor=ft.colors.AMBER if self.current_filter == "offline" else None,
+                color=ft.colors.WHITE if self.current_filter == "offline" else None,
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=5),
+                ),
+            ),
+            ft.ElevatedButton(
+                self._["filter_error"],
+                on_click=self.filter_error_on_click,
+                bgcolor=ft.colors.RED if self.current_filter == "error" else None,
+                color=ft.colors.WHITE if self.current_filter == "error" else None,
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=5),
+                ),
+            ),
+            ft.ElevatedButton(
+                self._["filter_stopped"],
+                on_click=self.filter_stopped_on_click,
+                bgcolor=ft.colors.GREY if self.current_filter == "stopped" else None,
+                color=ft.colors.WHITE if self.current_filter == "stopped" else None,
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=5),
+                ),
+            ),
+        ]
+        
+        platforms = {}
+        for recording in self.app.record_manager.recordings:
+            if recording.platform and recording.platform_key:
+                platforms[recording.platform_key] = recording.platform
+        
+        platform_options = [
+            ft.dropdown.Option(key="all", text=self._["filter_all"])
+        ]
+        
+        for key, name in platforms.items():
+            platform_options.append(ft.dropdown.Option(key=key, text=name))
+        
+        current_platform_keys = ["all"] + list(platforms.keys())
+        if self.current_platform_filter not in current_platform_keys:
+            self.current_platform_filter = "all"
+        
+        platform_dropdown = ft.Dropdown(
+            options=platform_options,
+            value=self.current_platform_filter,
+            on_change=self.on_platform_dropdown_change,
+            width=120,
+            text_size=14,
+            content_padding=ft.padding.only(top=8, bottom=8, left=10, right=10),
+            border_radius=5,
+            border_color=ft.colors.OUTLINE,
+            focused_border_color=ft.colors.PRIMARY,
+            focused_bgcolor=ft.colors.SURFACE_VARIANT,
+            dense=True,
+        )
+        if len(current_platform_keys) > 8:
+            platform_dropdown.menu_height = 320
+        
+        platform_filter_area = ft.Row(
+            [
+                ft.Text(self._["platform_filter"] + ":", size=14),
+                platform_dropdown
+            ],
+            spacing=8,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+        
         return ft.Row(
             [
-                ft.Text(self._["filter"] + ":", size=14),
-                ft.ElevatedButton(
-                    self._["filter_all"],
-                    on_click=self.filter_all_on_click,
-                    bgcolor=ft.colors.BLUE if self.current_filter == "all" else None,
-                    color=ft.colors.WHITE if self.current_filter == "all" else None,
-                    style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=5),
-                    ),
-                ),
-                ft.ElevatedButton(
-                    self._["filter_recording"],
-                    on_click=self.filter_recording_on_click,
-                    bgcolor=ft.colors.GREEN if self.current_filter == "recording" else None,
-                    color=ft.colors.WHITE if self.current_filter == "recording" else None,
-                    style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=5),
-                    ),
-                ),
-                ft.ElevatedButton(
-                    self._["filter_offline"],
-                    on_click=self.filter_offline_on_click,
-                    bgcolor=ft.colors.AMBER if self.current_filter == "offline" else None,
-                    color=ft.colors.WHITE if self.current_filter == "offline" else None,
-                    style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=5),
-                    ),
-                ),
-                ft.ElevatedButton(
-                    self._["filter_error"],
-                    on_click=self.filter_error_on_click,
-                    bgcolor=ft.colors.RED if self.current_filter == "error" else None,
-                    color=ft.colors.WHITE if self.current_filter == "error" else None,
-                    style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=5),
-                    ),
-                ),
-                ft.ElevatedButton(
-                    self._["filter_stopped"],
-                    on_click=self.filter_stopped_on_click,
-                    bgcolor=ft.colors.GREY if self.current_filter == "stopped" else None,
-                    color=ft.colors.WHITE if self.current_filter == "stopped" else None,
-                    style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=5),
-                    ),
-                ),
+                *filter_buttons,
+                ft.Container(expand=True),
+                platform_filter_area
             ],
             alignment=ft.MainAxisAlignment.START,
             spacing=5,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
     
     async def filter_all_on_click(self, _):
@@ -238,21 +294,13 @@ class HomePage(PageBase):
             card_info = cards_obj.get(recording.rec_id)
             if not card_info:
                 continue
-                
-            visible = False
-            if self.current_filter == "all":
-                visible = True
-            elif self.current_filter == "recording":
-                visible = recording.recording
-            elif self.current_filter == "error":
-                visible = recording.status_info == RecordingStatus.RECORDING_ERROR
-            elif self.current_filter == "offline":
-                visible = not recording.is_live and recording.monitor_status
-            elif self.current_filter == "stopped":
-                visible = not recording.monitor_status
-                
-            card_info["card"].visible = visible
             
+            status_visible = RecordingFilters.get_status_filter_result(recording, self.current_filter)
+            platform_visible = RecordingFilters.get_platform_filter_result(recording, self.current_platform_filter)
+            
+            visible = status_visible and platform_visible
+            card_info["card"].visible = visible
+        
         self.content_area.update()
         self.recording_card_area.update()
 
@@ -262,16 +310,6 @@ class HomePage(PageBase):
             if not card_info["card"].visible:
                 card_info["card"].visible = True
                 card_info["card"].update()
-
-    @staticmethod
-    def should_show_recording(filter_type, recording):
-        return (
-                filter_type == "all"
-                or (filter_type == "recording" and recording.recording)
-                or (filter_type == "error" and recording.status_info == RecordingStatus.RECORDING_ERROR)
-                or (filter_type == "offline" and not recording.is_live and recording.monitor_status)
-                or (filter_type == "stopped" and not recording.monitor_status)
-        )
 
     async def filter_recordings(self, query):
         recordings = self.app.record_manager.recordings
@@ -289,12 +327,13 @@ class HomePage(PageBase):
             }
             
             filtered_ids = set()
+            
             for rec_id in search_ids:
                 recording = self.app.record_manager.find_recording_by_id(rec_id)
                 if not recording:
                     continue
 
-                if self.should_show_recording(self.current_filter, recording):
+                if RecordingFilters.should_show_recording(self.current_filter, self.current_platform_filter, recording):
                     filtered_ids.add(rec_id)
 
             for card_info in cards_obj.values():
@@ -351,9 +390,10 @@ class HomePage(PageBase):
             for card, recording in results:
                 self.recording_card_area.content.controls.append(card)
                 self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
-        
-        if existing_cards:
-            self.recording_card_area.content.controls.extend(existing_cards)
+            
+            if existing_cards:
+                for card in existing_cards:
+                    self.recording_card_area.content.controls.append(card)
 
         self.loading_indicator.visible = False
         self.loading_indicator.update()
@@ -414,6 +454,11 @@ class HomePage(PageBase):
                     enabled_message_push=False
                 )
 
+            platform, platform_key = get_platform_info(recording.url)
+            if platform and platform_key:
+                recording.platform = platform
+                recording.platform_key = platform_key
+
             recording.loop_time_seconds = int(user_config.get("loop_time_seconds", 300))
             recording.update_title(self._[recording.quality])
             await self.app.record_manager.add_recording(recording)
@@ -438,6 +483,9 @@ class HomePage(PageBase):
                 self.app.page.pubsub.send_others_on_topic("add", recording)
             
             self.recording_card_area.update()
+            
+            self.content_area.controls[1] = self.create_filter_area()
+            self.content_area.update()
 
         await self.app.snack_bar.show_snack_bar(self._["add_recording_success_tip"], bgcolor=ft.Colors.GREEN)
 
@@ -476,6 +524,9 @@ class HomePage(PageBase):
             self.recording_card_area.controls.remove(card["card"])
         await self.show_all_cards()
         
+        self.content_area.controls[1] = self.create_filter_area()
+        self.content_area.update()
+        
         self.loading_indicator.visible = False
         self.loading_indicator.update()
         
@@ -506,6 +557,9 @@ class HomePage(PageBase):
                 await self.delete_all_recording_cards()
                 self.app.page.pubsub.send_others_on_topic("delete_all", None)
 
+            self.content_area.controls[1] = self.create_filter_area()
+            self.content_area.update()
+            
             self.recording_card_area.update()
             await self.app.snack_bar.show_snack_bar(
                 self._["delete_recording_success_tip"], bgcolor=ft.Colors.GREEN, duration=2000
@@ -535,6 +589,11 @@ class HomePage(PageBase):
         self.recording_card_area.content.controls.clear()
         self.recording_card_area.update()
         self.app.record_card_manager.cards_obj = {}
+        
+        self.current_platform_filter = "all"
+        
+        self.content_area.controls[1] = self.create_filter_area()
+        self.content_area.update()
 
     async def subscribe_del_all_cards(self, *_):
         await self.delete_all_recording_cards()
@@ -558,6 +617,9 @@ class HomePage(PageBase):
             self.loading_indicator.update()
             
             self.recording_card_area.update()
+            
+            self.content_area.controls[1] = self.create_filter_area()
+            self.content_area.update()
 
     async def update_grid_layout(self, _):
         self.page.run_task(self.recalculate_grid_columns)
@@ -592,3 +654,7 @@ class HomePage(PageBase):
                 self.page.run_task(self.stop_monitor_recordings_on_click, e)
             elif e.alt and e.key == "D":
                 self.page.run_task(self.delete_monitor_recordings_on_click, e)
+
+    def on_platform_dropdown_change(self, e):
+        self.current_platform_filter = e.control.value
+        self.page.run_task(self.apply_filter)
