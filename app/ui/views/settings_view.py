@@ -1144,6 +1144,16 @@ class SettingsPage(PageBase):
             else:
                 await self.app.snack_bar.show_snack_bar(self._["not_logged_in"], bgcolor=ft.Colors.RED)
         
+        async def toggle_login_required(_):
+            login_required = login_required_switch.value
+            self.user_config["login_required"] = login_required
+            await self.config_manager.save_user_config(self.user_config)
+            
+            if login_required:
+                await self.app.snack_bar.show_snack_bar(self._["login_required_enabled"], bgcolor=ft.Colors.GREEN)
+            else:
+                await self.app.snack_bar.show_snack_bar(self._["login_required_disabled"], bgcolor=ft.Colors.GREEN)
+        
         username = self.app.current_username or "admin"
         
         old_password_field = ft.TextField(
@@ -1170,12 +1180,21 @@ class SettingsPage(PageBase):
             icon=ft.icons.LOCK_RESET,
         )
         
+        login_required_switch = ft.Switch(
+            value=self.get_config_value("login_required", True),
+            on_change=toggle_login_required,
+        )
+        
         return ft.Column(
             [
                 self.create_setting_group(
                     self._["security_settings"],
                     self._["web_login_configuration"],
                     [
+                        self.create_setting_row(
+                            self._["login_required"],
+                            login_required_switch,
+                        ),
                         self.create_setting_row(
                             self._["current_username"],
                             ft.Text(username),

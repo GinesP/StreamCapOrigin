@@ -122,8 +122,8 @@ async def main(page: ft.Page) -> None:
             if hasattr(app, "tray_manager"):
                 try:
                     app.tray_manager.start(page)
-                except Exception as e:
-                    logger.error(f"Failed to start tray manager: {e}")
+                except Exception as err:
+                    logger.error(f"Failed to start tray manager: {err}")
 
         page.update()
         page.on_route_change(ft.RouteChangeEvent(route=page.route))
@@ -133,23 +133,28 @@ async def main(page: ft.Page) -> None:
         app.auth_manager = auth_manager
         await auth_manager.initialize()
         
-        session_token = await page.client_storage.get_async("session_token")
-        if not session_token or not auth_manager.validate_session(session_token):
-            async def on_login_success(token):
-                _session_info = auth_manager.active_sessions.get(token, {})
-                app.current_username = _session_info.get("username")
+        login_required = app.settings.get_config_value("login_required", True)
+        
+        if login_required:
+            session_token = await page.client_storage.get_async("session_token")
+            if not session_token or not auth_manager.validate_session(session_token):
+                async def on_login_success(token):
+                    _session_info = auth_manager.active_sessions.get(token, {})
+                    app.current_username = _session_info.get("username")
+                    
+                    page.clean()
+                    await load_app()
                 
                 page.clean()
-                await load_app()
-            
-            page.clean()
-            
-            login_page = LoginPage(page, auth_manager, on_login_success)
-            page.add(login_page.get_view())
-            return
+                
+                login_page = LoginPage(page, auth_manager, on_login_success)
+                page.add(login_page.get_view())
+                return
+            else:
+                session_info = auth_manager.active_sessions.get(session_token, {})
+                app.current_username = session_info.get("username")
         else:
-            session_info = auth_manager.active_sessions.get(session_token, {})
-            app.current_username = session_info.get("username")
+            app.current_username = "admin"
     
     await load_app()
 
