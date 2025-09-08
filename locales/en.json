@@ -14,7 +14,7 @@
   },
     "home_page": {
       "welcome": "Welcome to StreamCap",
-      "tagline": "Powerful live streaming recording tool",
+      "tagline": "Record every exciting moment of the live broadcast",
       "start_recording": "Start Recording",
       "recording_list": "Recording List",
       "browse_recordings": "Browse Recordings",
@@ -32,12 +32,6 @@
       "feature_desc_4": "Default 24h loop monitoring, support scheduled monitoring",
       "version": "Version",
       "announcement": "Announcement",
-      "announcement_title_1": "StreamCap v1.0.1 has been released",
-      "announcement_content_1": "New multi-platform support, bug fixes, and stability improvements",
-      "announcement_title_2": "Usage tips",
-      "announcement_content_2": "Using batch operations can manage multiple recording tasks at the same time",
-      "announcement_title_3": "Coming soon",
-      "announcement_content_3": "The next version will support automatic segmented recording and cloud backup",
       "stats": "Statistics",
       "total_rooms": "Total Rooms",
       "active_recordings": "Active Recordings",
@@ -110,7 +104,9 @@
     "minute_label_text": "Minute",
     "select_media_type": "Select Media Type",
     "video": "Video",
-    "audio": "Audio"
+    "audio": "Audio",
+    "duplicate_url_title": "Duplicate Live Room URL",
+    "duplicate_url_content": "The live room URL already exists, do you want to continue adding?"
   },
   "search_dialog": {
     "search_keyword": "Enter search keyword"
@@ -190,7 +186,9 @@
     "stopped": "Stopped",
     "filter": "Filter",
     "offline": "Offline",
-    "no_monitor": "Not Monitored"
+    "no_monitor": "Not Monitored",
+    "checking": "Checking",
+    "live_room": "Live Room"
   },
   "settings_page": {
     "recording_settings": "Recording Settings",
@@ -367,7 +365,8 @@
     "switch_account_type": "Switch account type",
     "switch_language_tip": "Tip: It is recommended to restart the program after switching languages",
     "platform_max_concurrent_requests": "Max concurrent recordings per platform",
-    "platform_max_concurrent_requests_tip": "The maximum number of concurrent requests allowed per platform. Default is 3."
+    "platform_max_concurrent_requests_tip": "The maximum number of concurrent requests allowed per platform. Default is 3.",
+    "check_live_on_browser_refresh": "Check live status when refreshing the web"
   },
   "about_page": {
     "about_project": "About This Application",
