@@ -34,14 +34,15 @@ class RecordingCardManager:
         self.app.page.pubsub.subscribe_topic("update", self.subscribe_update_card)
         self.app.page.pubsub.subscribe_topic("delete", self.subscribe_remove_cards)
 
-    async def create_card(self, recording: Recording):
+    async def create_card(self, recording: Recording, subscribe_add_cards: bool = False):
         """Create a card for a given recording."""
         rec_id = recording.rec_id
         if not self.cards_obj.get(rec_id):
-            if self.app.recording_enabled:
-                self.app.page.run_task(self.app.record_manager.check_if_live, recording)
-            else:
-                recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
+            check_live_on_browser_refresh = self.app.settings.user_config.get("check_live_on_browser_refresh", True)
+            if self.app.recording_enabled and not subscribe_add_cards:
+                if check_live_on_browser_refresh or recording.streamer_name == self._['live_room']:
+                    self.app.page.run_task(self.app.record_manager.check_if_live, recording)
+            
         card_data = self._create_card_components(recording)
         self.cards_obj[rec_id] = card_data
         self.start_update_task(recording)
@@ -266,8 +267,9 @@ class RecordingCardManager:
             recording.update(
                 {
                     "monitor_status": not recording.monitor_status,
-                    "status_info": RecordingStatus.MONITORING,
+                    "status_info": RecordingStatus.STATUS_CHECKING,
                     "display_title": f"{recording.title}",
+                    "showed_checking_status": False,
                 }
             )
             self.app.page.run_task(self.app.record_manager.check_if_live, recording)
@@ -462,8 +464,8 @@ class RecordingCardManager:
                 try:
                     delete_alert_dialog.open = False
                     delete_alert_dialog.update()
-                except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                    logger.debug(f"Close delete dialog failed: {e}")
+                except (ft.core.page.PageDisconnectedException, AssertionError) as err:
+                    logger.debug(f"Close delete dialog failed: {err}")
 
             delete_alert_dialog = ft.AlertDialog(
                 title=ft.Text(self._["confirm"]),
