@@ -4,7 +4,7 @@ import os
 
 import flet as ft
 from dotenv import load_dotenv
-from screeninfo import get_monitors
+# from screeninfo import get_monitors
 
 from app.app_manager import App, execute_dir
 from app.auth.auth_manager import AuthManager
@@ -31,27 +31,32 @@ global_state = GlobalState()
 
 def setup_window(page: ft.Page, app: App, is_web: bool) -> None:
     page.window.icon = os.path.join(execute_dir, ASSETS_DIR, "icon.ico")
-    page.window.center()
-    page.window.to_front()
     page.window.skip_task_bar = False
     page.window.always_on_top = False
     page.focused = True
 
     if not is_web:
-        try:
-            if app.settings.user_config.get("remember_window_size"):
-                window_width = app.settings.user_config.get("window_width")
-                window_height = app.settings.user_config.get("window_height")
-                if window_width and window_height:
-                    page.window.width = int(window_width)
-                    page.window.height = int(window_height)
-                    return
+        if app.settings.user_config.get("remember_window_size"):
+            window_width = app.settings.user_config.get("window_width")
+            window_height = app.settings.user_config.get("window_height")
+            if window_width and window_height:
+                page.window.width = int(window_width)
+                page.window.height = int(window_height)
+                page.window.center()
+                page.window.to_front()
+                return
 
-            screen = get_monitors()[0]
-            page.window.width = int(screen.width * WINDOW_SCALE)
-            page.window.height = int(screen.height * WINDOW_SCALE)
-        except IndexError:
-            logger.warning("No monitors detected, using default window size.")
+        # Default fixed size
+        width = 1280
+        height = 800
+        page.window.width = width
+        page.window.height = height
+        
+        # Fixed position to avoid DPI scaling issues
+        page.window.left = 50
+        page.window.top = 50
+        
+        page.window.to_front()
 
 
 def get_route_handler() -> dict[str, str]:
