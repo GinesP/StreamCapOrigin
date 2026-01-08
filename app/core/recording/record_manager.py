@@ -7,6 +7,7 @@ from ...messages import desktop_notify, message_pusher
 from ...models.recording.recording_model import Recording
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
+from ...utils.i18n import tr
 from ...utils.logger import logger
 from ..platforms.platform_handlers import get_platform_info
 from ..runtime.process_manager import BackgroundService
@@ -403,7 +404,7 @@ class RecordingManager:
                     "is_recording": True,
                 }
             )
-            logger.info(f"Started recording for {recording.title}")
+            logger.info(tr("console.started_recording", "Started recording for {}").format(recording.title))
 
     def stop_recording(self, recording: Recording, manually_stopped: bool = True):
         """Stop the recording process."""

@@ -1,5 +1,6 @@
 import os
 
+from ...utils import i18n
 from ...utils.logger import logger
 from .config_manager import ConfigManager
 
@@ -24,6 +25,7 @@ class LanguageManager:
         i18n_filename = f"{self.app.settings.language_code}.json"
         i18n_file_path = os.path.join(self.app.run_path, "locales", i18n_filename)
         self.language = config_manager.load_i18n_config(i18n_file_path)
+        i18n.load_translations(self.language)
         return self.language
 
     def add_observer(self, observer):

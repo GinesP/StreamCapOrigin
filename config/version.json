@@ -1,7 +1,8 @@
 {
   "introduction": {
     "en": "A free application dedicated to recording videos from online live streaming platforms. By integrating FFmpeg, it efficiently and reliably records live streams from over 40 major platforms including Douyin, TikTok, Kuaishou, Huya, Douyu, Bilibili, Rednote, Baidu, Weibo, Kuwo, Migu, Twitch, YouTube, PandaTV, SoopLive, FlexTV(TTing), PopKontv, Twitcasting, WinkTV, 17Live, Acfun, CHZZK, and Shopee.",
-    "zh_CN": "一款专注于录制在线直播平台视频的免费应用。通过集成FFmpeg，高效、稳定地录制抖音、TikTok、快手、虎牙、斗鱼、B站、小红书、百度、微博、酷狗、咪咕、Twitch、YouTube、PandaTV、SoopLive、FlexTV(TTing)、PopKontv、Twitcasting、WinkTV、17Live、Acfun、CHZZK 和 Shopee 等40+主流平台的直播流。"
+    "zh_CN": "一款专注于录制在线直播平台视频的免费应用。通过集成FFmpeg，高效、稳定地录制抖音、TikTok、快手、虎牙、斗鱼、B站、小红书、百度、微博、酷狗、咪咕、Twitch、YouTube、PandaTV、SoopLive、FlexTV(TTing)、PopKontv、Twitcasting、WinkTV、17Live、Acfun、CHZZK 和 Shopee 等40+主流平台的直播流。",
+    "es": "Una aplicación gratuita dedicada a grabar videos de plataformas de transmisión en vivo en línea. Al integrar FFmpeg, graba de manera eficiente y confiable transmisiones en vivo de más de 40 plataformas principales, incluidas Douyin, TikTok, Kuaishou, Huya, Douyu, Bilibili, Rednote, Baidu, Weibo, Kuwo, Migu, Twitch, YouTube, PandaTV, SoopLive, FlexTV(TTing), PopKontv, Twitcasting, WinkTV, 17Live, Acfun, CHZZK y Shopee."
   },
   "open_source_license": "Apache License 2.0",
   "version_updates": [
@@ -14,6 +15,9 @@
         ],
         "zh_CN": [
           "丰富功能，增强稳定性"
+        ],
+        "es": [
+          "Funciones enriquecidas y estabilidad mejorada"
         ]
       },
       "release_date": "2025-08-15",
@@ -44,6 +48,20 @@
           {
             "title": "即将推出",
             "content": "更多平台支持中..."
+          }
+        ],
+        "es": [
+          {
+            "title": "StreamCap v1.0.2 lanzado oficialmente",
+            "content": "Nuevo soporte multiplataforma, adaptación web para móviles, corrección de errores y mejoras de estabilidad"
+          },
+          {
+            "title": "Consejos de uso",
+            "content": "Presione Alt + H en Windows o Option + H en Mac para acceder rápidamente al documento de ayuda de accesos directos y mejorar su eficiencia laboral."
+          },
+          {
+            "title": "Próximamente",
+            "content": "Se están soportando más plataformas..."
           }
         ]
       }
