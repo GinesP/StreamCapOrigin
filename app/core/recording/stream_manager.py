@@ -10,6 +10,7 @@ from ...messages import desktop_notify, message_pusher
 from ...models.media.video_quality_model import VideoQuality
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
+from ...utils.i18n import tr
 from ...utils.logger import logger
 from ..media import ffmpeg_builders
 from ..media.direct_downloader import DirectStreamDownloader
@@ -196,8 +197,8 @@ class LiveStreamRecorder:
         return self.save_format, False
 
     async def fetch_stream(self) -> StreamData:
-        logger.info(f"Live URL: {self.live_url}")
-        logger.info(f"Use Proxy: {self.proxy or None}")
+        logger.info(tr("console.live_url", "Live URL: {}").format(self.live_url))
+        logger.info(tr("console.use_proxy", "Use Proxy: {}").format(self.proxy or None))
         self.recording.use_proxy = bool(self.proxy)
         handler = platform_handlers.get_platform_handler(
             live_url=self.live_url,
@@ -223,7 +224,7 @@ class LiveStreamRecorder:
         filename = self._get_filename(stream_info)
         self.output_dir = self._get_output_dir(stream_info)
         save_path = self._get_save_path(filename, use_direct_download)
-        logger.info(f"Save Path: {save_path}")
+        logger.info(tr("console.save_path", "Save Path: {}").format(save_path))
         self.recording.recording_dir = os.path.dirname(save_path)
         os.makedirs(self.recording.recording_dir, exist_ok=True)
         record_url = self._get_record_url(stream_info)
@@ -240,7 +241,7 @@ class LiveStreamRecorder:
                 await asyncio.sleep(1)
             
             self.app.record_manager.active_recorders[self.recording.rec_id] = self
-            logger.info(f"Saved recorder instance for {self.recording.rec_id}, id: {id(self)}")
+            logger.info(tr("console.saved_recorder_instance", "Saved recorder instance for {}, id: {}").format(self.recording.rec_id, id(self)))
         except Exception as e:
             logger.error(f"Failed to save recorder instance: {e}")
 
@@ -293,7 +294,7 @@ class LiveStreamRecorder:
         try:
             if self.recording.rec_id in self.app.record_manager.active_recorders:
                 del self.app.record_manager.active_recorders[self.recording.rec_id]
-                logger.info(f"Removed recorder from active_recorders: {self.recording.rec_id}")
+                logger.info(tr("console.removed_active_recorder", "Removed recorder from active_recorders: {}").format(self.recording.rec_id))
         except Exception as e:
             logger.error(f"Failed to remove recorder instance: {e}")
 
@@ -320,7 +321,11 @@ class LiveStreamRecorder:
         The child process executes ffmpeg for recording
         """
 
-        logger.info(f"Starting ffmpeg recording - recorder id: {id(self)}, rec_id: {self.recording.rec_id}")
+        """
+        self.child_process_executes_ffmpeg_for_recording
+        """
+
+        logger.info(tr("console.starting_ffmpeg", "Starting ffmpeg recording - recorder id: {}, rec_id: {}").format(id(self), self.recording.rec_id))
         self.should_stop = False
 
         try:
@@ -337,8 +342,8 @@ class LiveStreamRecorder:
             self.app.add_ffmpeg_process(process)
             self.recording.status_info = RecordingStatus.RECORDING
             self.recording.record_url = record_url
-            logger.info(f"Recording in Progress: {live_url}")
-            logger.log("STREAM", f"Recording Stream URL: {record_url}")
+            logger.info(tr("console.recording_in_progress", "Recording in Progress: {}").format(live_url))
+            logger.log("STREAM", tr("console.recording_stream_url", "Recording Stream URL: {}").format(record_url))
             self.recording_start_time = time.time()
 
             while True:
@@ -371,7 +376,7 @@ class LiveStreamRecorder:
                     break
 
                 if process.returncode is not None:
-                    logger.info(f"Exit loop recording (normal 0 | abnormal 1): code={process.returncode}, {live_url}")
+                    logger.info(tr("console.exit_loop_recording", "Exit loop recording (normal 0 | abnormal 1): code={}, {}").format(process.returncode, live_url))
                     await self.remove_active_recorder()
                     self.recording.is_recording = False
                     break
@@ -411,7 +416,7 @@ class LiveStreamRecorder:
                     if self.should_stop:
                         logger.success(f"Live recording has stopped: {record_name}")
                     else:
-                        logger.success(f"Live recording completed: {record_name}")
+                        logger.success(tr("console.live_recording_completed", "Live recording completed: {}").format(record_name))
                         self.app.page.run_task(self.end_message_push)
                     
                     try:

@@ -468,7 +468,7 @@ class SettingsPage(PageBase):
                                 value=self.get_config_value("check_live_on_browser_refresh", True),
                                 data="check_live_on_browser_refresh",
                                 on_change=self.on_change,
-                                tooltip=self._['check_live_on_browser_refresh_tip']
+tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on browser refresh')
                             ),
                         ),
                     ],
