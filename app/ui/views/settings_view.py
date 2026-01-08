@@ -286,6 +286,14 @@ class SettingsPage(PageBase):
                             ),
                         ),
                         self.create_folder_setting_row(self._["name_rules"]),
+                        self.create_setting_row(
+                            self._["remember_window_size"],
+                            ft.Switch(
+                                value=self.get_config_value("remember_window_size", False),
+                                on_change=self.on_change,
+                                data="remember_window_size",
+                            ),
+                        ),
                     ],
                     is_mobile,
                 ),
@@ -625,6 +633,20 @@ class SettingsPage(PageBase):
                             ],
                         ),
                         self.create_channel_config(
+                            self._["feishu"],
+                            [
+                                self.create_setting_row(
+                                    self._["feishu_webhook_url"],
+                                    ft.TextField(
+                                        value=self.get_config_value("feishu_webhook_url"),
+                                        width=300,
+                                        on_change=self.on_change,
+                                        data="feishu_webhook_url",
+                                    ),
+                                ),
+                            ],
+                        ),
+                        self.create_channel_config(
                             self._["serverchan"],
                             [
                                 self.create_setting_row(
@@ -829,6 +851,9 @@ class SettingsPage(PageBase):
             ),
             self.create_channel_switch_container(
                 self._["wechat"], ft.Icons.WECHAT, "wechat_enabled"
+            ),
+            self.create_channel_switch_container(
+                self._["feishu"], ft.Icons.BOOK, "feishu_enabled"
             ),
             self.create_channel_switch_container(
                 self._["serverchan"], ft.Icons.CLOUD_OUTLINED, "serverchan_enabled"

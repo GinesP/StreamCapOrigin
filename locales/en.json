@@ -213,6 +213,7 @@
     "time": "time",
     "title": "title",
     "proxy_settings": "Proxy Settings",
+    "remember_window_size": "Remember Window Size",
     "is_proxy_enabled": "Configuration for using proxy and related settings",
     "enable_proxy": "Enable Proxy",
     "proxy_address": "Proxy Address",
@@ -266,6 +267,7 @@
     "push_channels": "Push Channels",
     "dingtalk": "DingTalk",
     "wechat": "Wechat",
+    "feishu": "Feishu",
     "email": "Email",
     "telegram": "Telegram",
     "select_and_enable_channels": "Select and enable the channels you want to use",
@@ -277,6 +279,7 @@
     "dingtalk_webhook_hint": "Enter DingTalk group webhook URL",
     "dingtalk_phone_numbers_hint": "Enter DingTalk phone numbers",
     "wechat_webhook_url": "WeChat Webhook URL",
+    "feishu_webhook_url": "Feishu Webhook URL",
     "bark_webhook_url": "Bark Webhook URL",
     "bark_interrupt_level": "Bark Interrupt Level",
     "bark_sound": "Bark Sound",
@@ -366,7 +369,8 @@
     "switch_language_tip": "Tip: It is recommended to restart the program after switching languages",
     "platform_max_concurrent_requests": "Max concurrent recordings per platform",
     "platform_max_concurrent_requests_tip": "The maximum number of concurrent requests allowed per platform. Default is 3.",
-    "check_live_on_browser_refresh": "Check live status when refreshing the web"
+    "check_live_on_browser_refresh": "Check live status when refreshing the web",
+    "check_live_on_browser_refresh_tip": "Check live status when refreshing the web"
   },
   "about_page": {
     "about_project": "About This Application",
