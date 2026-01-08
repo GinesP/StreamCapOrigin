@@ -843,7 +843,11 @@ class PiaopiaoHandler(PlatformHandler):
     async def get_stream_info(self, live_url: str) -> StreamData:
         if not self.live_stream:
             self.live_stream = streamget.PiaopaioLiveStream(proxy_addr=self.proxy, cookies=self.cookies)
-        json_data = await self.live_stream.fetch_web_stream_data(url=live_url)
+
+        if 'preview.html' not in live_url:
+            json_data = await self.live_stream.fetch_app_stream_data(url=live_url)
+        else:
+            json_data = await self.live_stream.fetch_web_stream_data(url=live_url)
         return await self.live_stream.fetch_stream_url(json_data, self.record_quality)
 
 
@@ -1111,6 +1115,7 @@ RedNoteHandler.register(r"www\.xiaohongshu\.com/", r"xhslink\.com/")
 BigoHandler.register(r"https://www\.bigo\.tv/", r"https://slink\.bigovideo\.tv/")
 BluedHandler.register(r"https://app\.blued\.cn/")
 SoopHandler.register(r"sooplive\.co\.kr/")
+SoopHandler.register(r"sooplive\.com/")
 NeteaseHandler.register(r"cc\.163\.com/")
 QiandureboHandler.register(r"qiandurebo.com/")
 PamdaTVHandler.register(r".*\.pandalive.co.kr/")
@@ -1143,11 +1148,10 @@ LehaiHandler.register(r"https://.*\.lehaitv\.com/")
 HuamaoHandler.register(r"h.catshow168.com")
 ShopeeHandler.register(r".*.shp.ee/")
 YoutubeHandler.register(r".*\.youtube\.com/")
-TaobaoHandler.register(r".*\.tb\.cn/")
+TaobaoHandler.register(r".*\.tb\.cn/", r"https://.*\.taobao\.com/")
 JDHandler.register(r"3\.cn/")
 FaceitHandler.register(r"https://.*\.faceit\.com/")
 LianJieHandler.register(r"https://.*\.lailianjie\.com/")
 MiguHandler.register(r"https://.*\.miguvideo\.com/")
 LaixiuHandler.register(r"https://.*\.imkktv\.com/")
 PicartoHandler.register(r"https://.*\.picarto\.tv/")
-
