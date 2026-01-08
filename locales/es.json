@@ -212,6 +212,7 @@
         "author": "autor",
         "time": "hora",
         "title": "título",
+        "remember_window_size": "Recordar tamaño de ventana",
         "proxy_settings": "Ajustes de Proxy",
         "is_proxy_enabled": "Configuración para usar proxy y ajustes relacionados",
         "enable_proxy": "Habilitar Proxy",
@@ -266,6 +267,7 @@
         "push_channels": "Canales de Notificación",
         "dingtalk": "DingTalk",
         "wechat": "Wechat",
+        "feishu": "Feishu",
         "email": "Email",
         "telegram": "Telegram",
         "select_and_enable_channels": "Seleccione y habilite los canales que desea usar",
@@ -277,6 +279,7 @@
         "dingtalk_webhook_hint": "Ingrese URL webhook grupo DingTalk",
         "dingtalk_phone_numbers_hint": "Ingrese números de teléfono DingTalk",
         "wechat_webhook_url": "URL Webhook WeChat",
+        "feishu_webhook_url": "URL Webhook Feishu",
         "bark_webhook_url": "URL Webhook Bark",
         "bark_interrupt_level": "Nivel de Interrupción Bark",
         "bark_sound": "Sonido Bark",
@@ -367,7 +370,8 @@
         "switch_language_tip": "Consejo: Se recomienda reiniciar el programa después de cambiar el idioma",
         "platform_max_concurrent_requests": "Grabaciones simultáneas máximas por plataforma",
         "platform_max_concurrent_requests_tip": "El número máximo de solicitudes simultáneas permitidas por plataforma. El valor predeterminado es 3.",
-        "check_live_on_browser_refresh": "Comprobar estado en vivo al actualizar la web"
+        "check_live_on_browser_refresh": "Comprobar estado en vivo al actualizar la web",
+        "check_live_on_browser_refresh_tip": "Comprobar estado en vivo al actualizar la web"
     },
     "about_page": {
         "about_project": "Acerca de esta Aplicación",
