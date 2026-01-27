@@ -2,6 +2,8 @@ import asyncio
 import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
+import random
+import time
 
 from ...messages import desktop_notify, message_pusher
 from ...models.recording.recording_model import Recording
@@ -9,6 +11,7 @@ from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
 from ...utils.i18n import tr
 from ...utils.logger import logger
+from ...utils.delay import DelayedTaskExecutor
 from ..platforms.platform_handlers import get_platform_info
 from ..runtime.process_manager import BackgroundService
 from .stream_manager import LiveStreamRecorder
@@ -33,6 +36,7 @@ class RecordingManager:
         max_concurrent = int(self.settings.user_config.get("platform_max_concurrent_requests", 3))
         self.platform_semaphores = defaultdict(lambda: asyncio.Semaphore(max_concurrent))
         self.active_recorders = {}
+        self.persist_delay_handler = DelayedTaskExecutor(self.app, self, delay=2)
 
     @property
     def recordings(self):
@@ -79,7 +83,13 @@ class RecordingManager:
             await self.persist_recordings()
 
     async def persist_recordings(self):
-        """Persist recordings to a JSON file."""
+        """Persist recordings to a JSON file with a small delay to batch updates."""
+        self.app.page.run_task(self.persist_delay_handler.start_task_timer, self._actual_persist_recordings, None)
+
+    async def _actual_persist_recordings(self, delay):
+        """The actual disk write operation."""
+        if delay:
+            await asyncio.sleep(delay)
         data_to_save = [rec.to_dict() for rec in self.recordings]
         await self.app.config_manager.save_recordings_config(data_to_save)
 
@@ -195,6 +205,8 @@ class RecordingManager:
                 is_exceeded = utils.is_time_interval_exceeded(recording.detection_time, recording.loop_time_seconds)
                 if not recording.detection_time or is_exceeded:
                     self.app.page.run_task(self.check_if_live, recording)
+                    # Stagger the start of each task to avoid a burst of requests
+                    await asyncio.sleep(random.uniform(1.0, 2.5))
 
     _periodic_task_running = False
 
@@ -305,6 +317,8 @@ class RecordingManager:
         semaphore = self.platform_semaphores[platform_key]
         recorder = LiveStreamRecorder(self.app, recording, recording_info)
         async with semaphore:
+            # Stagger requests slightly to avoid rate limiting - moved to BEFORE request
+            await asyncio.sleep(random.uniform(2.0, 5.0))
             stream_info = await recorder.fetch_stream()
             logger.info(f"Stream Data: {stream_info}")
         if not stream_info or not stream_info.anchor_name:
@@ -316,7 +330,8 @@ class RecordingManager:
                 self.app.page.pubsub.send_others_on_topic("update", recording)
             return
         if self.settings.user_config.get("remove_emojis"):
-            stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, self._["live_room"])
+            live_room_text = self._.get("live_room", "Live Room")
+            stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, live_room_text)
 
         if stream_info.is_live:
             recording.live_title = stream_info.title
@@ -490,9 +505,13 @@ class RecordingManager:
     @staticmethod
     async def get_scheduled_time_range(scheduled_start_time, monitor_hours) -> list | None:
         scheduled_time_range_list = []
-        for index, start_time in enumerate(scheduled_start_time.split(',')):
+        if not scheduled_start_time:
+            return scheduled_time_range_list
+            
+        for index, start_time in enumerate(str(scheduled_start_time).split(',')):
             try:
-                hours = str(monitor_hours).split(',')[index]
+                hours_list = str(monitor_hours or "").split(',')
+                hours = hours_list[index] if index < len(hours_list) else "5"
                 if start_time and hours:
                     end_time = utils.add_hours_to_time(start_time, float(hours or 5))
                     scheduled_time_range = f"{start_time}~{end_time}"

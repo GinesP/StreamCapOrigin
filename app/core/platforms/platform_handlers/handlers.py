@@ -1,4 +1,9 @@
 import streamget
+import httpx
+import re
+
+
+
 
 from ....utils.utils import trace_error_decorator
 from .base import PlatformHandler, StreamData
@@ -52,6 +57,7 @@ class DouyinHandler(PlatformHandler):
         else:
             json_data = await self.live_stream.fetch_web_stream_data(url=live_url)
         return await self.live_stream.fetch_stream_url(json_data, self.record_quality)
+
 
 
 class TikTokHandler(PlatformHandler):

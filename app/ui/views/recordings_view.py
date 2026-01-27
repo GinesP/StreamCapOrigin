@@ -74,17 +74,18 @@ class RecordingsPage(PageBase):
                 self.create_recordings_content_area()
             ]
         )
-        self.content_area.update()
         
         if not self.recording_card_area.content.controls:
             self.recording_card_area.content.controls.clear()
-            await self.add_record_cards()
+            await self.add_record_cards(is_initial_load=True)
         else:
-            # if cards exist, apply filter
-            await self.apply_filter()
+            # if cards exist, apply filter without immediate refresh
+            await self.apply_filter(update_ui=False)
         
         if self.is_grid_view:
-            await self.recalculate_grid_columns()
+            await self.recalculate_grid_columns(update_ui=False)
+        
+        self.content_area.update()
         
         self.page.on_keyboard_event = self.on_keyboard
         self.page.on_resized = self.update_grid_layout
@@ -353,8 +354,7 @@ class RecordingsPage(PageBase):
     async def filter_stopped_on_click(self, _):
         self.current_filter = "stopped"
         await self.apply_filter()
-    
-    async def apply_filter(self):
+    async def apply_filter(self, update_ui=True):
         if len(self.content_area.controls) > 1:
             self.content_area.controls[1] = self.create_filter_area()
         else:
@@ -374,8 +374,9 @@ class RecordingsPage(PageBase):
             visible = status_visible and platform_visible
             card_info["card"].visible = visible
         
-        self.content_area.update()
-        self.recording_card_area.update()
+        if update_ui:
+            self.content_area.update()
+            self.recording_card_area.update()
 
     async def reset_cards_visibility(self):
         cards_obj = self.app.record_card_manager.cards_obj
@@ -431,10 +432,10 @@ class RecordingsPage(PageBase):
             scroll=ft.ScrollMode.AUTO if not self.app.is_mobile else ft.ScrollMode.HIDDEN,
         )
 
-    async def add_record_cards(self):
-        
-        self.loading_indicator.visible = True
-        self.loading_indicator.update()
+    async def add_record_cards(self, is_initial_load=False):
+        if not is_initial_load:
+            self.loading_indicator.visible = True
+            self.loading_indicator.update()
 
         cards_to_create = []
         existing_cards = []
@@ -468,9 +469,10 @@ class RecordingsPage(PageBase):
                 for card in existing_cards:
                     self.recording_card_area.content.controls.append(card)
 
-        self.loading_indicator.visible = False
-        self.loading_indicator.update()
-        self.recording_card_area.update()
+        if not is_initial_load:
+            self.loading_indicator.visible = False
+            self.loading_indicator.update()
+            self.recording_card_area.update()
         
         if not RecordingManager.is_periodic_task_running():
             self.page.run_task(
@@ -478,7 +480,7 @@ class RecordingsPage(PageBase):
                 self.app.record_manager.loop_time_seconds
             )
         
-        await self.apply_filter()
+        await self.apply_filter(update_ui=not is_initial_load)
 
     async def show_all_cards(self):
         cards_obj = self.app.record_card_manager.cards_obj
@@ -601,9 +603,6 @@ class RecordingsPage(PageBase):
             self.recording_card_area.controls.remove(card["card"])
         await self.show_all_cards()
         
-        self.content_area.controls[1] = self.create_filter_area()
-        self.content_area.update()
-        
         self.loading_indicator.visible = False
         self.loading_indicator.update()
         
@@ -634,13 +633,13 @@ class RecordingsPage(PageBase):
                 await self.delete_all_recording_cards()
                 self.app.page.pubsub.send_others_on_topic("delete_all", None)
 
-            self.content_area.controls[1] = self.create_filter_area()
-            self.content_area.update()
-            
-            self.recording_card_area.update()
             await self.app.snack_bar.show_snack_bar(
                 self._["delete_recording_success_tip"], bgcolor=ft.Colors.GREEN, duration=2000
             )
+            # Batch updates at the end
+            self.recording_card_area.update()
+            self.content_area.controls[1] = self.create_filter_area()
+            self.content_area.update()
             await close_dialog(None)
 
         async def close_dialog(_):
@@ -701,7 +700,7 @@ class RecordingsPage(PageBase):
     async def update_grid_layout(self, _):
         self.page.run_task(self.recalculate_grid_columns)
 
-    async def recalculate_grid_columns(self):
+    async def recalculate_grid_columns(self, update_ui=True):
         if not self.is_grid_view:
             return
 
@@ -716,15 +715,16 @@ class RecordingsPage(PageBase):
 
         if isinstance(self.recording_card_area.content, ft.GridView):
             grid_view = self.recording_card_area.content
-            grid_view.runs_count = runs_count
-            
-            grid_view.child_aspect_ratio = child_aspect_ratio
-            
-            if self.app.is_mobile:
-                grid_view.spacing = 5
-                grid_view.run_spacing = 5
-            
-            grid_view.update()
+            if grid_view.runs_count != runs_count or grid_view.child_aspect_ratio != child_aspect_ratio:
+                grid_view.runs_count = runs_count
+                grid_view.child_aspect_ratio = child_aspect_ratio
+                
+                if self.app.is_mobile:
+                    grid_view.spacing = 5
+                    grid_view.run_spacing = 5
+                
+                if update_ui:
+                    grid_view.update()
 
     async def on_keyboard(self, e: ft.KeyboardEvent):
         if e.alt and e.key == "H":

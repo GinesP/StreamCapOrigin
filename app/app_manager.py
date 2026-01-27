@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 
@@ -90,19 +91,38 @@ class App:
             return
 
         self._loading_page = True
-
+        logger.debug(f"Switching page to: {page_name}")
         try:
-            await self.clear_content_area()
+            self.content_area.controls.clear()
+            self.content_area.update()
+            
             if page := self.pages.get(page_name):
-                await self.settings.is_changed()
+                # Timeout safety for potentially slow operations
+                try:
+                    await asyncio.wait_for(self.settings.is_changed(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Settings save timed out during page switch")
+                except Exception as e:
+                    logger.error(f"Error in is_changed during switch: {e}")
+
                 self.current_page = page
-                await page.load()
+                
+                try:
+                    await asyncio.wait_for(page.load(), timeout=10.0)
+                except asyncio.TimeoutError:
+                    logger.error(f"Page load timed out: {page_name}")
+                except Exception as e:
+                    logger.error(f"Error loading page {page_name}: {e}")
+        except Exception as e:
+            logger.error(f"Critical error in switch_page: {e}")
         finally:
             self._loading_page = False
+            logger.debug(f"Finished switching page to: {page_name}")
 
-    async def clear_content_area(self):
+    async def clear_content_area(self, update=True):
         self.content_area.clean()
-        self.content_area.update()
+        if update:
+            self.content_area.update()
 
     async def cleanup(self):
         try:
