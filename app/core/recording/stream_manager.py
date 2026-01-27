@@ -77,10 +77,11 @@ class LiveStreamRecorder:
             stream_info.title = self._clean_and_truncate_title(stream_info.title)
             live_title = stream_info.title
 
-        if self.recording.streamer_name and self.recording.streamer_name != self._["live_room"]:
+        live_room_text = self._.get("live_room", "Live Room")
+        if self.recording.streamer_name and self.recording.streamer_name != live_room_text:
             stream_info.anchor_name = utils.clean_name(self.recording.streamer_name)
         else:
-            stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, self._["live_room"])
+            stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, live_room_text)
 
         now = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
 

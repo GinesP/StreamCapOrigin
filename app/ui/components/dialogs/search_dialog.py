@@ -33,6 +33,8 @@ class SearchDialog(ft.AlertDialog):
             border_color=ft.Colors.GREY_400,
             focused_border_color=ft.Colors.BLUE,
             hint_style=ft.TextStyle(color=ft.Colors.GREY_500, size=14),
+            autofocus=True,
+            on_submit=self.submit_query,
         )
         self.actions = [
             ft.TextButton(

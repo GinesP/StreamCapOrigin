@@ -93,7 +93,7 @@ class SettingsPage(PageBase):
         )
 
         self.content_area.controls.append(column_layout)
-        self.app.complete_page.update()
+        self.content_area.update()
 
     def init_unsaved_changes(self):
         self.has_unsaved_changes = {

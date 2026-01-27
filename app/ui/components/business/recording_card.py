@@ -24,6 +24,7 @@ class RecordingCardManager:
         self._ = {}
         self.load()
         self.pubsub_subscribe()
+        self._duration_task_started = False
 
     def load(self):
         language = self.app.language_manager.language
@@ -45,7 +46,11 @@ class RecordingCardManager:
             
         card_data = self._create_card_components(recording)
         self.cards_obj[rec_id] = card_data
-        self.start_update_task(recording)
+        
+        if not self._duration_task_started:
+            self._duration_task_started = True
+            self.app.page.run_task(self.global_update_durations)
+            
         return card_data["card"]
 
     def _create_card_components(self, recording: Recording):
@@ -239,7 +244,7 @@ class RecordingCardManager:
                     recording_card["card"].content.bgcolor = self.get_card_background_color(recording)
                     recording_card["card"].content.border = ft.border.all(2, self.get_card_border_color(recording))
                     try:
-                        self.app.page.update()
+                        recording_card["card"].update()
                     except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                         logger.debug(f"Update card failed: {e}")
                         return
@@ -286,7 +291,7 @@ class RecordingCardManager:
             dialog.open = True
             self.app.dialog_area.content = dialog
             try:
-                self.app.page.update()
+                self.app.dialog_area.update()
             except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                 logger.debug(f"Update recording info dialog failed: {e}")
         except (ft.core.page.PageDisconnectedException, AssertionError) as e:
@@ -395,28 +400,27 @@ class RecordingCardManager:
     def get_tip_for_monitor_state(self, recording: Recording):
         return self._["stop_monitor"] if recording.monitor_status else self._["start_monitor"]
 
-    async def update_duration(self, recording: Recording):
-        """Update the duration text periodically."""
+    async def global_update_durations(self):
+        """Update all active recording durations in a single background task."""
         while True:
-            update_interval = 1
-            await asyncio.sleep(update_interval)
-            if not recording or recording.rec_id not in self.cards_obj:  # Stop task if card is removed
-                break
-
-            if recording.is_recording:
-                try:
-                    duration_label = self.cards_obj[recording.rec_id]["duration_label"]
-                    duration_label.value = self.app.record_manager.get_duration(recording)
-                    duration_label.update()
-                except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                    logger.debug(f"Update duration failed: {e}")
-                    break
-                except Exception as e:
-                    logger.debug(f"Update duration failed: {e}")
+            await asyncio.sleep(1)
+            try:
+                # Iterate over a copy of recordings to avoid concurrent modification issues
+                for recording in list(self.app.record_manager.recordings):
+                    if recording.is_recording and recording.rec_id in self.cards_obj:
+                        card_info = self.cards_obj[recording.rec_id]
+                        if card_info.get("duration_label"):
+                            try:
+                                card_info["duration_label"].value = self.app.record_manager.get_duration(recording)
+                                card_info["duration_label"].update()
+                            except:
+                                pass
+            except Exception as e:
+                logger.debug(f"Global duration update failed: {e}")
 
     def start_update_task(self, recording: Recording):
-        """Start a background task to update the duration text."""
-        self.update_duration_tasks[recording.rec_id] = self.app.page.run_task(self.update_duration, recording)
+        """No longer used individually, kept for compatibility if called elsewhere."""
+        pass
 
     async def on_card_click(self, recording: Recording):
         """Handle card click events."""
@@ -480,7 +484,7 @@ class RecordingCardManager:
             delete_alert_dialog.open = True
             self.app.dialog_area.content = delete_alert_dialog
             try:
-                self.app.page.update()
+                self.app.dialog_area.update()
             except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                 logger.debug(f"Update delete dialog failed: {e}")
         except (ft.core.page.PageDisconnectedException, AssertionError) as e:
