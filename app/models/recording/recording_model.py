@@ -18,7 +18,9 @@ class Recording:
         recording_dir,
         enabled_message_push,
         only_notify_no_record,
-        flv_use_direct_download
+        flv_use_direct_download,
+        live_check_count=0,
+        live_found_count=0
     ):
         """
         Initialize a recording object.
@@ -55,6 +57,8 @@ class Recording:
         self.enabled_message_push = enabled_message_push
         self.only_notify_no_record = only_notify_no_record
         self.flv_use_direct_download = flv_use_direct_download
+        self.live_check_count = live_check_count
+        self.live_found_count = live_found_count
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
         self.speed = "X KB/s"
@@ -103,7 +107,9 @@ class Recording:
             "platform": self.platform,
             "platform_key": self.platform_key,
             "only_notify_no_record": self.only_notify_no_record,
-            "flv_use_direct_download": self.flv_use_direct_download
+            "flv_use_direct_download": self.flv_use_direct_download,
+            "live_check_count": self.live_check_count,
+            "live_found_count": self.live_found_count
         }
 
     @classmethod
@@ -124,7 +130,9 @@ class Recording:
             data.get("recording_dir"),
             data.get("enabled_message_push"),
             data.get("only_notify_no_record"),
-            data.get("flv_use_direct_download")
+            data.get("flv_use_direct_download"),
+            data.get("live_check_count", 0),
+            data.get("live_found_count", 0)
         )
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)
@@ -134,6 +142,21 @@ class Recording:
         if recording.last_duration_str is not None:
             recording.last_duration = timedelta(seconds=float(recording.last_duration_str))
         return recording
+
+    def increment_live_counts(self, is_live: bool):
+        """
+        Increment check counts and apply decay logic if threshold is reached.
+        This ensures the priority score remains responsive to recent changes.
+        """
+        self.live_check_count += 1
+        if is_live:
+            self.live_found_count += 1
+
+        # Decay logic: when counts get too high, divide by 2 to keep them responsive
+        # Threshold of 200 checks (roughly 1.6 hours with 30s checks)
+        if self.live_check_count > 200:
+            self.live_check_count //= 2
+            self.live_found_count //= 2
 
     def update_title(self, quality_info, prefix=None):
         """Helper method to update the title."""

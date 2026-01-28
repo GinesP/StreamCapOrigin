@@ -200,7 +200,19 @@ class RecordingManager:
 
     async def check_all_live_status(self):
         """Check the live status of all recordings and update their display titles."""
-        for recording in self.recordings:
+        # Prioritize recordings that are live more often
+        def get_priority_score(rec):
+            if rec.live_check_count == 0:
+                return 0
+            return rec.live_found_count / rec.live_check_count
+
+        recordings_to_check = sorted(
+            self.recordings,
+            key=lambda r: (get_priority_score(r), random.random()),
+            reverse=True
+        )
+        
+        for recording in recordings_to_check:
             if recording.monitor_status and not recording.is_recording:
                 is_exceeded = utils.is_time_interval_exceeded(recording.detection_time, recording.loop_time_seconds)
                 if not recording.detection_time or is_exceeded:
@@ -226,12 +238,16 @@ class RecordingManager:
             while True:
                 immediate_check_on_startup = self.app.settings.user_config.get("check_live_on_browser_refresh", True)
                 if immediate_check_on_startup:
+                    # Run first check immediately (it is already staggered inside check_all_live_status)
+                    if self.app.recording_enabled:
+                        await self.check_all_live_status()
                     await asyncio.sleep(interval)
+                else:
+                    await asyncio.sleep(interval)
+                
                 await self.check_free_space()
                 if self.app.recording_enabled:
                     await self.check_all_live_status()
-                if not immediate_check_on_startup:
-                    await asyncio.sleep(interval)
 
         if not RecordingManager.is_periodic_task_running():
             RecordingManager.set_periodic_task_running(True)
@@ -262,6 +278,9 @@ class RecordingManager:
 
         recording.detection_time = datetime.now().time()
         recording.is_checking = True
+        
+        # We'll increment the check count AFTER the check or just use the new method
+        # for both live and not live cases. 
 
         if not recording.showed_checking_status:
             recording.status_info = RecordingStatus.STATUS_CHECKING
@@ -334,6 +353,10 @@ class RecordingManager:
             stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, live_room_text)
 
         if stream_info.is_live:
+            # Update counts using the new responsive method
+            recording.increment_live_counts(is_live=True)
+            self.app.page.run_task(self.persist_recordings)
+            
             recording.live_title = stream_info.title
             if recording.streamer_name.strip() == self._["live_room"]:
                 recording.streamer_name = stream_info.anchor_name
@@ -389,6 +412,10 @@ class RecordingManager:
                 recording.status_info = RecordingStatus.LIVE_BROADCASTING
 
         else:
+            # Update counts for non-live case
+            recording.increment_live_counts(is_live=False)
+            self.app.page.run_task(self.persist_recordings)
+
             recording.is_recording = False
             if recording.is_live:
                 recording.is_live = False
@@ -405,7 +432,6 @@ class RecordingManager:
                         "display_title": title,
                     }
                 )
-                self.app.page.run_task(self.persist_recordings)
 
         recording.is_checking = False
         self.app.page.run_task(self.app.record_card_manager.update_card, recording)

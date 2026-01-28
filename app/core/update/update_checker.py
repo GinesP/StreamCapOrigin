@@ -274,14 +274,13 @@ class UpdateChecker:
             ],
         )
 
-        self.app.dialog_area.content = dialog
-        self.app.dialog_area.content.open = True
-        self.app.dialog_area.update()
+        self.app.page.open(dialog)
     
     def close_dialog(self) -> None:
-        if self.app.dialog_area.content:
-            self.app.dialog_area.content.open = False
-            self.app.dialog_area.update()
+        """Close the current dialog."""
+        # Programmatic close is now handled by buttons in 0.27+
+        # If needed, we could keep a reference to 'self.current_dialog'
+        pass
 
     def open_download_page(self, update_info: dict[str, Any]) -> None:
         import platform

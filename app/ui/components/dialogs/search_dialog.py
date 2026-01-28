@@ -1,4 +1,5 @@
 import flet as ft
+from ....utils.logger import logger
 
 
 class SearchDialog(ft.AlertDialog):
@@ -22,10 +23,6 @@ class SearchDialog(ft.AlertDialog):
 
         search_title = f"{self._['search']} ({filter_name})"
 
-        super().__init__(
-            title=ft.Text(search_title, size=20, weight=ft.FontWeight.BOLD),
-            content_padding=ft.padding.only(left=20, top=15, right=20, bottom=20),
-        )
         self.query = ft.TextField(
             hint_text=self._["search_keyword"],
             expand=True,
@@ -50,13 +47,20 @@ class SearchDialog(ft.AlertDialog):
                 on_click=self.submit_query,
             ),
         ]
-        self.content = ft.Column(
+        self.content_col = ft.Column(
             [self.query, ft.Divider(height=1, thickness=1, color=ft.Colors.GREY_300)],
             tight=True,
             width=400,
             height=300
         )
-        self.actions_alignment = ft.MainAxisAlignment.END
+
+        super().__init__(
+            title=ft.Text(search_title, size=20, weight=ft.FontWeight.BOLD),
+            content=self.content_col,
+            actions=self.actions,
+            actions_alignment=ft.MainAxisAlignment.END,
+            content_padding=ft.padding.only(left=20, top=15, right=20, bottom=20),
+        )
         self.on_close = on_close
         self.recordings_page.app.language_manager.add_observer(self)
 
@@ -73,11 +77,13 @@ class SearchDialog(ft.AlertDialog):
             self._["filter_error"] = self._["recording_error"]
             self._["filter_stopped"] = self._["stopped"]
 
-    async def close_dlg(self, _e):
+    def close_dlg(self, _e):
+        logger.debug("Attempting to close SearchDialog")
         self.open = False
         self.update()
 
     async def submit_query(self, e):
         query = self.query.value.strip()
+        logger.debug(f"Submitting search query: {query}")
         await self.recordings_page.filter_recordings(query)
-        await self.close_dlg(e) 
+        self.close_dlg(e)

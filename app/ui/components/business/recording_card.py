@@ -38,11 +38,6 @@ class RecordingCardManager:
     async def create_card(self, recording: Recording, subscribe_add_cards: bool = False):
         """Create a card for a given recording."""
         rec_id = recording.rec_id
-        if not self.cards_obj.get(rec_id):
-            check_live_on_browser_refresh = self.app.settings.user_config.get("check_live_on_browser_refresh", True)
-            if self.app.recording_enabled and not subscribe_add_cards:
-                if check_live_on_browser_refresh or recording.streamer_name == self._['live_room']:
-                    self.app.page.run_task(self.app.record_manager.check_if_live, recording)
             
         card_data = self._create_card_components(recording)
         self.cards_obj[rec_id] = card_data
@@ -244,7 +239,8 @@ class RecordingCardManager:
                     recording_card["card"].content.bgcolor = self.get_card_background_color(recording)
                     recording_card["card"].content.border = ft.border.all(2, self.get_card_border_color(recording))
                     try:
-                        recording_card["card"].update()
+                        if recording_card["card"].page:
+                            recording_card["card"].update()
                     except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                         logger.debug(f"Update card failed: {e}")
                         return
@@ -288,13 +284,8 @@ class RecordingCardManager:
         """Display a dialog with detailed information about the recording."""
         try:
             dialog = CardDialog(self.app, recording)
-            dialog.open = True
-            self.app.dialog_area.content = dialog
-            try:
-                self.app.dialog_area.update()
-            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                logger.debug(f"Update recording info dialog failed: {e}")
-        except (ft.core.page.PageDisconnectedException, AssertionError) as e:
+            self.app.page.open(dialog)
+        except Exception as e:
             logger.debug(f"Show recording info dialog failed: {e}")
         except Exception as e:
             logger.debug(f"Show recording info dialog failed: {e}")
@@ -412,7 +403,8 @@ class RecordingCardManager:
                         if card_info.get("duration_label"):
                             try:
                                 card_info["duration_label"].value = self.app.record_manager.get_duration(recording)
-                                card_info["duration_label"].update()
+                                if card_info["duration_label"].page:
+                                    card_info["duration_label"].update()
                             except:
                                 pass
             except Exception as e:
@@ -467,7 +459,7 @@ class RecordingCardManager:
             async def close_dialog(_):
                 try:
                     delete_alert_dialog.open = False
-                    delete_alert_dialog.update()
+                    self.app.page.update()
                 except (ft.core.page.PageDisconnectedException, AssertionError) as err:
                     logger.debug(f"Close delete dialog failed: {err}")
 
@@ -481,12 +473,9 @@ class RecordingCardManager:
                 actions_alignment=ft.MainAxisAlignment.END,
                 modal=False,
             )
-            delete_alert_dialog.open = True
-            self.app.dialog_area.content = delete_alert_dialog
-            try:
-                self.app.dialog_area.update()
-            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                logger.debug(f"Update delete dialog failed: {e}")
+            self.app.page.open(delete_alert_dialog)
+        except (ft.core.page.PageDisconnectedException, AssertionError) as e:
+            logger.debug(f"Show delete dialog failed: {e}")
         except (ft.core.page.PageDisconnectedException, AssertionError) as e:
             logger.debug(f"Show delete dialog failed: {e}")
         except Exception as e:
@@ -498,9 +487,10 @@ class RecordingCardManager:
             await video_player.preview_video(recording.preview_url, is_file_path=False, room_url=recording.url)
         elif recording.recording_dir and os.path.exists(recording.recording_dir):
             video_files = []
+            streamer_prefix = utils.clean_name(recording.streamer_name)
             for root, _, files in os.walk(recording.recording_dir):
                 for file in files:
-                    if utils.is_valid_video_file(file):
+                    if utils.is_valid_video_file(file) and streamer_prefix in file:
                         video_files.append(os.path.join(root, file))
 
             if video_files:
