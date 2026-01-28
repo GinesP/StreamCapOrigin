@@ -36,7 +36,6 @@ class SettingsPage(PageBase):
         self.delay_handler = DelayedTaskExecutor(self.app, self)
         self.load_language()
         self.init_unsaved_changes()
-        self.page.on_keyboard_event = self.on_keyboard
 
     async def load(self):
         self.content_area.clean()
@@ -46,7 +45,6 @@ class SettingsPage(PageBase):
         self.tab_push = self.create_push_settings_tab()
         self.tab_cookies = self.create_cookies_settings_tab()
         self.tab_accounts = self.create_accounts_settings_tab()
-        self.page.on_keyboard_event = self.on_keyboard
 
         tabs = [
             ft.Tab(text=self._["recording_settings"], content=self.tab_recording),
@@ -147,9 +145,8 @@ class SettingsPage(PageBase):
             modal=False,
         )
 
-        self.app.dialog_area.content = restore_alert_dialog
-        self.app.dialog_area.content.open = True
-        self.app.dialog_area.update()
+        restore_alert_dialog.open = True
+        self.page.open(restore_alert_dialog)
 
     async def on_change(self, e):
         """Handle changes in any input field and trigger auto-save."""
@@ -1315,9 +1312,7 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
 
     async def on_keyboard(self, e: ft.KeyboardEvent):
         if e.alt and e.key == "H":
-            self.app.dialog_area.content = HelpDialog(self.app)
-            self.app.dialog_area.content.open = True
-            self.app.dialog_area.update()
+            self.page.open(HelpDialog(self.app))
 
         if self.app.current_page == self and e.ctrl and e.key == "S":
             self.page.run_task(self.is_changed)
