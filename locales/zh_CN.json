@@ -188,6 +188,7 @@
     "offline": "未开播",
     "no_monitor": "未监控",
     "checking": "检测中",
+    "priority": "优先级",
     "live_room": "直播间"
   },
   "settings_page": {

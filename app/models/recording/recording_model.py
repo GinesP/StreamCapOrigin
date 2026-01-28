@@ -20,7 +20,8 @@ class Recording:
         only_notify_no_record,
         flv_use_direct_download,
         live_check_count=0,
-        live_found_count=0
+        live_found_count=0,
+        priority_score=0.0
     ):
         """
         Initialize a recording object.
@@ -59,6 +60,7 @@ class Recording:
         self.flv_use_direct_download = flv_use_direct_download
         self.live_check_count = live_check_count
         self.live_found_count = live_found_count
+        self.priority_score = priority_score or (live_found_count / live_check_count if live_check_count > 0 else 0.0)
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
         self.speed = "X KB/s"
@@ -109,7 +111,8 @@ class Recording:
             "only_notify_no_record": self.only_notify_no_record,
             "flv_use_direct_download": self.flv_use_direct_download,
             "live_check_count": self.live_check_count,
-            "live_found_count": self.live_found_count
+            "live_found_count": self.live_found_count,
+            "priority_score": self.priority_score
         }
 
     @classmethod
@@ -132,7 +135,8 @@ class Recording:
             data.get("only_notify_no_record"),
             data.get("flv_use_direct_download"),
             data.get("live_check_count", 0),
-            data.get("live_found_count", 0)
+            data.get("live_found_count", 0),
+            data.get("priority_score", 0.0)
         )
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)
@@ -145,16 +149,23 @@ class Recording:
 
     def increment_live_counts(self, is_live: bool):
         """
-        Increment check counts and apply decay logic if threshold is reached.
-        This ensures the priority score remains responsive to recent changes.
+        Update priority score using Exponential Moving Average (EMA).
+        This ensures the priority score remains highly responsive to recent changes.
         """
+        # Alpha (α) determines how much weight we give to the latest result.
+        # 0.1 means a "memory" of roughly the last 10 checks.
+        alpha = 0.1
+        current_val = 1.0 if is_live else 0.0
+        
+        # EMA Formula: score = (score * (1 - alpha)) + (current_val * alpha)
+        self.priority_score = (self.priority_score * (1 - alpha)) + (current_val * alpha)
+        
+        # Update legacy counts just in case, but keep them capped/decayed
         self.live_check_count += 1
         if is_live:
             self.live_found_count += 1
-
-        # Decay logic: when counts get too high, divide by 2 to keep them responsive
-        # Threshold of 200 checks (roughly 1.6 hours with 30s checks)
-        if self.live_check_count > 200:
+            
+        if self.live_check_count > 100:
             self.live_check_count //= 2
             self.live_found_count //= 2
 
