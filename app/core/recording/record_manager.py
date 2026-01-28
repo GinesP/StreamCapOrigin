@@ -200,11 +200,9 @@ class RecordingManager:
 
     async def check_all_live_status(self):
         """Check the live status of all recordings and update their display titles."""
-        # Prioritize recordings that are live more often
+        # Prioritize recordings based on their EMA priority score
         def get_priority_score(rec):
-            if rec.live_check_count == 0:
-                return 0
-            return rec.live_found_count / rec.live_check_count
+            return getattr(rec, 'priority_score', 0.0)
 
         recordings_to_check = sorted(
             self.recordings,

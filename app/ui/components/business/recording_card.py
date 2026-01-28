@@ -106,6 +106,10 @@ class RecordingCardManager:
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_info_button_on_click, e, rec),
         )
         speed_text_label = ft.Text(speed, size=12)
+    
+        priority_score = getattr(recording, "priority_score", 0.0)
+        priority_text = f"{self._['priority']}: {priority_score:.1%}" if priority_score > 0 else ""
+        priority_label = ft.Text(priority_text, size=12, color=ft.Colors.GREY_500, visible=priority_score > 0)
 
         status_label = self.create_status_label(recording)
 
@@ -121,7 +125,7 @@ class RecordingCardManager:
                 [
                     title_row,
                     duration_text_label,
-                    speed_text_label,
+                    ft.Row([speed_text_label, priority_label], spacing=10),
                     ft.Row(
                         [
                             record_button,
@@ -153,6 +157,7 @@ class RecordingCardManager:
             "display_title_label": display_title_label,
             "duration_label": duration_text_label,
             "speed_label": speed_text_label,
+            "priority_label": priority_label,
             "record_button": record_button,
             "open_folder_button": open_folder_button,
             "recording_info_button": recording_info_button,
@@ -226,6 +231,12 @@ class RecordingCardManager:
 
                 if recording_card.get("speed_label"):
                     recording_card["speed_label"].value = recording.speed
+
+                if recording_card.get("priority_label"):
+                    priority_score = getattr(recording, "priority_score", 0.0)
+                    priority_text = f"{self._['priority']}: {priority_score:.1%}" if priority_score > 0 else ""
+                    recording_card["priority_label"].value = priority_text
+                    recording_card["priority_label"].visible = priority_score > 0
 
                 if recording_card.get("record_button"):
                     recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)

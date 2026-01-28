@@ -188,6 +188,7 @@
     "offline": "Offline",
     "no_monitor": "Not Monitored",
     "checking": "Checking",
+    "priority": "Priority",
     "live_room": "Live Room"
   },
   "settings_page": {

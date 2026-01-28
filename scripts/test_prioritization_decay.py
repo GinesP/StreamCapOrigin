@@ -8,12 +8,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.models.recording.recording_model import Recording
 
 def get_priority_score(rec):
-    if rec.live_check_count == 0:
-        return 0
-    return rec.live_found_count / rec.live_check_count
+    return getattr(rec, 'priority_score', 0.0)
 
 def test_decay_logic():
-    print("--- Testing Decay Logic ---")
+    print("--- Testing Decay Logic (EMA) ---")
     rec = Recording(
         rec_id="test", url="test.com", streamer_name="TestStreamer",
         record_format="mp4", quality="OD", segment_record=False,
@@ -22,35 +20,37 @@ def test_decay_logic():
         enabled_message_push=False, only_notify_no_record=False, flv_use_direct_download=False
     )
 
-    # Simulate 200 non-live checks
-    print("Simulating 200 non-live checks...")
-    for _ in range(200):
+    # Initial score should be 0
+    assert rec.priority_score == 0.0
+
+    # Simulate 100 non-live checks
+    print("Simulating 100 non-live checks...")
+    for _ in range(100):
         rec.increment_live_counts(is_live=False)
     
-    print(f"Stats after 200 checks: {rec.live_check_count} checks, {rec.live_found_count} found, score: {get_priority_score(rec):.4f}")
-    assert rec.live_check_count == 200
-    assert rec.live_found_count == 0
-
-    # The 201st check should trigger decay
-    print("\nTriggering decay (201st check)...")
-    rec.increment_live_counts(is_live=False)
-    print(f"Stats after 201st check (decayed): {rec.live_check_count} checks, {rec.live_found_count} found, score: {get_priority_score(rec):.4f}")
-    # 201 // 2 = 100
+    # Score should still be 0 (or very close to it)
+    print(f"Stats after 100 checks: {rec.live_check_count} legacy checks, score: {get_priority_score(rec):.4f}")
+    assert rec.priority_score == 0.0
     assert rec.live_check_count == 100
-    assert rec.live_found_count == 0
+
+    # The 101st check should trigger legacy decay
+    print("\nTriggering legacy decay (101st check)...")
+    rec.increment_live_counts(is_live=False)
+    print(f"Stats after 101st check: {rec.live_check_count} legacy checks, score: {get_priority_score(rec):.4f}")
+    assert rec.live_check_count == 50
 
     # Now simulate the streamer becoming active
-    print("\nStreamer becomes active! Simulating 50 live checks...")
-    for _ in range(50):
+    print("\nStreamer becomes active! Simulating 10 live checks...")
+    for _ in range(10):
         rec.increment_live_counts(is_live=True)
     
     final_score = get_priority_score(rec)
-    print(f"Final stats: {rec.live_check_count} checks, {rec.live_found_count} found, score: {final_score:.4f}")
+    print(f"Final stats: {rec.live_check_count} checks, score: {final_score:.4f}")
     
-    # Without decay, they would have had 251 checks and 50 found (score 0.199)
-    # With decay, they have 150 checks and 50 found (score 0.333)
-    print(f"With decay, the score is more responsive to recent activity (0.33 vs ~0.20)")
-    assert final_score > 0.3 # Should be ~0.33
+    # With alpha = 0.1, after 10 live checks starting from 0:
+    # score = 1 - (1-0.1)^10 = 1 - 0.348 = 0.651
+    print(f"EMA Score after 10 live checks: {final_score:.4f} (Expected ~0.65)")
+    assert 0.6 < final_score < 0.7
 
 def test_sorting_with_decay():
     print("\n--- Testing Sorting with Decay ---")

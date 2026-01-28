@@ -188,6 +188,7 @@
         "offline": "Desconectado",
         "no_monitor": "No Monitoreado",
         "checking": "Comprobando",
+        "priority": "Prioridad",
         "live_room": "Sala en Vivo"
     },
     "settings_page": {
