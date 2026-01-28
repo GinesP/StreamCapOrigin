@@ -1,6 +1,7 @@
 import flet as ft
 
 from ..base_page import PageBase
+from ...utils.logger import logger
 from ..components.dialogs.help_dialog import HelpDialog
 
 
@@ -11,7 +12,6 @@ class AboutPage(PageBase):
         self.about_config = {}
         self.app.language_manager.add_observer(self)
         self.load_language()
-        self.page.on_keyboard_event = self.on_keyboard
 
     def load_language(self):
         self._ = self.app.language_manager.language.get("about_page")
@@ -19,6 +19,7 @@ class AboutPage(PageBase):
 
     async def load(self):
         """Load the about page content."""
+        logger.debug("Loading AboutPage...")
         self.content_area.clean()
 
         is_mobile = self.app.is_mobile
@@ -358,6 +359,7 @@ class AboutPage(PageBase):
 
         self.content_area.controls.append(about_page_layout)
         self.content_area.update()
+        logger.debug("AboutPage loaded.")
 
     @staticmethod
     async def open_update_page(e):
@@ -371,9 +373,7 @@ class AboutPage(PageBase):
 
     async def on_keyboard(self, e: ft.KeyboardEvent):
         if e.alt and e.key == "H":
-            self.app.dialog_area.content = HelpDialog(self.app)
-            self.app.dialog_area.content.open = True
-            self.app.dialog_area.update()
+            self.page.open(HelpDialog(self.app))
             
     async def _check_for_updates(self, _):
         _ = self.app.language_manager.language.get("update", {})

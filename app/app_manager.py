@@ -52,18 +52,16 @@ class App:
         self.sidebar = NavigationSidebar(self)
         self.left_navigation_menu = LeftNavigationMenu(self)
 
-        self.snack_bar_area = ft.Container()
-        self.dialog_area = ft.Container()
         self.complete_page = ft.Row(
             expand=True,
             controls=[
                 self.left_navigation_menu,
                 ft.VerticalDivider(width=1),
                 self.content_area,
-                self.dialog_area,
-                self.snack_bar_area,
             ]
         )
+        self.dialog_area = ft.Stack()
+        self.page.overlay.append(self.dialog_area)
         self.snack_bar = ShowSnackBar(self)
         self.subprocess_start_up_info = utils.get_startup_info()
         self.record_card_manager = RecordingCardManager(self)
@@ -85,6 +83,10 @@ class App:
             "storage": self.storage,
             "about": self.about,
         }
+
+    async def on_keyboard(self, e: ft.KeyboardEvent):
+        if self.current_page and hasattr(self.current_page, "on_keyboard"):
+            await self.current_page.on_keyboard(e)
 
     async def switch_page(self, page_name):
         if self._loading_page:
@@ -109,6 +111,7 @@ class App:
                 
                 try:
                     await asyncio.wait_for(page.load(), timeout=10.0)
+                    self.content_area.update()
                 except asyncio.TimeoutError:
                     logger.error(f"Page load timed out: {page_name}")
                 except Exception as e:
@@ -117,6 +120,7 @@ class App:
             logger.error(f"Critical error in switch_page: {e}")
         finally:
             self._loading_page = False
+            self.page.update()
             logger.debug(f"Finished switching page to: {page_name}")
 
     async def clear_content_area(self, update=True):

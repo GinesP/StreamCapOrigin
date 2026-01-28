@@ -41,8 +41,6 @@ def setup_responsive_layout(page: ft.Page, app: App) -> None:
             controls=[
                 app.content_area,
                 app.bottom_navigation,
-                app.dialog_area,
-                app.snack_bar_area
             ]
         )
     else:
@@ -58,8 +56,6 @@ def setup_responsive_layout(page: ft.Page, app: App) -> None:
                 app.left_navigation_menu,
                 ft.VerticalDivider(width=1),
                 app.content_area,
-                app.dialog_area,
-                app.snack_bar_area,
             ]
         )
 

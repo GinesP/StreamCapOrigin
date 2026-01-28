@@ -67,6 +67,7 @@ class RecordingsPage(PageBase):
 
     async def load(self):
         """Load the recordings page content."""
+        self.content_area.controls.clear()
         self.content_area.controls.extend(
             [
                 self.create_recordings_title_area(),
@@ -86,9 +87,7 @@ class RecordingsPage(PageBase):
             await self.recalculate_grid_columns(update_ui=False)
         
         self.content_area.update()
-        
-        self.page.on_keyboard_event = self.on_keyboard
-        self.page.on_resized = self.update_grid_layout
+
 
     def pubsub_subscribe(self):
         self.app.page.pubsub.subscribe_topic('add', self.subscribe_add_cards)
@@ -541,6 +540,7 @@ class RecordingsPage(PageBase):
             recording.loop_time_seconds = int(user_config.get("loop_time_seconds", 300))
             recording.update_title(self._[recording.quality])
             await self.app.record_manager.add_recording(recording)
+            self.app.page.run_task(self.app.record_manager.check_if_live, recording)
             new_recordings.append(recording)
 
         if new_recordings:
@@ -571,9 +571,7 @@ class RecordingsPage(PageBase):
     async def search_on_click(self, _e):
         """Open the search dialog when the search button is clicked."""
         search_dialog = SearchDialog(recordings_page=self)
-        search_dialog.open = True
-        self.app.dialog_area.content = search_dialog
-        self.app.dialog_area.update()
+        self.page.open(search_dialog)
 
     async def add_recording_on_click(self, _e):
         await self.add_recording_dialog.show_dialog()
@@ -658,8 +656,7 @@ class RecordingsPage(PageBase):
         )
 
         batch_delete_alert_dialog.open = True
-        self.app.dialog_area.content = batch_delete_alert_dialog
-        self.page.update()
+        self.page.open(batch_delete_alert_dialog)
 
     async def delete_all_recording_cards(self):
         self.recording_card_area.content.controls.clear()
@@ -728,9 +725,7 @@ class RecordingsPage(PageBase):
 
     async def on_keyboard(self, e: ft.KeyboardEvent):
         if e.alt and e.key == "H":
-            self.app.dialog_area.content = HelpDialog(self.app)
-            self.app.dialog_area.content.open = True
-            self.app.dialog_area.update()
+            self.page.open(HelpDialog(self.app))
         if self.app.current_page == self:
             if e.ctrl and e.key == "F":
                 self.page.run_task(self.search_on_click, e)

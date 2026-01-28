@@ -77,7 +77,7 @@ def get_platform_handler(
 def get_platform_info(record_url: str) -> tuple:
     platform_map = {
         "douyin.com/": ("抖音直播", "douyin"),
-        "https://www.tiktok.com/": ("TikTok直播", "tiktok"),
+        "tiktok.com/": ("TikTok直播", "tiktok"),
         "https://live.kuaishou.com/": ("快手直播", "kuaishou"),
         "https://www.huya.com/": ("虎牙直播", "huya"),
         "https://www.douyu.com/": ("斗鱼直播", "douyu"),

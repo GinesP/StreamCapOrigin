@@ -78,10 +78,8 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
 
             threading.Thread(target=close_app, daemon=True).start()
         else:
-            if not getattr(app, "is_web_mode", False) and hasattr(app, "tray_manager"):
-                app.tray_manager.stop()
             _safe_destroy_window(page)
-
+        
         await close_dialog(e)
 
     async def close_dialog(_):
@@ -161,7 +159,5 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
         shape=ft.RoundedRectangleBorder(radius=10),
     )
 
-    close_confirm_dialog.open = True
-    app.dialog_area.content = close_confirm_dialog
     app.close_confirm_dialog = close_confirm_dialog
-    page.update()
+    page.open(close_confirm_dialog)

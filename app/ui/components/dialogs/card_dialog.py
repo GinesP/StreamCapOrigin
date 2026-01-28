@@ -51,7 +51,17 @@ class CardDialog(ft.AlertDialog):
             [
                 ft.Text(f"{self._['anchor_name']}: {anchor_name}", size=14, selectable=True),
                 ft.Text(f"{self._['platform_name']}: {platform_name}", size=14, selectable=True),
-                ft.Text(f"{self._['live_link']}: {live_link}", size=14, selectable=True),
+                ft.Text(
+                    spans=[
+                        ft.TextSpan(f"{self._['live_link']}: "),
+                        ft.TextSpan(
+                            live_link,
+                            style=ft.TextStyle(color=ft.Colors.BLUE, decoration=ft.TextDecoration.UNDERLINE),
+                            on_click=lambda _: self.app.page.launch_url(live_link),
+                        ),
+                    ],
+                    size=14,
+                ),
                 ft.Text(f"{self._['live_title']}: {live_title}", size=14, selectable=True),
                 ft.Text(f"{self._['record_format']}: {record_format}", size=14),
                 ft.Text(f"{self._['record_quality']}: {quality_info}", size=14),

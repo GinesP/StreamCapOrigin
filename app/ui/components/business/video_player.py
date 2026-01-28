@@ -36,7 +36,7 @@ class VideoPlayer:
 
         def close_dialog(_):
             dialog.open = False
-            self.app.dialog_area.update()
+            self.app.page.update()
 
         is_mobile = self.app.is_mobile
 
@@ -113,9 +113,7 @@ class VideoPlayer:
                 actions=actions,
                 actions_alignment=ft.MainAxisAlignment.END
             )
-        dialog.open = True
-        self.app.dialog_area.content = dialog
-        self.app.dialog_area.update()
+        self.app.page.open(dialog)
 
     async def preview_video(self, source: str, is_file_path: bool = True, room_url: str | None = None):
         """
