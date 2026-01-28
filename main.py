@@ -157,6 +157,7 @@ async def main(page: ft.Page) -> None:
         page.add(app.complete_page)
         
         page.on_route_change = handle_route_change(page, app)
+        page.on_keyboard_event = app.on_keyboard
         page.window.prevent_close = True
         page.window.on_event = handle_window_event(page, app, save_progress_overlay)
         if is_web:
