@@ -70,7 +70,7 @@ class HomePage(PageBase):
     async def load(self):
         self.content_area.controls.clear()
 
-        # Fetch top 10 recordings
+        # Fetch top 10 recordings dynamically each time the home view is loaded
         top_recordings = await self.fetch_top_recordings()
 
         home_content = ft.Column(
@@ -89,6 +89,13 @@ class HomePage(PageBase):
 
         self.content_area.controls.append(home_content)
         self.content_area.update()
+
+    async def on_view_activated(self):
+        """
+        This method is called whenever the home view is activated.
+        It ensures the top 10 recordings are refreshed dynamically.
+        """
+        await self.load()
 
     def create_home_header(self):
         logo_path = os.path.join("icons", "loading-animation.png")
