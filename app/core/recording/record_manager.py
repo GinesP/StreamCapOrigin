@@ -217,6 +217,9 @@ class RecordingManager:
                     self.app.page.run_task(self.check_if_live, recording)
                     # Stagger the start of each task to avoid a burst of requests
                     await asyncio.sleep(random.uniform(1.0, 2.5))
+        
+        # Persist all recording updates once after all checks are queued
+        self.app.page.run_task(self.persist_recordings)
 
     _periodic_task_running = False
 
@@ -352,8 +355,9 @@ class RecordingManager:
 
         if stream_info.is_live:
             # Update counts using the new responsive method
-            recording.increment_live_counts(is_live=True)
-            self.app.page.run_task(self.persist_recordings)
+            alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
+            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.005))
+            recording.increment_live_counts(is_live=True, alpha_active=alpha_active, alpha_offline=alpha_offline)
             
             recording.live_title = stream_info.title
             if recording.streamer_name.strip() == self._["live_room"]:
@@ -411,8 +415,9 @@ class RecordingManager:
 
         else:
             # Update counts for non-live case
-            recording.increment_live_counts(is_live=False)
-            self.app.page.run_task(self.persist_recordings)
+            alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
+            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
+            recording.increment_live_counts(is_live=False, alpha_active=alpha_active, alpha_offline=alpha_offline)
 
             recording.is_recording = False
             if recording.is_live:

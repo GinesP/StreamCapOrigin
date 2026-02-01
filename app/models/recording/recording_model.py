@@ -147,14 +147,19 @@ class Recording:
             recording.last_duration = timedelta(seconds=float(recording.last_duration_str))
         return recording
 
-    def increment_live_counts(self, is_live: bool):
+    def increment_live_counts(self, is_live: bool, alpha_active: float = 0.1, alpha_offline: float = 0.005):
         """
         Update priority score using Exponential Moving Average (EMA).
-        This ensures the priority score remains highly responsive to recent changes.
+        Uses different alpha values for active vs offline streams.
+        
+        :param is_live: Whether the stream is currently live
+        :param alpha_active: Alpha value when stream is live (higher = faster response)
+        :param alpha_offline: Alpha value when stream is offline (lower = slower decay)
         """
-        # Alpha (α) determines how much weight we give to the latest result.
-        # 0.1 means a "memory" of roughly the last 10 checks.
-        alpha = 0.1
+        # Select appropriate alpha based on stream status
+        # Active streams use higher alpha for quick response
+        # Offline streams use lower alpha for slow decay (maintains priority longer)
+        alpha = alpha_active if is_live else alpha_offline
         current_val = 1.0 if is_live else 0.0
         
         # EMA Formula: score = (score * (1 - alpha)) + (current_val * alpha)
