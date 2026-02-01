@@ -22,13 +22,62 @@ class HomePage(PageBase):
     def init(self):
         pass
 
+    def create_top_recordings_area(self, top_recordings):
+        """
+        Create a UI area to display the top 10 recordings.
+        :param top_recordings: List of top 10 recordings sorted by priority.
+        """
+        rows = []
+        for recording in top_recordings:
+            rows.append(
+                ft.Row(
+                    controls=[
+                        ft.Text(recording.get("streamer_name", "Unknown"), size=16, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"Priority: {recording.get('priority_score', 0):.2f}", size=14, color=ft.Colors.GREY),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                )
+            )
+
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("Top 10 Recordings", size=20, weight=ft.FontWeight.BOLD),
+                    *rows
+                ],
+                spacing=10,
+            ),
+            alignment=ft.alignment.center,
+            padding=ft.padding.all(20),
+        )
+
+    async def fetch_top_recordings(self):
+        """
+        Fetch the top 10 recordings sorted by priority from the recordings configuration.
+        """
+        recordings = self.app.config_manager.load_recordings_config()
+        if not recordings:
+            return []
+
+        # Sort recordings by priority_score in descending order and take the top 10
+        sorted_recordings = sorted(
+            recordings,
+            key=lambda r: r.get("priority_score", 0),
+            reverse=True
+        )
+        return sorted_recordings[:10]
+
     async def load(self):
         self.content_area.controls.clear()
+
+        # Fetch top 10 recordings
+        top_recordings = await self.fetch_top_recordings()
 
         home_content = ft.Column(
             controls=[
                 self.create_home_header(),
                 self.create_quick_action_area(),
+                self.create_top_recordings_area(top_recordings),
                 self.create_announcements_area(),
                 self.create_stats_area(),
                 self.create_features_area(),
