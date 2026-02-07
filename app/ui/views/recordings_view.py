@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from datetime import datetime
 
 import flet as ft
 
@@ -512,6 +513,7 @@ class RecordingsPage(PageBase):
                     enabled_message_push=recording_info["enabled_message_push"],
                     only_notify_no_record=recording_info["only_notify_no_record"],
                     flv_use_direct_download=recording_info["flv_use_direct_download"],
+                    added_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 )
             else:
                 recording = Recording(
@@ -530,6 +532,7 @@ class RecordingsPage(PageBase):
                     enabled_message_push=False,
                     only_notify_no_record=user_config.get("only_notify_no_record"),
                     flv_use_direct_download=user_config.get("flv_use_direct_download"),
+                    added_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 )
 
             platform, platform_key = get_platform_info(recording.url)

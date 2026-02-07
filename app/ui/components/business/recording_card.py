@@ -113,6 +113,14 @@ class RecordingCardManager:
 
         status_label = self.create_status_label(recording)
 
+        added_at = getattr(recording, "added_at", None)
+        added_at_text = f"{self._['added_at']}: {added_at}" if added_at else ""
+        added_at_label = ft.Text(added_at_text, size=11, color=ft.Colors.GREY_500, visible=bool(added_at))
+
+        last_active = getattr(recording, "last_active_at", None)
+        last_active_text = f"{self._['last_active_at']}: {last_active}" if last_active else ""
+        last_active_label = ft.Text(last_active_text, size=11, color=ft.Colors.GREY_500, visible=bool(last_active))
+
         title_row = ft.Row(
             [display_title_label, status_label] if status_label else [display_title_label],
             alignment=ft.MainAxisAlignment.START,
@@ -126,6 +134,7 @@ class RecordingCardManager:
                     title_row,
                     duration_text_label,
                     ft.Row([speed_text_label, priority_label], spacing=10),
+                    ft.Row([added_at_label, last_active_label], spacing=10),
                     ft.Row(
                         [
                             record_button,
@@ -164,6 +173,8 @@ class RecordingCardManager:
             "edit_button": edit_button,
             "monitor_button": monitor_button,
             "status_label": status_label,
+            "added_at_label": added_at_label,
+            "last_active_label": last_active_label,
         }
 
     def get_card_background_color(self, recording: Recording):
@@ -237,6 +248,16 @@ class RecordingCardManager:
                     priority_text = f"{self._['priority']}: {priority_score:.1%}" if priority_score > 0 else ""
                     recording_card["priority_label"].value = priority_text
                     recording_card["priority_label"].visible = priority_score > 0
+
+                if recording_card.get("added_at_label"):
+                    added_at = getattr(recording, "added_at", None)
+                    recording_card["added_at_label"].value = f"{self._['added_at']}: {added_at}" if added_at else ""
+                    recording_card["added_at_label"].visible = bool(added_at)
+
+                if recording_card.get("last_active_label"):
+                    last_active = getattr(recording, "last_active_at", None)
+                    recording_card["last_active_label"].value = f"{self._['last_active_at']}: {last_active}" if last_active else ""
+                    recording_card["last_active_label"].visible = bool(last_active)
 
                 if recording_card.get("record_button"):
                     recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)

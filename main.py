@@ -1,6 +1,7 @@
 import argparse
 import multiprocessing
 import os
+import sys
 
 import flet as ft
 from dotenv import load_dotenv
@@ -220,10 +221,26 @@ async def main(page: ft.Page) -> None:
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    # Detect if the app is running as a bundled executable
+    if getattr(sys, 'frozen', False):
+        # If frozen, use the temporary directory where the app is extracted
+        # Or the directory of the executable
+        bundle_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.executable)))
+    else:
+        # If running as a normal script
+        bundle_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Load the .env file from the detected directory
+    dotenv_path = os.path.join(bundle_dir, '.env')
+    load_dotenv(dotenv_path)
+
     platform = os.getenv("PLATFORM")
     default_host = os.getenv("HOST", DEFAULT_HOST)
-    default_port = int(os.getenv("PORT", DEFAULT_PORT))
+    default_port = os.getenv("PORT", DEFAULT_PORT)
+    if default_port is not None:
+        default_port = int(default_port)
+    else:
+        default_port = DEFAULT_PORT
 
     parser = argparse.ArgumentParser(description="Run the Flet app with optional web mode.")
     parser.add_argument("--web", action="store_true", help="Run the app in web mode")
@@ -246,3 +263,4 @@ if __name__ == "__main__":
 
     else:
         ft.app(target=main, assets_dir=ASSETS_DIR)
+

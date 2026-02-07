@@ -354,6 +354,9 @@ class RecordingManager:
             stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, live_room_text)
 
         if stream_info.is_live:
+            # Update last active time
+            recording.last_active_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
             # Update counts using the new responsive method
             alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
             alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.005))
@@ -416,7 +419,7 @@ class RecordingManager:
         else:
             # Update counts for non-live case
             alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
-            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
+            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.005))
             recording.increment_live_counts(is_live=False, alpha_active=alpha_active, alpha_offline=alpha_offline)
 
             recording.is_recording = False

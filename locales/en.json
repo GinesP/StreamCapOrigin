@@ -189,7 +189,9 @@
     "no_monitor": "Not Monitored",
     "checking": "Checking",
     "priority": "Priority",
-    "live_room": "Live Room"
+    "live_room": "Live Room",
+    "added_at": "Added at",
+    "last_active_at": "Last active"
   },
   "settings_page": {
     "recording_settings": "Recording Settings",
