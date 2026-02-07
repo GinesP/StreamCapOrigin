@@ -189,7 +189,9 @@
         "no_monitor": "No Monitoreado",
         "checking": "Comprobando",
         "priority": "Prioridad",
-        "live_room": "Sala en Vivo"
+        "live_room": "Sala en Vivo",
+        "added_at": "Añadido",
+        "last_active_at": "Última vez activo"
     },
     "settings_page": {
         "recording_settings": "Ajustes de Grabación",

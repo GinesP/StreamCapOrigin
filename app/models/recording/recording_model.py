@@ -21,7 +21,9 @@ class Recording:
         flv_use_direct_download,
         live_check_count=0,
         live_found_count=0,
-        priority_score=0.0
+        priority_score=0.0,
+        added_at=None,
+        last_active_at=None
     ):
         """
         Initialize a recording object.
@@ -61,6 +63,8 @@ class Recording:
         self.live_check_count = live_check_count
         self.live_found_count = live_found_count
         self.priority_score = priority_score or (live_found_count / live_check_count if live_check_count > 0 else 0.0)
+        self.added_at = added_at
+        self.last_active_at = last_active_at
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
         self.speed = "X KB/s"
@@ -112,7 +116,9 @@ class Recording:
             "flv_use_direct_download": self.flv_use_direct_download,
             "live_check_count": self.live_check_count,
             "live_found_count": self.live_found_count,
-            "priority_score": self.priority_score
+            "priority_score": self.priority_score,
+            "added_at": self.added_at,
+            "last_active_at": self.last_active_at
         }
 
     @classmethod
@@ -136,7 +142,9 @@ class Recording:
             data.get("flv_use_direct_download"),
             data.get("live_check_count", 0),
             data.get("live_found_count", 0),
-            data.get("priority_score", 0.0)
+            data.get("priority_score", 0.0),
+            data.get("added_at"),
+            data.get("last_active_at")
         )
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)
