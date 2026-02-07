@@ -10,6 +10,7 @@ from ...utils.delay import DelayedTaskExecutor
 from ...utils.logger import logger
 from ..base_page import PageBase
 from ..components.dialogs.help_dialog import HelpDialog
+from ...utils.cookie_importer import load_json_cookies, convert_json_to_cookie_string
 
 
 class SettingsPage(PageBase):
@@ -952,7 +953,10 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
             cookie_field = ft.TextField(
                 value=self.get_cookies_value(platform), width=500, data=platform, on_change=self.on_cookies_change
             )
-            setting_rows.append(self.create_setting_row(self._[f"{platform}_cookie"], cookie_field))
+            if platform == "tiktok":
+                setting_rows.append(self.pick_cookie_file(self._[f"{platform}_cookie"], cookie_field))
+            else:
+                setting_rows.append(self.create_setting_row(self._[f"{platform}_cookie"], cookie_field))
 
         return ft.Column(
             [
@@ -1283,6 +1287,110 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
         else:
             return ft.Row(
                 [ft.Text(label, width=200, text_align=ft.TextAlign.RIGHT), control, btn_pick_folder],
+                alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            )
+
+    def pick_cookie_file(self, label, control):
+        def picked_file(e: ft.FilePickerResultEvent):
+            if e.files:
+                file_path = e.files[0].path
+                if file_path:
+                    try:
+                        cookies_json = load_json_cookies(file_path)
+                        if cookies_json:
+                            cookie_string = convert_json_to_cookie_string(cookies_json)
+                            if cookie_string:
+                                control.value = cookie_string
+                                control.update()
+                                # Trigger on_change manually since setting value doesn't trigger it
+                                e.control.data = control.data
+                                e.data = cookie_string
+                            if cookie_string:
+                                control.value = cookie_string
+                                control.update()
+                                # Update config directly and save immediately
+                                self.cookies_config[control.data] = cookie_string
+                                self.has_unsaved_changes['cookies_config'] = False # Marked as saved after we save it below
+                                
+                                # Run save task immediately
+                                self.page.run_task(self.config_manager.save_cookies_config, self.cookies_config)
+                                
+                                self.page.run_task(
+                                    self.app.snack_bar.show_snack_bar, 
+                                    f"Cookies imported successfully from {os.path.basename(file_path)}", 
+                                    ft.Colors.GREEN
+                                )
+                            else:
+                                self.page.run_task(
+                                    self.app.snack_bar.show_snack_bar, 
+                                    "Failed to convert cookies.", 
+                                    ft.Colors.RED
+                                )
+                        else:
+                            self.page.run_task(
+                                self.app.snack_bar.show_snack_bar, 
+                                "No cookies found in file.", 
+                                ft.Colors.RED
+                            )
+                    except Exception as err:
+                        logger.error(f"Error importing cookies: {err}")
+                        self.page.run_task(
+                            self.app.snack_bar.show_snack_bar, 
+                            f"Error importing cookies: {err}", 
+                            ft.Colors.RED
+                        )
+
+        async def pick_file(_):
+            if self.app.page.web:
+                await self.app.snack_bar.show_snack_bar(self._["unsupported_select_path"])
+                return
+            file_picker.pick_files(
+                allow_multiple=False,
+                allowed_extensions=["json"],
+                dialog_title="Select Cookies JSON File"
+            )
+
+        file_picker = ft.FilePicker(on_result=picked_file)
+        self.page.overlay.append(file_picker)
+        self.page.update()
+
+        btn_pick_file = ft.IconButton(
+            icon=ft.Icons.FILE_UPLOAD, 
+            on_click=pick_file, 
+            tooltip="Import Cookies from JSON"
+        )
+        
+        if self.app.is_mobile:
+            if hasattr(control, 'width'):
+                control.width = float("inf")
+                control.expand = True
+                
+            return ft.Column(
+                [
+                    ft.Text(label, text_align=ft.TextAlign.LEFT),
+                    ft.Row(
+                        [
+                            ft.Container(
+                                content=control,
+                                expand=True,
+                            ),
+                            btn_pick_file
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        expand=True,
+                        width=float("inf"),
+                    ),
+                ],
+                spacing=5,
+                alignment=ft.MainAxisAlignment.START,
+                horizontal_alignment=ft.CrossAxisAlignment.START,
+                width=float("inf"),
+            )
+        else:
+            return ft.Row(
+                [ft.Text(label, width=200, text_align=ft.TextAlign.RIGHT), control, btn_pick_file],
                 alignment=ft.MainAxisAlignment.START,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             )
