@@ -65,7 +65,7 @@ class RecordingManager:
         for recording in self.recordings:
             recording.loop_time_seconds = self.loop_time_seconds
             recording.update_title(self._[recording.quality])
-            recording.showed_checking_status = True
+            recording.is_checking = False
 
     async def add_recording(self, recording):
         with GlobalRecordingState.lock:
@@ -304,13 +304,9 @@ class RecordingManager:
         recording.detection_time = datetime.now().time()
         recording.is_checking = True
         
-        # We'll increment the check count AFTER the check or just use the new method
-        # for both live and not live cases. 
-
-        if not recording.showed_checking_status:
-            recording.status_info = RecordingStatus.STATUS_CHECKING
-            recording.showed_checking_status = True
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+        # Always update UI to show "Checking" status at the start of detection
+        recording.status_info = RecordingStatus.STATUS_CHECKING
+        self.app.page.run_task(self.app.record_card_manager.update_card, recording)
 
         if recording.scheduled_recording:
             scheduled_time_range_list = await self.get_scheduled_time_range(
