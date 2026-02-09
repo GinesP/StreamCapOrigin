@@ -5,6 +5,8 @@ import threading
 from ...utils.logger import logger
 
 
+import queue
+
 class BackgroundService:
 
     _instance = None
@@ -16,12 +18,13 @@ class BackgroundService:
         return cls._instance
     
     def __init__(self):
-        self.tasks = []
+        self.tasks = queue.Queue()
         self.is_running = False
         self.worker_thread = None
+        self._stop_event = threading.Event()
     
     def add_task(self, task_func, *args, **kwargs):
-        self.tasks.append((task_func, args, kwargs))
+        self.tasks.put((task_func, args, kwargs))
         logger.info(f"Added background task: {task_func.__name__}")
         
         if not self.is_running:
@@ -32,21 +35,34 @@ class BackgroundService:
             return
             
         self.is_running = True
-        self.worker_thread = threading.Thread(target=self._process_tasks, daemon=False)
+        self._stop_event.clear()
+        self.worker_thread = threading.Thread(target=self._process_tasks, daemon=True)
         self.worker_thread.start()
         logger.info("Background service started")
     
+    def stop(self):
+        self._stop_event.set()
+        self.is_running = False
+
     def _process_tasks(self):
-        while self.tasks:
-            task_func, args, kwargs = self.tasks.pop(0)
+        while not self._stop_event.is_set():
             try:
-                logger.info(f"Executing background task: {task_func.__name__}")
-                task_func(*args, **kwargs)
-                logger.info(f"Background task completed: {task_func.__name__}")
-            except Exception as e:
-                logger.error(f"Background task execution failed: {e}")
+                # Wait for a task with a timeout to allow checking stop_event
+                task_func, args, kwargs = self.tasks.get(timeout=1.0)
+                try:
+                    logger.info(f"Executing background task: {task_func.__name__}")
+                    task_func(*args, **kwargs)
+                    logger.info(f"Background task completed: {task_func.__name__}")
+                except Exception as e:
+                    logger.error(f"Background task execution failed: {e}")
+                finally:
+                    self.tasks.task_done()
+            except queue.Empty:
+                if self.tasks.empty() and not self.is_running:
+                    break
+                continue
         
-        logger.info("All background tasks completed, service stopped")
+        logger.info("Background service worker stopped")
         self.is_running = False
 
 
