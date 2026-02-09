@@ -258,17 +258,41 @@ class RecordingManager:
         else:
             logger.info("Periodic live check task already running globally, skipping initialization")
 
+    async def check_if_live_with_retry(self, recording: Recording, retries: int = 2, delay: int = 20):
+        """
+        Check if the live stream is available with retries.
+        Useful when a stream ends abruptly and might restart shortly.
+        """
+        for i in range(retries):
+            if recording.is_recording or not recording.monitor_status:
+                break
+            
+            logger.log("RETRY", f"Performing extra live check ({i + 1}/{retries}) for: {recording.url}")
+            await self.check_if_live(recording)
+            
+            # If after check_if_live the recording started (is_recording will be True), we stop retrying
+            if recording.is_recording:
+                logger.log("RETRY", f"Stream resumed and recording started for: {recording.url}")
+                break
+            
+            if i < retries - 1:
+                await asyncio.sleep(delay)
+
     async def check_if_live(self, recording: Recording):
         """Check if the live stream is available, fetch stream data and update is_live status."""
 
         recording.manually_stopped = False
-        if recording.is_recording or recording.stopping_in_progress:
+        if recording.is_recording:
             logger.debug(f"Skip check_if_live because recording is busy: {recording.url}")
             return
 
         if recording.rec_id in self.active_recorders:
-            logger.debug(f"Skip check_if_live because recorder is active: {recording.url}")
-            return
+            recorder = self.active_recorders[recording.rec_id]
+            if not recorder.should_stop:
+                logger.debug(f"Skip check_if_live because recorder is active: {recording.url}")
+                return
+            else:
+                logger.debug(f"Proceeding with check_if_live because existing recorder is stopping: {recording.url}")
 
         if not recording.monitor_status:
             recording.display_title = f"[{self._['monitor_stopped']}] {recording.title}"
@@ -340,7 +364,7 @@ class RecordingManager:
             # Stagger requests slightly to avoid rate limiting - moved to BEFORE request
             await asyncio.sleep(random.uniform(2.0, 5.0))
             stream_info = await recorder.fetch_stream()
-            logger.info(f"Stream Data: {stream_info}")
+            logger.info(f"Stream Data: {stream_info.anchor_name if stream_info else 'None'}")
         if not stream_info or not stream_info.anchor_name:
             logger.error(f"Fetch stream data failed: {recording.url}")
             recording.is_checking = False
@@ -469,6 +493,7 @@ class RecordingManager:
             logger.info(f"Trying to stop recorder for {recording.rec_id}, title: {recording.title}")
             logger.debug(f"Active recorders: {list(self.active_recorders.keys())}")
 
+            recording.detection_time = None
             if recording.rec_id in self.active_recorders:
                 recorder = self.active_recorders[recording.rec_id]
                 logger.debug(f"Found recorder instance - id: {id(recorder)}")
@@ -491,7 +516,7 @@ class RecordingManager:
             recording.status_info = RecordingStatus.NOT_RECORDING
             logger.info(f"Stopped recording for {recording.title}")
 
-            self.app.page.run_task(self._reset_stopping_flag, recording)
+            self.app.page.run_task(self.persist_recordings)
 
     def get_duration(self, recording: Recording):
         """Get the duration of the current recording session in a formatted string."""

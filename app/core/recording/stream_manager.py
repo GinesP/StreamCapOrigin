@@ -199,7 +199,7 @@ class LiveStreamRecorder:
 
     async def fetch_stream(self) -> StreamData:
         logger.info(tr("console.live_url", "Live URL: {}").format(self.live_url))
-        logger.info(tr("console.use_proxy", "Use Proxy: {}").format(self.proxy or None))
+        # logger.info(tr("console.use_proxy", "Use Proxy: {}").format(self.proxy or None))
         self.recording.use_proxy = bool(self.proxy)
         handler = platform_handlers.get_platform_handler(
             live_url=self.live_url,
@@ -295,6 +295,7 @@ class LiveStreamRecorder:
         try:
             if self.recording.rec_id in self.app.record_manager.active_recorders:
                 del self.app.record_manager.active_recorders[self.recording.rec_id]
+                self.recording.stopping_in_progress = False
                 logger.info(tr("console.removed_active_recorder", "Removed recorder from active_recorders: {}").format(self.recording.rec_id))
         except Exception as e:
             logger.error(f"Failed to remove recorder instance: {e}")
@@ -304,8 +305,9 @@ class LiveStreamRecorder:
             # not manually stopped
             recording_duration = time.time() - self.recording_start_time
             if recording_duration > self.min_valid_recording_duration:
-                if self.app.recording_enabled and not self.is_flv_preferred_platform:
-                    self.app.page.run_task(self.app.record_manager.check_if_live, self.recording)
+                if self.app.recording_enabled:
+                    # Perform extra checks outside the normal cycle to catch transient disconnects
+                    self.app.page.run_task(self.app.record_manager.check_if_live_with_retry, self.recording)
             else:
                 self.recording.status_info = RecordingStatus.RECORDING_ERROR
 
