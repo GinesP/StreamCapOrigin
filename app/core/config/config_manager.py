@@ -22,6 +22,7 @@ class ConfigManager:
         self.accounts_config_path = os.path.join(self.config_path, "accounts.json")
         self.web_auth_config_path = os.path.join(self.config_path, "web_auth.json")
 
+        self._cache = {}
         os.makedirs(os.path.dirname(self.default_config_path), exist_ok=True)
         self.init()
 
@@ -32,6 +33,17 @@ class ConfigManager:
         self.init_accounts_config()
         self.init_recordings_config()
         self.init_web_auth_config()
+        # Warm up cache
+        self.load_all_to_cache()
+
+    def load_all_to_cache(self):
+        """Pre-load all configurations into cache."""
+        self._cache["default"] = self._load_config(self.default_config_path, "Error loading default config")
+        self._cache["user"] = self._load_config(self.user_config_path, "Error loading user config")
+        self._cache["recordings"] = self._load_config(self.recordings_config_path, "Error loading recordings config")
+        self._cache["accounts"] = self._load_config(self.accounts_config_path, "Error loading accounts config")
+        self._cache["cookies"] = self._load_config(self.cookies_config_path, "Error loading cookies config")
+        self._cache["web_auth"] = self._load_config(self.web_auth_config_path, "Error loading web auth config")
 
     @staticmethod
     def _init_config(config_path, default_config=None):
@@ -51,7 +63,7 @@ class ConfigManager:
         self._init_config(self.default_config_path, default_config)
 
     def init_user_config(self):
-        if os.path.exists(self.user_config_path) and self.load_user_config():
+        if os.path.exists(self.user_config_path) and self._load_config(self.user_config_path, "Check user config"):
             return
         shutil.copy(self.default_config_path, self.user_config_path)
 
@@ -81,28 +93,39 @@ class ConfigManager:
             logger.error(f"Invalid JSON format in file: {config_path}")
             return {}
         except FileNotFoundError:
-            logger.error(f"Configuration file not found: {config_path}")
+            # logger.error(f"Configuration file not found: {config_path}")
             return {}
         except Exception as e:
             logger.error(f"{error_message}: {e}")
             return {}
 
     def load_default_config(self):
-        return self._load_config(self.default_config_path, "An error occurred while loading default config")
+        if "default" not in self._cache:
+            self._cache["default"] = self._load_config(self.default_config_path, "An error occurred while loading default config")
+        return self._cache["default"]
 
     def load_user_config(self):
-        return self._load_config(self.user_config_path, "An error occurred while loading user config")
+        if "user" not in self._cache:
+            self._cache["user"] = self._load_config(self.user_config_path, "An error occurred while loading user config")
+        return self._cache["user"]
 
     def load_recordings_config(self):
-        return self._load_config(self.recordings_config_path, "An error occurred while loading recordings config")
+        if "recordings" not in self._cache:
+            self._cache["recordings"] = self._load_config(self.recordings_config_path, "An error occurred while loading recordings config")
+        return self._cache["recordings"]
 
     def load_accounts_config(self):
-        return self._load_config(self.accounts_config_path, "An error occurred while loading accounts config")
+        if "accounts" not in self._cache:
+            self._cache["accounts"] = self._load_config(self.accounts_config_path, "An error occurred while loading accounts config")
+        return self._cache["accounts"]
 
     def load_cookies_config(self):
-        return self._load_config(self.cookies_config_path, "An error occurred while loading cookies config")
+        if "cookies" not in self._cache:
+            self._cache["cookies"] = self._load_config(self.cookies_config_path, "An error occurred while loading cookies config")
+        return self._cache["cookies"]
 
     def load_about_config(self):
+        # About config might change on update, maybe don't cache or clear cache on need
         return self._load_config(self.about_config_path, "An error occurred while loading about config")
 
     def load_language_config(self):
@@ -113,7 +136,9 @@ class ConfigManager:
         return self._load_config(path, "An error occurred while loading i18n config")
 
     def load_web_auth_config(self):
-        return self._load_config(self.web_auth_config_path, "An error occurred while loading web auth config")
+        if "web_auth" not in self._cache:
+            self._cache["web_auth"] = self._load_config(self.web_auth_config_path, "An error occurred while loading web auth config")
+        return self._cache["web_auth"]
 
     @staticmethod
     async def _save_config(config_path, config, success_message, error_message):
@@ -126,6 +151,7 @@ class ConfigManager:
             logger.error(f"{error_message}: {e}")
 
     async def save_recordings_config(self, config):
+        self._cache["recordings"] = config
         await self._save_config(
             self.recordings_config_path,
             config,
@@ -134,6 +160,7 @@ class ConfigManager:
         )
 
     async def save_accounts_config(self, config):
+        self._cache["accounts"] = config
         await self._save_config(
             self.accounts_config_path,
             config,
@@ -142,6 +169,7 @@ class ConfigManager:
         )
 
     async def save_web_auth_config(self, config):
+        self._cache["web_auth"] = config
         await self._save_config(
             self.web_auth_config_path,
             config,
@@ -150,6 +178,7 @@ class ConfigManager:
         )
 
     async def save_user_config(self, config):
+        self._cache["user"] = config
         await self._save_config(
             self.user_config_path,
             config,
@@ -158,6 +187,7 @@ class ConfigManager:
         )
 
     async def save_cookies_config(self, config):
+        self._cache["cookies"] = config
         await self._save_config(
             self.cookies_config_path,
             config,
