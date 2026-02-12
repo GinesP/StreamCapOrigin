@@ -211,12 +211,27 @@ class RecordingManager:
         )
         
         for recording in recordings_to_check:
-            if recording.monitor_status and not recording.is_recording:
-                is_exceeded = utils.is_time_interval_exceeded(recording.detection_time, recording.loop_time_seconds)
-                if not recording.detection_time or is_exceeded:
-                    self.app.page.run_task(self.check_if_live, recording)
-                    # Stagger the start of each task to avoid a burst of requests
-                    await asyncio.sleep(random.uniform(1.0, 2.5))
+            if not recording.monitor_status:
+                continue
+
+            if recording.is_recording:
+                # Still live, so update historical patterns!
+                alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
+                alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
+                recording.increment_live_counts(is_live=True, alpha_active=alpha_active, alpha_offline=alpha_offline)
+                continue
+
+            # 1. Apply Smart Predictive Polling (Intelligence)
+            from .history_manager import HistoryManager
+            base_interval = int(self.settings.user_config.get("loop_time_seconds", 300))
+            recording.loop_time_seconds = HistoryManager.get_adjusted_interval(recording, base_interval)
+
+            # 2. Check if it's time to poll
+            is_exceeded = utils.is_time_interval_exceeded(recording.detection_time, recording.loop_time_seconds)
+            if not recording.detection_time or is_exceeded:
+                self.app.page.run_task(self.check_if_live, recording)
+                # Stagger the start of each task to avoid a burst of requests
+                await asyncio.sleep(random.uniform(1.0, 2.5))
         
         # Persist all recording updates once after all checks are queued
         self.app.page.run_task(self.persist_recordings)
@@ -379,7 +394,7 @@ class RecordingManager:
 
             # Update counts using the new responsive method
             alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
-            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.005))
+            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
             recording.increment_live_counts(is_live=True, alpha_active=alpha_active, alpha_offline=alpha_offline)
             
             recording.live_title = stream_info.title
@@ -439,7 +454,7 @@ class RecordingManager:
         else:
             # Update counts for non-live case
             alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
-            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.005))
+            alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
             recording.increment_live_counts(is_live=False, alpha_active=alpha_active, alpha_offline=alpha_offline)
 
             recording.is_recording = False

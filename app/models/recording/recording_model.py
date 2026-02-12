@@ -23,7 +23,10 @@ class Recording:
         live_found_count=0,
         priority_score=0.0,
         added_at=None,
-        last_active_at=None
+        last_active_at=None,
+        historical_intervals=None,
+        last_seen_live=None,
+        consistency_score=0.0
     ):
         """
         Initialize a recording object.
@@ -65,6 +68,12 @@ class Recording:
         self.priority_score = priority_score or (live_found_count / live_check_count if live_check_count > 0 else 0.0)
         self.added_at = added_at
         self.last_active_at = last_active_at
+
+        # Intelligence fields
+        self.historical_intervals = historical_intervals or {}  # Format: {"0": [8, 9, 20], "1": ...} (day: [hours])
+        self.last_seen_live = last_seen_live  # ISO format string
+        self.consistency_score = consistency_score
+        
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
         self.speed = "X KB/s"
@@ -118,33 +127,39 @@ class Recording:
             "live_found_count": self.live_found_count,
             "priority_score": self.priority_score,
             "added_at": self.added_at,
-            "last_active_at": self.last_active_at
+            "last_active_at": self.last_active_at,
+            "historical_intervals": self.historical_intervals,
+            "last_seen_live": self.last_seen_live,
+            "consistency_score": self.consistency_score
         }
 
     @classmethod
     def from_dict(cls, data):
         """Create a Recording instance from a dictionary."""
         recording = cls(
-            data.get("rec_id"),
-            data.get("url"),
-            data.get("streamer_name"),
-            data.get("record_format"),
-            data.get("quality"),
-            data.get("segment_record"),
-            data.get("segment_time"),
-            data.get("monitor_status"),
-            data.get("scheduled_recording"),
-            data.get("scheduled_start_time"),
-            data.get("monitor_hours"),
-            data.get("recording_dir"),
-            data.get("enabled_message_push"),
-            data.get("only_notify_no_record"),
-            data.get("flv_use_direct_download"),
-            data.get("live_check_count", 0),
-            data.get("live_found_count", 0),
-            data.get("priority_score", 0.0),
-            data.get("added_at"),
-            data.get("last_active_at")
+            rec_id=data.get("rec_id"),
+            url=data.get("url"),
+            streamer_name=data.get("streamer_name"),
+            record_format=data.get("record_format"),
+            quality=data.get("quality"),
+            segment_record=data.get("segment_record"),
+            segment_time=data.get("segment_time"),
+            monitor_status=data.get("monitor_status"),
+            scheduled_recording=data.get("scheduled_recording"),
+            scheduled_start_time=data.get("scheduled_start_time"),
+            monitor_hours=data.get("monitor_hours"),
+            recording_dir=data.get("recording_dir"),
+            enabled_message_push=data.get("enabled_message_push"),
+            only_notify_no_record=data.get("only_notify_no_record"),
+            flv_use_direct_download=data.get("flv_use_direct_download"),
+            live_check_count=data.get("live_check_count", 0),
+            live_found_count=data.get("live_found_count", 0),
+            priority_score=data.get("priority_score", 0.0),
+            added_at=data.get("added_at"),
+            last_active_at=data.get("last_active_at"),
+            historical_intervals=data.get("historical_intervals"),
+            last_seen_live=data.get("last_seen_live"),
+            consistency_score=data.get("consistency_score", 0.0)
         )
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)
@@ -157,23 +172,51 @@ class Recording:
 
     def increment_live_counts(self, is_live: bool, alpha_active: float = 0.1, alpha_offline: float = 0.005):
         """
-        Update priority score using Exponential Moving Average (EMA).
-        Uses different alpha values for active vs offline streams.
-        
-        :param is_live: Whether the stream is currently live
-        :param alpha_active: Alpha value when stream is live (higher = faster response)
-        :param alpha_offline: Alpha value when stream is offline (lower = slower decay)
+        Update priority score using Multi-Dimensional EMA.
+        Includes recency decay for long-term inactivity and tracks scheduling patterns.
         """
-        # Select appropriate alpha based on stream status
-        # Active streams use higher alpha for quick response
-        # Offline streams use lower alpha for slow decay (maintains priority longer)
+        from datetime import datetime
+        now = datetime.now()
+
+        # 1. Update historical patterns (Scheduling Intelligence)
+        if is_live:
+            day_str = str(now.weekday())
+            hour = now.hour
+            if day_str not in self.historical_intervals:
+                self.historical_intervals[day_str] = []
+            if hour not in self.historical_intervals[day_str]:
+                self.historical_intervals[day_str].append(hour)
+                # Keep only last 5 entries per day to detect shifts in schedule
+                if len(self.historical_intervals[day_str]) > 5:
+                    self.historical_intervals[day_str].pop(0)
+
+            self.last_seen_live = now.isoformat()
+
+        # 1.1 Calculate Consistency (Density of schedule)
+        if self.historical_intervals:
+            # Ratio of total recorded slots vs max possible slots (5 per active day)
+            total_slots = sum(len(hours) for hours in self.historical_intervals.values())
+            num_days = len(self.historical_intervals)
+            # Normalized score: how "full" are their usual 5-slot windows
+            self.consistency_score = total_slots / (num_days * 5.0)
+
+        # 2. Base EMA logic
         alpha = alpha_active if is_live else alpha_offline
         current_val = 1.0 if is_live else 0.0
-        
-        # EMA Formula: score = (score * (1 - alpha)) + (current_val * alpha)
         self.priority_score = (self.priority_score * (1 - alpha)) + (current_val * alpha)
-        
-        # Update legacy counts just in case, but keep them capped/decayed
+
+        # 3. Recency Decay (Intelligence)
+        # If not seen live for > 30 days, accelerate decay
+        if self.last_seen_live:
+            last_seen = datetime.fromisoformat(self.last_seen_live)
+            days_inactive = (now - last_seen).days
+            if days_inactive > 30:
+                # Apply 1% extra decay per day over 30
+                decay_days = min(days_inactive - 30, 60) # Cap extra decay
+                extra_decay = 0.99 ** decay_days
+                self.priority_score *= extra_decay
+
+        # Update legacy counts
         self.live_check_count += 1
         if is_live:
             self.live_found_count += 1

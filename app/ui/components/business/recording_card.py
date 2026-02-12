@@ -105,8 +105,6 @@ class RecordingCardManager:
             tooltip=self._["recording_info"],
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_info_button_on_click, e, rec),
         )
-        speed_text_label = ft.Text(speed, size=12)
-    
         priority_score = getattr(recording, "priority_score", 0.0)
         priority_text = f"{self._['priority']}: {priority_score:.1%}" if priority_score > 0 else ""
         priority_label = ft.Text(priority_text, size=12, color=ft.Colors.GREY_500, visible=priority_score > 0)
@@ -121,6 +119,33 @@ class RecordingCardManager:
         last_active_text = f"{self._['last_active_at']}: {last_active}" if last_active else ""
         last_active_label = ft.Text(last_active_text, size=11, color=ft.Colors.GREY_500, visible=bool(last_active))
 
+        # 4. Consistency Label (Intelligence)
+        consistency_score = getattr(recording, "consistency_score", 0.0)
+        consistency_text = f"{self._['consistency']}: {consistency_score:.0%}"
+        consistency_label = ft.Text(consistency_text, size=12, color=ft.Colors.GREY_500, visible=consistency_score > 0)
+
+        # 3. Likelihood Tag (Intelligence)
+        from ....core.recording.history_manager import HistoryManager
+        likelihood_score = HistoryManager.get_likelihood_score(recording)
+        
+        if likelihood_score >= 0.9:
+            l_text = self._["likelihood_high"]
+            l_color = ft.Colors.GREEN_400
+        elif likelihood_score >= 0.5:
+            l_text = self._["likelihood_normal"]
+            l_color = ft.Colors.BLUE_400
+        else:
+            l_text = self._["likelihood_low"]
+            l_color = ft.Colors.AMBER_400
+
+        likelihood_label = ft.Container(
+            content=ft.Text(f"{self._['likelihood']}: {l_text}", size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+            bgcolor=l_color,
+            padding=ft.padding.symmetric(horizontal=8, vertical=2),
+            border_radius=10,
+            visible=bool(recording.historical_intervals)
+        )
+
         title_row = ft.Row(
             [display_title_label, status_label] if status_label else [display_title_label],
             alignment=ft.MainAxisAlignment.START,
@@ -133,7 +158,7 @@ class RecordingCardManager:
                 [
                     title_row,
                     duration_text_label,
-                    ft.Row([speed_text_label, priority_label], spacing=10),
+                    ft.Row([priority_label, consistency_label, likelihood_label], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     ft.Row([added_at_label, last_active_label], spacing=10),
                     ft.Row(
                         [
@@ -165,8 +190,8 @@ class RecordingCardManager:
             "card": card,
             "display_title_label": display_title_label,
             "duration_label": duration_text_label,
-            "speed_label": speed_text_label,
             "priority_label": priority_label,
+            "consistency_label": consistency_label,
             "record_button": record_button,
             "open_folder_button": open_folder_button,
             "recording_info_button": recording_info_button,
@@ -175,6 +200,7 @@ class RecordingCardManager:
             "status_label": status_label,
             "added_at_label": added_at_label,
             "last_active_label": last_active_label,
+            "likelihood_label": likelihood_label,
         }
 
     def get_card_background_color(self, recording: Recording):
@@ -240,14 +266,17 @@ class RecordingCardManager:
                 if recording_card.get("duration_label"):
                     recording_card["duration_label"].value = self.app.record_manager.get_duration(recording)
 
-                if recording_card.get("speed_label"):
-                    recording_card["speed_label"].value = recording.speed
-
                 if recording_card.get("priority_label"):
                     priority_score = getattr(recording, "priority_score", 0.0)
                     priority_text = f"{self._['priority']}: {priority_score:.1%}" if priority_score > 0 else ""
                     recording_card["priority_label"].value = priority_text
                     recording_card["priority_label"].visible = priority_score > 0
+
+                if recording_card.get("consistency_label"):
+                    consistency_score = getattr(recording, "consistency_score", 0.0)
+                    consistency_text = f"{self._['consistency']}: {consistency_score:.0%}"
+                    recording_card["consistency_label"].value = consistency_text
+                    recording_card["consistency_label"].visible = consistency_score > 0
 
                 if recording_card.get("added_at_label"):
                     added_at = getattr(recording, "added_at", None)
@@ -258,6 +287,23 @@ class RecordingCardManager:
                     last_active = getattr(recording, "last_active_at", None)
                     recording_card["last_active_label"].value = f"{self._['last_active_at']}: {last_active}" if last_active else ""
                     recording_card["last_active_label"].visible = bool(last_active)
+
+                if recording_card.get("likelihood_label"):
+                    from ....core.recording.history_manager import HistoryManager
+                    likelihood_score = HistoryManager.get_likelihood_score(recording)
+                    if likelihood_score >= 0.9:
+                        l_text = self._["likelihood_high"]
+                        l_color = ft.Colors.GREEN_400
+                    elif likelihood_score >= 0.5:
+                        l_text = self._["likelihood_normal"]
+                        l_color = ft.Colors.BLUE_400
+                    else:
+                        l_text = self._["likelihood_low"]
+                        l_color = ft.Colors.AMBER_400
+                    
+                    recording_card["likelihood_label"].content.value = f"{self._['likelihood']}: {l_text}"
+                    recording_card["likelihood_label"].bgcolor = l_color
+                    recording_card["likelihood_label"].visible = bool(recording.historical_intervals)
 
                 if recording_card.get("record_button"):
                     recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)

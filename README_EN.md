@@ -28,6 +28,17 @@ StreamCap is a multi-platform live stream recording client based on FFmpeg and S
 - **Multiple Output Formats**: Supports ts, flv, mkv, mov, mp4, mp3, m4a, and other formats.
 - **Automatic Transcoding**: Automatically transcodes recorded files to mp4 format after recording.
 - **Message Push**: Supports live stream status push notifications to keep you informed of live status.
+- **Smart Scheduling**: Automatically adjusts detection frequency based on historical data.
+- **Dynamic Priority**: Automatically values and sorts channels based on activity and habits.
+
+## 🧠 Intelligence Features
+
+This version introduces several intelligent optimizations to improve efficiency and user experience:
+
+- **Smart Predictive Polling**: The system learns the streaming habits of anchors. During typical streaming hours, the detection frequency increases (as low as 60s). During offline hours, it slows down (up to 10m) to save bandwidth and system resources.
+- **Multi-Dimensional Priority Decay**: If an anchor is inactive for >30 days, their priority decays faster, ensuring your most active channels stay at the top of the list.
+- **Likelihood Tags**: Color-coded probability labels (High/Normal/Low) on recording cards to identify which anchors are likely to go live soon.
+- **Smart Sorting**: Automatically pins live anchors to the top and sorts others by priority score, keeping your list highly organized.
 
 ## 📸Recording Interface
 
