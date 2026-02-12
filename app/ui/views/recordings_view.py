@@ -89,6 +89,28 @@ class RecordingsPage(PageBase):
         
         self.content_area.update()
 
+    async def _resort_cards(self, update_ui=True):
+        """Helper to re-sort card controls by priority and live status."""
+        recordings = self.app.record_manager.recordings
+        cards_obj = self.app.record_card_manager.cards_obj
+        
+        # Sort recordings: Live first, then by priority score (descending)
+        sorted_recordings = sorted(
+            recordings,
+            key=lambda r: (r.is_live, getattr(r, 'priority_score', 0.0), r.streamer_name),
+            reverse=True
+        )
+        
+        # Re-build controls list in sorted order
+        new_controls = []
+        for rec in sorted_recordings:
+            if rec.rec_id in cards_obj:
+                new_controls.append(cards_obj[rec.rec_id]["card"])
+        
+        self.recording_card_area.content.controls = new_controls
+        if update_ui:
+            self.recording_card_area.content.update()
+
 
     def pubsub_subscribe(self):
         self.app.page.pubsub.subscribe_topic('add', self.subscribe_add_cards)
@@ -469,6 +491,8 @@ class RecordingsPage(PageBase):
                 for card in existing_cards:
                     self.recording_card_area.content.controls.append(card)
 
+        await self._resort_cards(update_ui=False)
+
         if not is_initial_load:
             self.loading_indicator.visible = False
             self.loading_indicator.update()
@@ -564,6 +588,7 @@ class RecordingsPage(PageBase):
                 self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
                 self.app.page.pubsub.send_others_on_topic("add", recording)
             
+            await self._resort_cards(update_ui=False)
             self.recording_card_area.update()
             
             self.content_area.controls[1] = self.create_filter_area()
@@ -601,7 +626,9 @@ class RecordingsPage(PageBase):
         for card in to_remove:
             card_key = card["card"].key
             cards_obj.pop(card_key, None)
-            self.recording_card_area.controls.remove(card["card"])
+            self.recording_card_area.content.controls.remove(card["card"])
+
+        await self._resort_cards(update_ui=False)
         await self.show_all_cards()
         
         self.loading_indicator.visible = False

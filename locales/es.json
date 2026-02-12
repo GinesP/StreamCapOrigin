@@ -191,7 +191,12 @@
         "priority": "Prioridad",
         "live_room": "Sala en Vivo",
         "added_at": "Añadido",
-        "last_active_at": "Última vez activo"
+        "last_active_at": "Última vez activo",
+        "likelihood": "Probabilidad",
+        "likelihood_high": "Alta",
+        "likelihood_normal": "Media",
+        "likelihood_low": "Baja",
+        "consistency": "Consistencia"
     },
     "settings_page": {
         "recording_settings": "Ajustes de Grabación",

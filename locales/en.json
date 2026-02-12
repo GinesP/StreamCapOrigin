@@ -191,7 +191,12 @@
     "priority": "Priority",
     "live_room": "Live Room",
     "added_at": "Added at",
-    "last_active_at": "Last active"
+    "last_active_at": "Last active",
+    "likelihood": "Likelihood",
+    "likelihood_high": "High",
+    "likelihood_normal": "Normal",
+    "likelihood_low": "Low",
+    "consistency": "Consistency"
   },
   "settings_page": {
     "recording_settings": "Recording Settings",
