@@ -405,7 +405,8 @@ class RecordingsPage(PageBase):
         for card_info in cards_obj.values():
             if not card_info["card"].visible:
                 card_info["card"].visible = True
-                card_info["card"].update()
+                if card_info["card"].page:
+                    card_info["card"].update()
 
     async def filter_recordings(self, query):
         recordings = self.app.record_manager.recordings
@@ -434,7 +435,8 @@ class RecordingsPage(PageBase):
 
             for card_info in cards_obj.values():
                 card_info["card"].visible = card_info["card"].key in filtered_ids
-                card_info["card"].update()
+                if card_info["card"].page:
+                    card_info["card"].update()
 
             if not filtered_ids:
                 await self.app.snack_bar.show_snack_bar(self._["not_search_result"], duration=2000)
@@ -621,7 +623,8 @@ class RecordingsPage(PageBase):
             if card_id in selected_cards:
                 selected_cards[card_id].selected = False
                 card["card"].content.bgcolor = None
-                card["card"].update()
+                if card["card"].page:
+                    card["card"].update()
 
         for card in to_remove:
             card_key = card["card"].key
