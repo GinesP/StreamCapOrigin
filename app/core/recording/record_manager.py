@@ -219,6 +219,7 @@ class RecordingManager:
                 alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
                 alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
                 recording.increment_live_counts(is_live=True, alpha_active=alpha_active, alpha_offline=alpha_offline)
+                self.app.page.run_task(self.app.record_card_manager.update_card, recording)
                 continue
 
             # 1. Apply Smart Predictive Polling (Intelligence)
