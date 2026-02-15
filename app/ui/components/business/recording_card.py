@@ -138,6 +138,27 @@ class RecordingCardManager:
             l_text = self._["likelihood_low"]
             l_color = ft.Colors.AMBER_400
 
+        # 5. Queue Indicator (Intelligence)
+        # Low overhead: uses already present loop_time_seconds
+        interval = recording.loop_time_seconds
+        if interval <= 60:
+            q_text, q_color, q_tip = "F", ft.Colors.GREEN_400, "Fast Queue"
+        elif interval <= 180:
+            q_text, q_color, q_tip = "M", ft.Colors.BLUE_400, "Medium Queue"
+        else:
+            q_text, q_color, q_tip = "S", ft.Colors.AMBER_400, "Slow Queue"
+
+        queue_label = ft.Container(
+            content=ft.Text(q_text, size=10, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+            bgcolor=q_color,
+            padding=ft.padding.all(2),
+            border_radius=10,
+            width=18,
+            height=18,
+            alignment=ft.alignment.center,
+            tooltip=q_tip
+        )
+
         likelihood_label = ft.Container(
             content=ft.Text(f"{self._['likelihood']}: {l_text}", size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
             bgcolor=l_color,
@@ -158,7 +179,7 @@ class RecordingCardManager:
                 [
                     title_row,
                     duration_text_label,
-                    ft.Row([priority_label, consistency_label, likelihood_label], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Row([queue_label, priority_label, consistency_label, likelihood_label], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     ft.Row([added_at_label, last_active_label], spacing=10),
                     ft.Row(
                         [
@@ -201,6 +222,7 @@ class RecordingCardManager:
             "added_at_label": added_at_label,
             "last_active_label": last_active_label,
             "likelihood_label": likelihood_label,
+            "queue_label": queue_label,
         }
 
     def get_card_background_color(self, recording: Recording):
@@ -304,6 +326,19 @@ class RecordingCardManager:
                     recording_card["likelihood_label"].content.value = f"{self._['likelihood']}: {l_text}"
                     recording_card["likelihood_label"].bgcolor = l_color
                     recording_card["likelihood_label"].visible = bool(recording.historical_intervals)
+
+                if recording_card.get("queue_label"):
+                    interval = recording.loop_time_seconds
+                    if interval <= 60:
+                        q_text, q_color, q_tip = "F", ft.Colors.GREEN_400, "Fast Queue"
+                    elif interval <= 180:
+                        q_text, q_color, q_tip = "M", ft.Colors.BLUE_400, "Medium Queue"
+                    else:
+                        q_text, q_color, q_tip = "S", ft.Colors.AMBER_400, "Slow Queue"
+                    
+                    recording_card["queue_label"].content.value = q_text
+                    recording_card["queue_label"].bgcolor = q_color
+                    recording_card["queue_label"].tooltip = q_tip
 
                 if recording_card.get("record_button"):
                     recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)

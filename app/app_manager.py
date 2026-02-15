@@ -161,6 +161,6 @@ class App:
 
     async def start_periodic_tasks(self):
         """Start all periodic tasks"""
-        await self.record_manager.setup_periodic_live_check(
-            int(self.record_manager.loop_time_seconds or 180)
-        )
+        # The 30s interval is the "heartrate" that allows individual adjustments 
+        # (like 60s or 180s) to be checked accurately.
+        await self.record_manager.setup_periodic_live_check(30)
