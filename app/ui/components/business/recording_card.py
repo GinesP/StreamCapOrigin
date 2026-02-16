@@ -106,22 +106,22 @@ class RecordingCardManager:
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_info_button_on_click, e, rec),
         )
         priority_score = getattr(recording, "priority_score", 0.0)
-        priority_text = f"{self._['priority']}: {priority_score:.1%}" if priority_score > 0 else ""
+        priority_text = f"{self._.get('priority', 'Priority')}: {priority_score:.1%}" if priority_score > 0 else ""
         priority_label = ft.Text(priority_text, size=12, color=ft.Colors.GREY_500, visible=priority_score > 0)
 
         status_label = self.create_status_label(recording)
 
         added_at = getattr(recording, "added_at", None)
-        added_at_text = f"{self._['added_at']}: {added_at}" if added_at else ""
+        added_at_text = f"{self._.get('added_at', 'Added at')}: {added_at}" if added_at else ""
         added_at_label = ft.Text(added_at_text, size=11, color=ft.Colors.GREY_500, visible=bool(added_at))
 
         last_active = getattr(recording, "last_active_at", None)
-        last_active_text = f"{self._['last_active_at']}: {last_active}" if last_active else ""
+        last_active_text = f"{self._.get('last_active_at', 'Last active')}: {last_active}" if last_active else ""
         last_active_label = ft.Text(last_active_text, size=11, color=ft.Colors.GREY_500, visible=bool(last_active))
 
         # 4. Consistency Label (Intelligence)
         consistency_score = getattr(recording, "consistency_score", 0.0)
-        consistency_text = f"{self._['consistency']}: {consistency_score:.0%}"
+        consistency_text = f"{self._.get('consistency', 'Consistency')}: {consistency_score:.0%}"
         consistency_label = ft.Text(consistency_text, size=12, color=ft.Colors.GREY_500, visible=consistency_score > 0)
 
         # 3. Likelihood Tag (Intelligence)
@@ -129,13 +129,13 @@ class RecordingCardManager:
         likelihood_score = HistoryManager.get_likelihood_score(recording)
         
         if likelihood_score >= 0.9:
-            l_text = self._["likelihood_high"]
+            l_text = self._.get("likelihood_high", "High")
             l_color = ft.Colors.GREEN_400
         elif likelihood_score >= 0.5:
-            l_text = self._["likelihood_normal"]
+            l_text = self._.get("likelihood_normal", "Normal")
             l_color = ft.Colors.BLUE_400
         else:
-            l_text = self._["likelihood_low"]
+            l_text = self._.get("likelihood_low", "Low")
             l_color = ft.Colors.AMBER_400
 
         # 5. Queue Indicator (Intelligence)
@@ -160,7 +160,7 @@ class RecordingCardManager:
         )
 
         likelihood_label = ft.Container(
-            content=ft.Text(f"{self._['likelihood']}: {l_text}", size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+            content=ft.Text(f"{self._.get('likelihood', 'Likelihood')}: {l_text}", size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
             bgcolor=l_color,
             padding=ft.padding.symmetric(horizontal=8, vertical=2),
             border_radius=10,

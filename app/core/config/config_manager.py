@@ -85,15 +85,22 @@ class ConfigManager:
 
     @staticmethod
     def _load_config(config_path, error_message):
-        """Load configuration from a JSON file."""
+        """Load configuration from a JSON file with backup for corruption."""
         try:
+            if not os.path.exists(config_path):
+                return {}
             with open(config_path, encoding="utf-8") as file:
                 return json.load(file)
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON format in file: {config_path}")
-            return {}
-        except FileNotFoundError:
-            # logger.error(f"Configuration file not found: {config_path}")
+            # Backup corrupted file
+            try:
+                import shutil
+                backup_path = config_path + ".bak"
+                shutil.copy2(config_path, backup_path)
+                logger.info(f"Corrupted config backed up to: {backup_path}")
+            except Exception as e:
+                logger.error(f"Failed to backup corrupted config: {e}")
             return {}
         except Exception as e:
             logger.error(f"{error_message}: {e}")
@@ -142,13 +149,23 @@ class ConfigManager:
 
     @staticmethod
     async def _save_config(config_path, config, success_message, error_message):
-        """Save configuration to a JSON file."""
+        """Save configuration to a JSON file atomically using a temporary file."""
+        tmp_path = config_path + f".{os.getpid()}.tmp"
         try:
-            async with aiofiles.open(config_path, "w", encoding="utf-8") as file:
+            # Write to temporary file first
+            async with aiofiles.open(tmp_path, "w", encoding="utf-8") as file:
                 await file.write(json.dumps(config, ensure_ascii=False, indent=4))
+            
+            # Atomic rename (on Windows, os.replace is atomic)
+            os.replace(tmp_path, config_path)
             logger.info(success_message)
         except Exception as e:
             logger.error(f"{error_message}: {e}")
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
 
     async def save_recordings_config(self, config):
         self._cache["recordings"] = config

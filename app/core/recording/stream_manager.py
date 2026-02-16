@@ -535,6 +535,7 @@ class LiveStreamRecorder:
                     "-c:v", "copy",
                     "-c:a", "copy",
                     "-f", "mp4",
+                    "-movflags", "+faststart",
                     save_path
                 ]
                 process = await asyncio.create_subprocess_exec(
