@@ -40,6 +40,7 @@ StreamCap 是一个基于FFmpeg和StreamGet的多平台直播流录制客户端�
 - **多维优先级衰减**：引入了增强的优先级算法。如果主播超过30天未开播，其优先级会每天额外衰减1%，直到其再次开播，确保你的列表首屏永远是最近最活跃的主播。
 - **概率标签**：在录制卡片上提供“概率”标签（高/中/低），让你一眼识别哪些主播可能即将开播。
 - **智能排序**：自动将正在直播的主播置顶，其余主播按优先级分数倒序排列，保持列表高度有序。
+- **Doc Técnica (ES)**: Consulta los [detalles técnicos del sistema de inteligencia](./docs/INTELLIGENCE_ES.md).
 
 ## 📸录制界面
 

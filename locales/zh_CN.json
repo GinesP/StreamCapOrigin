@@ -191,7 +191,12 @@
     "priority": "优先级",
     "live_room": "直播间",
     "added_at": "添加时间",
-    "last_active_at": "最后活跃"
+    "last_active_at": "最后活跃",
+    "likelihood": "活跃预测",
+    "likelihood_high": "高",
+    "likelihood_normal": "中",
+    "likelihood_low": "低",
+    "consistency": "连贯性"
   },
   "settings_page": {
     "recording_settings": "录制设置",

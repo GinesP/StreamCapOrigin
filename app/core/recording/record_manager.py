@@ -47,6 +47,7 @@ class RecordingManager:
         self._worker_tasks = [
             asyncio.create_task(self._process_priority_queue("fast", self._queue_fast)),
             asyncio.create_task(self._process_priority_queue("medium", self._queue_medium)),
+            asyncio.create_task(self._process_priority_queue("medium", self._queue_medium)), # Second medium worker
             asyncio.create_task(self._process_priority_queue("slow", self._queue_slow))
         ]
 
