@@ -177,3 +177,5 @@ backup_config/
 ffmpeg.exe
 ffplay.exe
 ffprobe.exe
+config/recordings.db
+config/recordings.json.bak

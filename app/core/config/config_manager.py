@@ -1,9 +1,11 @@
 import json
 import os
 import shutil
+import sqlite3
 from typing import TypeVar
 
 import aiofiles
+import aiosqlite
 
 from ...utils.logger import logger
 
@@ -19,6 +21,7 @@ class ConfigManager:
         self.cookies_config_path = os.path.join(self.config_path, "cookies.json")
         self.about_config_path = os.path.join(self.config_path, "version.json")
         self.recordings_config_path = os.path.join(self.config_path, "recordings.json")
+        self.recordings_db_path = os.path.join(self.config_path, "recordings.db")
         self.accounts_config_path = os.path.join(self.config_path, "accounts.json")
         self.web_auth_config_path = os.path.join(self.config_path, "web_auth.json")
 
@@ -40,7 +43,7 @@ class ConfigManager:
         """Pre-load all configurations into cache."""
         self._cache["default"] = self._load_config(self.default_config_path, "Error loading default config")
         self._cache["user"] = self._load_config(self.user_config_path, "Error loading user config")
-        self._cache["recordings"] = self._load_config(self.recordings_config_path, "Error loading recordings config")
+        self._cache["recordings"] = self._load_recordings_db()
         self._cache["accounts"] = self._load_config(self.accounts_config_path, "Error loading accounts config")
         self._cache["cookies"] = self._load_config(self.cookies_config_path, "Error loading cookies config")
         self._cache["web_auth"] = self._load_config(self.web_auth_config_path, "Error loading web auth config")
@@ -76,8 +79,69 @@ class ConfigManager:
         self._init_config(self.accounts_config_path, cookies_config)
 
     def init_recordings_config(self):
-        cookies_config = {}
-        self._init_config(self.recordings_config_path, cookies_config)
+        self._init_recordings_db()
+
+    def _init_recordings_db(self):
+        """Initialize SQLite database for recordings and migrate from JSON if needed."""
+        conn = sqlite3.connect(self.recordings_db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS recordings (
+                rec_id TEXT PRIMARY KEY,
+                data TEXT
+            )
+        ''')
+        conn.commit()
+        
+        # Check if migration from JSON is needed
+        if os.path.exists(self.recordings_config_path):
+            try:
+                with open(self.recordings_config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                if data:
+                    for rec in data:
+                        rec_id = rec.get("rec_id")
+                        if rec_id:
+                            cursor.execute(
+                                "INSERT OR IGNORE INTO recordings (rec_id, data) VALUES (?, ?)",
+                                (rec_id, json.dumps(rec, ensure_ascii=False))
+                            )
+                    conn.commit()
+                    logger.info("Migrated recordings.json to recordings.db")
+                
+                # Backup the old JSON file
+                backup_path = self.recordings_config_path + ".bak"
+                if not os.path.exists(backup_path):
+                    shutil.move(self.recordings_config_path, backup_path)
+                    logger.info(f"Backed up old recordings.json to {backup_path}")
+                else:
+                    os.remove(self.recordings_config_path)
+                    
+            except Exception as e:
+                logger.error(f"Error migrating recordings.json: {e}")
+        
+        conn.close()
+
+    def _load_recordings_db(self):
+        """Load all recordings from the SQLite database."""
+        try:
+            conn = sqlite3.connect(self.recordings_db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT data FROM recordings")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            recordings = []
+            for row in rows:
+                try:
+                    recordings.append(json.loads(row[0]))
+                except Exception as e:
+                    logger.error(f"Error parsing recording row from DB: {e}")
+            return recordings
+        except Exception as e:
+            logger.error(f"Error loading recordings from DB: {e}")
+            return []
 
     def init_web_auth_config(self):
         cookies_config = {}
@@ -118,7 +182,7 @@ class ConfigManager:
 
     def load_recordings_config(self):
         if "recordings" not in self._cache:
-            self._cache["recordings"] = self._load_config(self.recordings_config_path, "An error occurred while loading recordings config")
+            self._cache["recordings"] = self._load_recordings_db()
         return self._cache["recordings"]
 
     def load_accounts_config(self):
@@ -169,12 +233,32 @@ class ConfigManager:
 
     async def save_recordings_config(self, config):
         self._cache["recordings"] = config
-        await self._save_config(
-            self.recordings_config_path,
-            config,
-            success_message="Recordings configuration saved.",
-            error_message="An error occurred while saving recordings config",
-        )
+        try:
+            async with aiosqlite.connect(self.recordings_db_path) as db:
+                async with db.execute("SELECT rec_id FROM recordings") as cursor:
+                    existing_ids = {row[0] for row in await cursor.fetchall()}
+                
+                current_ids = {rec["rec_id"] for rec in config if "rec_id" in rec}
+                
+                # Delete removed ones
+                ids_to_delete = existing_ids - current_ids
+                for del_id in ids_to_delete:
+                    await db.execute("DELETE FROM recordings WHERE rec_id = ?", (del_id,))
+                
+                # Insert or Replace existing ones
+                for rec in config:
+                    rec_id = rec.get("rec_id")
+                    if rec_id:
+                        data_str = json.dumps(rec, ensure_ascii=False)
+                        await db.execute(
+                            "INSERT OR REPLACE INTO recordings (rec_id, data) VALUES (?, ?)",
+                            (rec_id, data_str)
+                        )
+                
+                await db.commit()
+            logger.info("Recordings database saved successfully.")
+        except Exception as e:
+            logger.error(f"An error occurred while saving recordings config: {e}")
 
     async def save_accounts_config(self, config):
         self._cache["accounts"] = config
