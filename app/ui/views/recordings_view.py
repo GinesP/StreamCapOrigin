@@ -12,6 +12,7 @@ from ..base_page import PageBase
 from ..components.business.recording_dialog import RecordingDialog
 from ..components.dialogs.help_dialog import HelpDialog
 from ..components.dialogs.search_dialog import SearchDialog
+from ...utils.ui_utils import is_page_active, safe_update
 from ..filters import RecordingFilters
 
 
@@ -68,8 +69,11 @@ class RecordingsPage(PageBase):
 
     async def load(self):
         """Load the recordings page content."""
-        self.content_area.controls.clear()
-        self.content_area.controls.extend(
+        self.view_container.controls.clear()
+        if not is_page_active(self.app, self):
+            return
+
+        self.view_container.controls.extend(
             [
                 self.create_recordings_title_area(),
                 self.create_filter_area(),
@@ -78,7 +82,6 @@ class RecordingsPage(PageBase):
         )
         
         if not self.recording_card_area.content.controls:
-            self.recording_card_area.content.controls.clear()
             await self.add_record_cards(is_initial_load=True)
         else:
             # if cards exist, apply filter without immediate refresh
@@ -86,11 +89,12 @@ class RecordingsPage(PageBase):
         
         if self.is_grid_view:
             await self.recalculate_grid_columns(update_ui=False)
-        
-        self.content_area.update()
 
     async def _resort_cards(self, update_ui=True):
         """Helper to re-sort card controls by priority and live status."""
+        if not is_page_active(self.app, self):
+            return
+
         recordings = self.app.record_manager.recordings
         cards_obj = self.app.record_card_manager.cards_obj
         
@@ -109,7 +113,7 @@ class RecordingsPage(PageBase):
         
         self.recording_card_area.content.controls = new_controls
         if update_ui:
-            self.recording_card_area.content.update()
+            safe_update(self.recording_card_area.content)
 
 
     def pubsub_subscribe(self):
@@ -141,15 +145,17 @@ class RecordingsPage(PageBase):
             )
 
         self.recording_card_area.content = new_content
-        self.content_area.clean()
-        self.content_area.controls.extend(
+        
+        # Redraw the whole page content efficiently
+        self.view_container.controls.clear()
+        self.view_container.controls.extend(
             [
                 self.create_recordings_title_area(),
                 self.create_filter_area(),
                 self.create_recordings_content_area()
             ]
         )
-        self.content_area.update()
+        safe_update(self.view_container)
         
         self.app.settings.user_config["is_grid_view"] = self.is_grid_view
         self.page.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
@@ -377,10 +383,13 @@ class RecordingsPage(PageBase):
         self.current_filter = "stopped"
         await self.apply_filter()
     async def apply_filter(self, update_ui=True):
-        if len(self.content_area.controls) > 1:
-            self.content_area.controls[1] = self.create_filter_area()
+        if not is_page_active(self.app, self):
+            return
+
+        if len(self.view_container.controls) > 1:
+            self.view_container.controls[1] = self.create_filter_area()
         else:
-            self.content_area.controls.append(self.create_filter_area())
+            self.view_container.controls.append(self.create_filter_area())
         
         cards_obj = self.app.record_card_manager.cards_obj
         recordings = self.app.record_manager.recordings
@@ -397,8 +406,8 @@ class RecordingsPage(PageBase):
             card_info["card"].visible = visible
         
         if update_ui:
-            self.content_area.update()
-            self.recording_card_area.update()
+            safe_update(self.view_container)
+            safe_update(self.recording_card_area)
 
     async def reset_cards_visibility(self):
         cards_obj = self.app.record_card_manager.cards_obj
@@ -497,8 +506,8 @@ class RecordingsPage(PageBase):
 
         if not is_initial_load:
             self.loading_indicator.visible = False
-            self.loading_indicator.update()
-            self.recording_card_area.update()
+            safe_update(self.loading_indicator)
+            safe_update(self.recording_card_area)
         
         if not RecordingManager.is_periodic_task_running():
             self.page.run_task(

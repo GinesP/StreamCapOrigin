@@ -6,6 +6,7 @@ import flet as ft
 from dotenv import find_dotenv, load_dotenv
 
 from ...utils.logger import logger
+from ...utils.ui_utils import is_page_active, safe_update
 from ..base_page import PageBase as BasePage
 
 dotenv_path = find_dotenv()
@@ -28,6 +29,9 @@ class StoragePage(BasePage):
         self.app.language_manager.add_observer(self)
 
     async def load(self):
+        self.view_container.controls.clear()
+        if not is_page_active(self.app, self):
+            return
         self.root_path = self.app.settings.get_video_save_path()
         self.current_path = self.root_path
         self.setup_ui()
@@ -42,8 +46,7 @@ class StoragePage(BasePage):
         )
         self.file_list = ft.ListView(expand=True, spacing=2, padding=10)
         self.content = ft.Column(controls=[self.path_display, self.file_list])
-        self.app.content_area.controls = [self.content]
-        self.app.content_area.update()
+        self.view_container.controls.append(self.content)
 
     def load_language(self):
         language = self.app.language_manager.language
@@ -163,13 +166,15 @@ class StoragePage(BasePage):
         self.current_path = path
         self.path_display.value = self._["current_path"] + ":" + self.current_path
         await self.update_file_list()
-        self.content.update()
+        if is_page_active(self.app, self):
+            safe_update(self.view_container)
 
     async def navigate_to_parent(self):
         self.current_path = os.path.dirname(self.current_path)
         self.path_display.value = self._["current_path"] + ":" + self.current_path
         await self.update_file_list()
-        self.content.update()
+        if is_page_active(self.app, self):
+            safe_update(self.view_container)
 
     async def preview_file(self, file_path, room_url=None):
         import urllib.parse

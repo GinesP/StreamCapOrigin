@@ -74,11 +74,11 @@ def get_route_handler() -> dict[str, str]:
 def handle_route_change(page: ft.Page, app: App) -> callable:
     route_map = get_route_handler()
 
-    def route_change(e: ft.RouteChangeEvent) -> None:
+    async def route_change(e: ft.RouteChangeEvent) -> None:
         tr = ft.TemplateRoute(e.route)
         page_name = route_map.get(tr.route)
         if page_name:
-            page.run_task(app.switch_page, page_name)
+            await app.switch_page(page_name)
         else:
             logger.warning(f"Unknown route: {e.route}, redirecting to /")
             page.go("/")

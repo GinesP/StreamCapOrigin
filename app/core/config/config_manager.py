@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import shutil
@@ -231,34 +232,45 @@ class ConfigManager:
                 except:
                     pass
 
+    _db_lock = asyncio.Lock()
+
     async def save_recordings_config(self, config):
         self._cache["recordings"] = config
-        try:
-            async with aiosqlite.connect(self.recordings_db_path) as db:
-                async with db.execute("SELECT rec_id FROM recordings") as cursor:
-                    existing_ids = {row[0] for row in await cursor.fetchall()}
-                
-                current_ids = {rec["rec_id"] for rec in config if "rec_id" in rec}
-                
-                # Delete removed ones
-                ids_to_delete = existing_ids - current_ids
-                for del_id in ids_to_delete:
-                    await db.execute("DELETE FROM recordings WHERE rec_id = ?", (del_id,))
-                
-                # Insert or Replace existing ones
-                for rec in config:
-                    rec_id = rec.get("rec_id")
-                    if rec_id:
-                        data_str = json.dumps(rec, ensure_ascii=False)
-                        await db.execute(
-                            "INSERT OR REPLACE INTO recordings (rec_id, data) VALUES (?, ?)",
-                            (rec_id, data_str)
+        async with self._db_lock:
+            try:
+                async with aiosqlite.connect(self.recordings_db_path) as db:
+                    # 1. Get existing IDs efficiently
+                    async with db.execute("SELECT rec_id FROM recordings") as cursor:
+                        existing_ids = {row[0] for row in await cursor.fetchall()}
+                    
+                    current_ids = {rec["rec_id"] for rec in config if "rec_id" in rec}
+                    
+                    # 2. Delete removed recordings
+                    ids_to_delete = existing_ids - current_ids
+                    if ids_to_delete:
+                        await db.executemany(
+                            "DELETE FROM recordings WHERE rec_id = ?", 
+                            [(del_id,) for del_id in ids_to_delete]
                         )
-                
-                await db.commit()
-            logger.info("Recordings database saved successfully.")
-        except Exception as e:
-            logger.error(f"An error occurred while saving recordings config: {e}")
+                    
+                    # 3. Prepare batch data for UPSERT
+                    # We use INSERT OR REPLACE as a simple UPSERT
+                    batch_data = []
+                    for rec in config:
+                        rec_id = rec.get("rec_id")
+                        if rec_id:
+                            batch_data.append((rec_id, json.dumps(rec, ensure_ascii=False)))
+                    
+                    if batch_data:
+                        await db.executemany(
+                            "INSERT OR REPLACE INTO recordings (rec_id, data) VALUES (?, ?)",
+                            batch_data
+                        )
+                    
+                    await db.commit()
+                logger.info(f"Recordings database saved successfully ({len(batch_data)} records updated/inserted).")
+            except Exception as e:
+                logger.error(f"An error occurred while saving recordings config: {e}")
 
     async def save_accounts_config(self, config):
         self._cache["accounts"] = config

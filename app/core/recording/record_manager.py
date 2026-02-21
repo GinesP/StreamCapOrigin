@@ -111,12 +111,10 @@ class RecordingManager:
 
     async def persist_recordings(self):
         """Persist recordings to a JSON file with a small delay to batch updates."""
-        self.app.page.run_task(self.persist_delay_handler.start_task_timer, self._actual_persist_recordings, None)
+        await self.persist_delay_handler.start_task_timer(self._actual_persist_recordings)
 
-    async def _actual_persist_recordings(self, delay):
+    async def _actual_persist_recordings(self):
         """The actual disk write operation."""
-        if delay:
-            await asyncio.sleep(delay)
         data_to_save = [rec.to_dict() for rec in self.recordings]
         await self.app.config_manager.save_recordings_config(data_to_save)
 
@@ -124,7 +122,7 @@ class RecordingManager:
         """Update an existing recording object and persist changes to a JSON file."""
         if recording:
             recording.update(updated_info)
-            self.app.page.run_task(self.persist_recordings)
+            await self.persist_recordings()
 
     @staticmethod
     async def _update_recording(
@@ -160,8 +158,7 @@ class RecordingManager:
 
             self.app.page.run_task(self.check_if_live, recording)
 
-            if auto_save:
-                self.app.page.run_task(self.persist_recordings)
+            await self.persist_recordings()
 
     async def stop_monitor_recording(self, recording: Recording, auto_save: bool = True):
         """
@@ -178,8 +175,7 @@ class RecordingManager:
             self.stop_recording(recording, manually_stopped=True)
             self.app.page.run_task(self.app.record_card_manager.update_card, recording)
             self.app.page.pubsub.send_others_on_topic("update", recording)
-            if auto_save:
-                self.app.page.run_task(self.persist_recordings)
+            await self.persist_recordings()
 
     async def start_monitor_recordings(self):
         """
@@ -310,7 +306,7 @@ class RecordingManager:
             )
         
         # Persist all recording updates once after all checks are queued
-        self.app.page.run_task(self.persist_recordings)
+        await self.persist_recordings()
 
     _periodic_task_running = False
 
@@ -421,7 +417,7 @@ class RecordingManager:
             if platform and platform_key and (recording.platform is None or recording.platform_key is None):
                 recording.platform = platform
                 recording.platform_key = platform_key
-                self.app.page.run_task(self.persist_recordings)
+                await self.persist_recordings()
 
             if self.settings.user_config["language"] != "zh_CN":
                 platform = platform_key

@@ -1,5 +1,6 @@
 import flet as ft
 
+from ...utils.ui_utils import is_page_active, safe_update
 from ..themes import PopupColorItem, ThemeManager
 
 
@@ -56,6 +57,7 @@ class NavigationColumn(ft.Column):
             self.controls[self.selected_index].content.controls[0].icon = self.controls[
                 self.selected_index
             ].destination.selected_icon
+        safe_update(self)
 
 
 class LeftNavigationMenu(ft.Column):
@@ -161,13 +163,11 @@ class LeftNavigationMenu(ft.Column):
             self.app.settings.user_config["theme_mode"] = "light"
         self.page.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
         await self.on_theme_change()
-        page.update()
+        safe_update(self.page)
 
     async def on_theme_change(self):
-        """When the theme changes, recreate the content and update the page"""
-        page_list = ["home", "about"]
-        if self.app.current_page.page_name in page_list:
-            await self.app.current_page.load()
+        """When the theme changes, recreate the content and update the page via switch_page"""
+        await self.app.switch_page(self.app.current_page.page_name, force_reload=True)
 
 
 class NavigationSidebar:
