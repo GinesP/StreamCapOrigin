@@ -131,8 +131,6 @@ class App:
             except Exception as e:
                 logger.error(f"Critical error in switch_page: {e}")
             finally:
-                # Ensure the sidebar highlight updates etc.
-                safe_update(self.page)
                 logger.debug(f"Finished switching page to: {page_name}")
 
     async def clear_content_area(self, update=True):
