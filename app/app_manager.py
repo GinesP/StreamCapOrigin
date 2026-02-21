@@ -4,7 +4,7 @@ import time
 
 import flet as ft
 
-from . import execute_dir
+from . import execute_dir, bundle_dir
 from .core.config.config_manager import ConfigManager
 from .core.config.language_manager import LanguageManager
 from .core.recording.record_manager import RecordingManager
@@ -30,9 +30,9 @@ class App:
         self.install_progress = None
         self.page = page
         self.run_path = execute_dir
-        self.assets_dir = os.path.join(execute_dir, "assets")
+        self.assets_dir = os.path.join(bundle_dir, "assets")
         self.process_manager = AsyncProcessManager()
-        self.config_manager = ConfigManager(self.run_path)
+        self.config_manager = ConfigManager(self.run_path, bundle_path=bundle_dir)
         self.is_web_mode = False
         self.auth_manager = None
         self.current_username = None
