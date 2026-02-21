@@ -34,7 +34,7 @@ class NavigationColumn(ft.Column):
         self.scroll = ft.ScrollMode.ALWAYS
         self.sidebar = sidebar
         self.selected_index = 0
-        self.page = page
+        self.app_page = page
         self.app = app
         self.controls = self.get_navigation_items()
 
@@ -46,7 +46,7 @@ class NavigationColumn(ft.Column):
     def item_clicked(self, e):
         self.selected_index = e.control.destination.index
         self.update_selected_item()
-        self.page.go(f"/{e.control.destination.name}")
+        self.app_page.run_task(self.app_page.push_route, f"/{e.control.destination.name}")
 
     def update_selected_item(self):
         for item in self.controls:
@@ -65,7 +65,7 @@ class LeftNavigationMenu(ft.Column):
         super().__init__()
         self.app = app
         self.sidebar = app.sidebar
-        self.page = app.page
+        self.app_page = app.page
         self.rail = None
         self.dark_light_text = None
         self.dark_light_icon = None
@@ -78,9 +78,9 @@ class LeftNavigationMenu(ft.Column):
 
     def load(self):
         self._ = self.app.language_manager.language.get("sidebar")
-        self.rail = NavigationColumn(sidebar=self.sidebar, page=self.page, app=self.app)
+        self.rail = NavigationColumn(sidebar=self.sidebar, page=self.app_page, app=self.app)
 
-        if self.page.theme_mode == ft.ThemeMode.DARK:
+        if self.app_page.theme_mode == ft.ThemeMode.DARK:
             self.dark_light_text = ft.Text(self._["dark_theme"])
             self.dark_light_icon = ft.IconButton(
                 icon=ft.Icons.BRIGHTNESS_HIGH_OUTLINED,
@@ -147,7 +147,7 @@ class LeftNavigationMenu(ft.Column):
         self.alignment = ft.MainAxisAlignment.START
 
     async def theme_changed(self, _):
-        page = self.app.page
+        page = self.app_page
         self._ = self.app.language_manager.language.get("sidebar")
         if page.theme_mode == ft.ThemeMode.LIGHT:
             page.theme_mode = ft.ThemeMode.DARK
@@ -161,9 +161,9 @@ class LeftNavigationMenu(ft.Column):
             self.dark_light_icon.icon = ft.Icons.BRIGHTNESS_2_OUTLINED
             self.dark_light_icon.tooltip = self._["toggle_night_theme"]
             self.app.settings.user_config["theme_mode"] = "light"
-        self.page.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
+        self.app_page.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
         await self.on_theme_change()
-        safe_update(self.page)
+        safe_update(self.app_page)
 
     async def on_theme_change(self):
         """When the theme changes, recreate the content and update the page via switch_page"""

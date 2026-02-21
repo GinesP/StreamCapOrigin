@@ -8,18 +8,13 @@ from ..utils.logger import logger
 from .tray_manager import TrayManager
 
 
-def _safe_destroy_window(page):
+async def _safe_destroy_window(page):
     try:
-        page.update()
-        to_cancel = asyncio.all_tasks(page.loop)
-        if not to_cancel:
-            return
-        for task in to_cancel:
-            task.cancel()
+        # Stop any periodic tasks or animations if needed, 
+        # but don't manually cancel all tasks as it kills the current execution.
+        await page.window.destroy()
     except Exception as ex:
         logger.error(f"close window error: {ex}")
-    finally:
-        page.window.destroy()
 
 
 async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
@@ -74,11 +69,11 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
                 finally:
                     if not getattr(app, "is_web_mode", False) and hasattr(app, "tray_manager"):
                         app.tray_manager.stop()
-                    page.window.destroy()
+                    page.run_task(page.window.destroy)
 
             threading.Thread(target=close_app, daemon=True).start()
         else:
-            _safe_destroy_window(page)
+            await _safe_destroy_window(page)
         
         await close_dialog(e)
 
@@ -101,12 +96,12 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
                 content=ft.Text(
                     _["minimize_to_tray_tip"],
                     size=12,
-                    color=ft.colors.GREY_500,
+                    color=ft.Colors.GREY_500,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 padding=ft.padding.all(8),
                 border_radius=5,
-                bgcolor=ft.colors.with_opacity(0.1, ft.colors.BLUE_GREY),
+                bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.BLUE_GREY),
             )
         )
 
@@ -115,14 +110,14 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
             content=ft.Text(_["cancel"], size=14),
             on_click=close_dialog,
             style=ft.ButtonStyle(
-                color=ft.colors.PRIMARY,
+                color=ft.Colors.PRIMARY,
             ),
         ),
         ft.OutlinedButton(
             content=ft.Text(_["exit_program"], size=14),
             on_click=close_dialog_dismissed,
             style=ft.ButtonStyle(
-                color=ft.colors.ERROR,
+                color=ft.Colors.ERROR,
             ),
         ),
     ]
@@ -132,7 +127,7 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
                 content=ft.Text(_["minimize_to_tray"], size=14),
                 on_click=minimize_to_tray,
                 style=ft.ButtonStyle(
-                    color=ft.colors.PRIMARY,
+                    color=ft.Colors.PRIMARY,
                 ),
             ))
 

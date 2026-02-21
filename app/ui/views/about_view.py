@@ -172,7 +172,7 @@ class AboutPage(PageBase):
             developer_buttons = ft.Column(
                 controls=[
                     ft.ElevatedButton(
-                        text=self._["view_update"],
+                        content=self._["view_update"],
                         icon=ft.Icons.CODE,
                         on_click=self.open_update_page,
                         width=float("inf"),
@@ -182,7 +182,7 @@ class AboutPage(PageBase):
                         ),
                     ),
                     ft.ElevatedButton(
-                        text=self._["view_docs"],
+                        content=self._["view_docs"],
                         icon=ft.Icons.DESCRIPTION,
                         on_click=self.open_dos_page,
                         width=float("inf"),
@@ -192,7 +192,7 @@ class AboutPage(PageBase):
                         ),
                     ),
                     ft.ElevatedButton(
-                        text=self.app.language_manager.language.get("update", {}).get("check_update"),
+                        content=self.app.language_manager.language.get("update", {}).get("check_update"),
                         icon=ft.Icons.UPDATE,
                         on_click=self._check_for_updates,
                         width=float("inf"),

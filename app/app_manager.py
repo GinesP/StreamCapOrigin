@@ -39,7 +39,7 @@ class App:
         self.content_area = ft.Container(
             content=ft.Column(),
             expand=True,
-            alignment=ft.alignment.top_left,
+            alignment=ft.Alignment.TOP_LEFT,
         )
 
         self.settings = SettingsPage(self)
@@ -131,8 +131,6 @@ class App:
             except Exception as e:
                 logger.error(f"Critical error in switch_page: {e}")
             finally:
-                # Ensure the sidebar highlight updates etc.
-                safe_update(self.page)
                 logger.debug(f"Finished switching page to: {page_name}")
 
     async def clear_content_area(self, update=True):

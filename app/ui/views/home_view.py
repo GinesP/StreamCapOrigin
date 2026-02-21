@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime
 
@@ -48,7 +49,7 @@ class HomePage(PageBase):
                 ],
                 spacing=10,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
             padding=ft.padding.all(20),
         )
 
@@ -107,7 +108,7 @@ class HomePage(PageBase):
             src=logo_path,
             width=120,
             height=120,
-            fit=ft.ImageFit.CONTAIN,
+            fit=ft.BoxFit.CONTAIN,
         )
 
         current_hour = datetime.now().hour
@@ -122,7 +123,7 @@ class HomePage(PageBase):
                 controls=[
                     ft.Container(
                         content=logo,
-                        alignment=ft.alignment.center,
+                        alignment=ft.Alignment.CENTER,
                         margin=ft.margin.only(top=30, bottom=10),
                     ),
                     ft.Text(
@@ -150,7 +151,7 @@ class HomePage(PageBase):
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=10,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
             padding=ft.padding.only(bottom=20),
         )
 
@@ -220,13 +221,13 @@ class HomePage(PageBase):
                                 width=button_width,
                                 height=button_height,
                             ),
-                            alignment=ft.alignment.center,
+                            alignment=ft.Alignment.CENTER,
                         ),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=10,
                 ),
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 padding=ft.padding.only(bottom=20),
             )
         else:
@@ -294,7 +295,7 @@ class HomePage(PageBase):
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,
                 ),
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 padding=ft.padding.only(bottom=20),
             )
 
@@ -623,7 +624,7 @@ class HomePage(PageBase):
                         alignment=ft.MainAxisAlignment.CENTER,
                     ),
                     padding=ft.padding.all(15),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment.CENTER,
                     width=None if is_mobile else 220,
                     expand=is_mobile,
                 ),
@@ -709,22 +710,22 @@ class HomePage(PageBase):
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.START,
             ),
-            alignment=ft.alignment.bottom_left,
+            alignment=ft.Alignment.BOTTOM_LEFT,
             padding=ft.padding.only(left=20, right=20, bottom=30),
         )
 
     async def on_start_recording_click(self, _):
-        self.app.page.go("/recordings")
+        asyncio.create_task(self.app.page.push_route("/recordings"))
         await self.app.recordings.add_recording_on_click(None)
 
     async def on_browse_recordings_click(self, _):
-        self.app.page.go("/recordings")
+        asyncio.create_task(self.app.page.push_route("/recordings"))
 
     async def on_manage_storage_click(self, _):
-        self.app.page.go("/storage")
+        asyncio.create_task(self.app.page.push_route("/storage"))
 
     async def on_settings_click(self, _):
-        self.app.page.go("/settings")
+        asyncio.create_task(self.app.page.push_route("/settings"))
 
     async def on_about_click(self, _):
-        self.app.page.go("/about")
+        asyncio.create_task(self.app.page.push_route("/about"))

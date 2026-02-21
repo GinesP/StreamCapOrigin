@@ -50,22 +50,36 @@ class SettingsPage(PageBase):
         self.tab_cookies = self.create_cookies_settings_tab()
         self.tab_accounts = self.create_accounts_settings_tab()
 
-        tabs = [
-            ft.Tab(text=self._["recording_settings"], content=self.tab_recording),
-            ft.Tab(text=self._["push_settings"], content=self.tab_push),
-            ft.Tab(text=self._["cookies_settings"], content=self.tab_cookies),
-            ft.Tab(text=self._["accounts_settings"], content=self.tab_accounts),
+        tab_headers = [
+            ft.Tab(label=self._["recording_settings"]),
+            ft.Tab(label=self._["push_settings"]),
+            ft.Tab(label=self._["cookies_settings"]),
+            ft.Tab(label=self._["accounts_settings"]),
+        ]
+        tab_contents = [
+            self.tab_recording,
+            self.tab_push,
+            self.tab_cookies,
+            self.tab_accounts,
         ]
         
         if self.app.page.web:
             self.tab_security = self.create_security_settings_tab()
-            tabs.append(ft.Tab(text=self._["security_settings"], content=self.tab_security))
+            tab_headers.append(ft.Tab(label=self._["security_settings"]))
+            tab_contents.append(self.tab_security)
 
         settings_tabs = ft.Tabs(
+            length=len(tab_headers),
             selected_index=0,
             animation_duration=300,
-            tabs=tabs,
             expand=True,
+            content=ft.Column(
+                [
+                    ft.TabBar(tabs=tab_headers),
+                    ft.TabBarView(controls=tab_contents, expand=True)
+                ], 
+                expand=True
+            ),
         )
 
         if self.app.is_mobile:
@@ -141,8 +155,8 @@ class SettingsPage(PageBase):
             title=ft.Text(self._["confirm"]),
             content=ft.Text(self._["query_restore_config_tip"]),
             actions=[
-                ft.TextButton(text=self._["cancel"], on_click=close_dialog),
-                ft.TextButton(text=self._["sure"], on_click=confirm_dlg),
+                ft.TextButton(content=self._["cancel"], on_click=close_dialog),
+                ft.TextButton(content=self._["sure"], on_click=confirm_dlg),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
             modal=False,
@@ -245,7 +259,7 @@ class SettingsPage(PageBase):
                                 ],
                                 value=self.get_config_value("language", self.default_language),
                                 width=200,
-                                on_change=self.on_change,
+                                on_select=self.on_change,
                                 data="language",
                                 tooltip=self._["switch_language"],
                             ),
@@ -332,7 +346,7 @@ class SettingsPage(PageBase):
                                 value=self.get_config_value("video_format", VideoFormat.TS),
                                 width=200,
                                 data="video_format",
-                                on_change=self.on_change,
+                                on_select=self.on_change,
                                 tooltip=self._["switch_video_format"],
                             ),
                         ),
@@ -343,7 +357,7 @@ class SettingsPage(PageBase):
                                 value=self.get_config_value("record_quality", VideoQuality.OD),
                                 width=200,
                                 data="record_quality",
-                                on_change=self.on_change,
+                                on_select=self.on_change,
                                 tooltip=self._["switch_recording_quality"],
                             ),
                         ),
@@ -379,7 +393,7 @@ class SettingsPage(PageBase):
                                 value=self.get_config_value("default_live_source", 'FLV'),
                                 width=200,
                                 data="default_live_source",
-                                on_change=self.on_change,
+                                on_select=self.on_change,
                                 tooltip=self._["default_live_source_tip"],
                             ),
                         ),
@@ -757,7 +771,7 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
                                         options=[ft.dropdown.Option("active"), ft.dropdown.Option("passive")],
                                         value=self.get_config_value("bark_interrupt_level"),
                                         width=200,
-                                        on_change=self.on_change,
+                                        on_select=self.on_change,
                                         data="bark_interrupt_level",
                                     ),
                                 ),
@@ -1041,7 +1055,7 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
                                 value=self.get_accounts_value("twitcasting_account_type", "Default"),
                                 width=500,
                                 data="twitcasting_account_type",
-                                on_change=self.on_accounts_change,
+                                on_select=self.on_accounts_change,
                                 tooltip=self._["switch_account_type"],
                             ),
                         ),
@@ -1148,7 +1162,7 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
     def create_channel_config(channel_name, settings):
         """Helper method to create expandable configurations for each channel."""
         return ft.ExpansionTile(
-            initially_expanded=False,
+            expanded=False,
             title=ft.Text(channel_name, size=14, weight=ft.FontWeight.BOLD),
             controls=[ft.Container(content=ft.Column(settings, spacing=5), padding=10)],
             tile_padding=0,
@@ -1237,26 +1251,27 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
             )
 
     def pick_folder(self, label, control):
-        def picked_folder(e: ft.FilePickerResultEvent):
-            path = e.path
-            if path:
-                control.value = path
-                control.update()
-                e.control.data = control.data
-                e.data = path
-                self.page.run_task(self.on_change, e)
-
         async def pick_folder(_):
             if self.app.page.web:
                 await self.app.snack_bar.show_snack_bar(self._["unsupported_select_path"])
-            folder_picker.get_directory_path()
+                return
+            path = await folder_picker.get_directory_path()
+            if path:
+                control.value = path
+                control.update()
+                class DummyEvent:
+                    pass
+                e = DummyEvent()
+                e.control = control
+                e.data = path
+                self.page.run_task(self.on_change, e)
 
-        folder_picker = ft.FilePicker(on_result=picked_folder)
-        self.page.overlay.append(folder_picker)
+        folder_picker = ft.FilePicker()
+        self.page.services.append(folder_picker)
         self.page.update()
 
         btn_pick_folder = ft.ElevatedButton(
-            text=self._["select"], icon=ft.Icons.FOLDER_OPEN, on_click=pick_folder, tooltip=self._["select_btn_tip"]
+            content=self._["select"], icon=ft.Icons.FOLDER_OPEN, on_click=pick_folder, tooltip=self._["select_btn_tip"]
         )
         
         if self.app.is_mobile:
@@ -1294,9 +1309,17 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
             )
 
     def pick_cookie_file(self, label, control):
-        def picked_file(e: ft.FilePickerResultEvent):
-            if e.files:
-                file_path = e.files[0].path
+        async def pick_file(_):
+            if self.app.page.web:
+                await self.app.snack_bar.show_snack_bar(self._["unsupported_select_path"])
+                return
+            files = await file_picker.pick_files(
+                allow_multiple=False,
+                allowed_extensions=["json"],
+                dialog_title="Select Cookies JSON File"
+            )
+            if files:
+                file_path = files[0].path
                 if file_path:
                     try:
                         cookies_json = load_json_cookies(file_path)
@@ -1306,11 +1329,12 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
                                 control.value = cookie_string
                                 control.update()
                                 # Trigger on_change manually since setting value doesn't trigger it
-                                e.control.data = control.data
+                                class DummyEvent:
+                                    pass
+                                e = DummyEvent()
+                                e.control = control
                                 e.data = cookie_string
-                            if cookie_string:
-                                control.value = cookie_string
-                                control.update()
+                                
                                 # Update config directly and save immediately
                                 self.cookies_config[control.data] = cookie_string
                                 self.has_unsaved_changes['cookies_config'] = False # Marked as saved after we save it below
@@ -1343,18 +1367,8 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
                             ft.Colors.RED
                         )
 
-        async def pick_file(_):
-            if self.app.page.web:
-                await self.app.snack_bar.show_snack_bar(self._["unsupported_select_path"])
-                return
-            file_picker.pick_files(
-                allow_multiple=False,
-                allowed_extensions=["json"],
-                dialog_title="Select Cookies JSON File"
-            )
-
-        file_picker = ft.FilePicker(on_result=picked_file)
-        self.page.overlay.append(file_picker)
+        file_picker = ft.FilePicker()
+        self.page.services.append(file_picker)
         self.page.update()
 
         btn_pick_file = ft.IconButton(
@@ -1497,9 +1511,9 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
         )
         
         change_password_button = ft.ElevatedButton(
-            text=self._["change_password"],
+            content=self._["change_password"],
             on_click=change_password,
-            icon=ft.icons.LOCK_RESET,
+            icon=ft.Icons.LOCK_RESET,
         )
         
         login_required_switch = ft.Switch(

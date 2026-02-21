@@ -1,10 +1,26 @@
 import argparse
+import asyncio
 import multiprocessing
 import os
 import sys
 
 import flet as ft
 from dotenv import load_dotenv
+
+# --- Flet 0.80.5 Compatibility Patch ---
+def _page_open(self, dialog):
+    if dialog not in self.overlay:
+        self.overlay.append(dialog)
+    dialog.open = True
+    self.update()
+
+def _page_close(self, dialog):
+    dialog.open = False
+    self.update()
+
+ft.Page.open = _page_open
+ft.Page.close = _page_close
+# ---------------------------------------
 # from screeninfo import get_monitors
 
 from app.app_manager import App, execute_dir
@@ -30,7 +46,7 @@ class GlobalState:
 global_state = GlobalState()
 
 
-def setup_window(page: ft.Page, app: App, is_web: bool) -> None:
+async def setup_window(page: ft.Page, app: App, is_web: bool) -> None:
     page.window.icon = os.path.join(execute_dir, ASSETS_DIR, "icon.ico")
     page.window.skip_task_bar = False
     page.window.always_on_top = False
@@ -43,8 +59,8 @@ def setup_window(page: ft.Page, app: App, is_web: bool) -> None:
             if window_width and window_height:
                 page.window.width = int(window_width)
                 page.window.height = int(window_height)
-                page.window.center()
-                page.window.to_front()
+                await page.window.center()
+                await page.window.to_front()
                 return
 
         # Default fixed size
@@ -57,7 +73,7 @@ def setup_window(page: ft.Page, app: App, is_web: bool) -> None:
         page.window.left = 50
         page.window.top = 50
         
-        page.window.to_front()
+        await page.window.to_front()
 
 
 def get_route_handler() -> dict[str, str]:
@@ -81,14 +97,17 @@ def handle_route_change(page: ft.Page, app: App) -> callable:
             await app.switch_page(page_name)
         else:
             logger.warning(f"Unknown route: {e.route}, redirecting to /")
-            page.go("/")
+            asyncio.create_task(page.push_route("/"))
 
     return route_change
 
 
 def handle_window_event(page: ft.Page, app: App, save_progress_overlay: 'SaveProgressOverlay') -> callable:
     async def on_window_event(e: ft.ControlEvent) -> None:
-        if e.data == "close":
+        # In Flet 0.2xx, data was "close". In Flet 0.80+, e.type is WindowEventType.CLOSE
+        is_close = e.data == "close" or getattr(e, "type", None) == "close" or (hasattr(e, "type") and getattr(e.type, "value", None) == "close")
+        
+        if is_close:
             if app.settings.user_config.get("remember_window_size"):
                 app.settings.user_config["window_width"] = page.window.width
                 app.settings.user_config["window_height"] = page.window.height
@@ -131,7 +150,7 @@ async def main(page: ft.Page) -> None:
     page.data = app
     app.is_web_mode = is_web
     app.is_mobile = False
-    setup_window(page, app, is_web)
+    await setup_window(page, app, is_web)
 
     if not is_web:
         try:
@@ -185,9 +204,9 @@ async def main(page: ft.Page) -> None:
         if page.route == '/':
             last_route = app.settings.user_config.get("last_route", "/home")
             logger.info(f"Restored last route: {last_route}")
-            page.go(last_route)
+            asyncio.create_task(page.push_route(last_route))
         else:
-            page.go(page.route)
+            asyncio.create_task(page.push_route(page.route))
 
     if is_web:
         auth_manager = AuthManager(app)
@@ -251,16 +270,16 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()
     if args.web or platform == "web":
         logger.debug("Running in web mode on http://" + args.host + ":" + str(args.port))
-        ft.app(
-            target=main,
+        ft.run(
+            main=main,
             view=ft.AppView.WEB_BROWSER,
             host=args.host,
             port=args.port,
             assets_dir=ASSETS_DIR,
-            use_color_emoji=True,
-            web_renderer=ft.WebRenderer.CANVAS_KIT
+            # use_color_emoji=True, # no longer available in 0.80
+            # web_renderer=ft.WebRenderer.CANVAS_KIT 
         )
 
     else:
-        ft.app(target=main, assets_dir=ASSETS_DIR)
+        ft.run(main=main, assets_dir=ASSETS_DIR)
 

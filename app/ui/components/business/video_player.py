@@ -83,7 +83,7 @@ class VideoPlayer:
 
             video_container = ft.Container(
                 content=video,
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 width=video_width,
                 height=video_height,
             )

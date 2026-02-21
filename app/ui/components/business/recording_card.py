@@ -155,7 +155,7 @@ class RecordingCardManager:
             border_radius=10,
             width=18,
             height=18,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
             tooltip=q_tip
         )
 
@@ -253,7 +253,7 @@ class RecordingCardManager:
             padding=5,
             width=60,
             height=26,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
 
     async def update_card(self, recording):
@@ -580,8 +580,8 @@ class RecordingCardManager:
                 title=ft.Text(self._["confirm"]),
                 content=ft.Text(self._["delete_confirm_tip"]),
                 actions=[
-                    ft.TextButton(text=self._["cancel"], on_click=close_dialog),
-                    ft.TextButton(text=self._["sure"], on_click=confirm_dlg),
+                    ft.TextButton(content=self._["cancel"], on_click=close_dialog),
+                    ft.TextButton(content=self._["sure"], on_click=confirm_dlg),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
                 modal=False,

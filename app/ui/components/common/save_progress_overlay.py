@@ -29,15 +29,15 @@ class SaveProgressOverlay:
             self._["saving_recording"], 
             size=18, 
             weight=ft.FontWeight.W_500,
-            color=ft.colors.WHITE,
+            color=ft.Colors.WHITE,
             text_align=ft.TextAlign.CENTER
         )
         
         self.cancel_button = ft.ElevatedButton(
-            text=f"😾 {self._['force_close']}",
+            content=f"😾 {self._['force_close']}",
             on_click=self._on_force_close,
             style=ft.ButtonStyle(
-                color=ft.colors.WHITE,
+                color=ft.Colors.WHITE,
                 bgcolor="#FF5252",
                 shape=ft.RoundedRectangleBorder(radius=8),
                 elevation=0,
@@ -50,7 +50,7 @@ class SaveProgressOverlay:
         self.warning_text = ft.Text(
             self._["force_close_warning"],
             size=12,
-            color=ft.colors.with_opacity(0.7, ft.colors.WHITE),
+            color=ft.Colors.with_opacity(0.7, ft.Colors.WHITE),
             text_align=ft.TextAlign.CENTER,
             visible=False
         )
@@ -91,13 +91,13 @@ class SaveProgressOverlay:
             width=400,
             height=280,
             padding=ft.padding.all(30),
-            alignment=ft.alignment.center,
-            bgcolor=ft.colors.with_opacity(0.95, "#212121"),
+            alignment=ft.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.95, "#212121"),
             border_radius=16,
             shadow=ft.BoxShadow(
                 spread_radius=0,
                 blur_radius=24,
-                color=ft.colors.with_opacity(0.5, ft.colors.BLACK),
+                color=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
                 offset=ft.Offset(0, 4)
             ),
         )
@@ -118,13 +118,13 @@ class SaveProgressOverlay:
             width=300,
             height=180,
             padding=ft.padding.all(25),
-            alignment=ft.alignment.center,
-            bgcolor=ft.colors.with_opacity(0.95, "#212121"),
+            alignment=ft.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.95, "#212121"),
             border_radius=16,
             shadow=ft.BoxShadow(
                 spread_radius=0,
                 blur_radius=24,
-                color=ft.colors.with_opacity(0.5, ft.colors.BLACK),
+                color=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
                 offset=ft.Offset(0, 4)
             ),
         )
@@ -132,22 +132,22 @@ class SaveProgressOverlay:
         self.overlay.controls = [
             ft.Container(
                 content=self.content_container,
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 expand=True,
-                bgcolor=ft.colors.with_opacity(0.7, ft.colors.BLACK),
+                bgcolor=ft.Colors.with_opacity(0.7, ft.Colors.BLACK),
                 animate_opacity=300,
             )
         ]
         
         self._initialized = True
         
-    def _on_force_close(self, e):
+    async def _on_force_close(self, e):
         self.message_text.value = self._["force_closing"]
         self.cancel_button.visible = False
         self.warning_text.visible = False
         self.overlay.update()
 
-        self.app.page.window.destroy()
+        await self.app.page.window.destroy()
 
     def show(self, message=None, cancellable=False):
         self._initialize_components()

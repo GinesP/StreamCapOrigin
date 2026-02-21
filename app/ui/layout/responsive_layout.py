@@ -29,8 +29,8 @@ def setup_responsive_layout(page: ft.Page, app: App) -> None:
                 ft.NavigationBarDestination(icon=ft.Icons.DRIVE_FILE_MOVE, label=_["storage"]),
                 ft.NavigationBarDestination(icon=ft.Icons.INFO, label=_["about"]),
             ],
-            on_change=lambda e: page.go(
-                f"/{['home', 'recordings', 'settings', 'storage', 'about'][e.control.selected_index]}"),
+            on_change=lambda e: page.run_task(
+                page.push_route, f"/{['home', 'recordings', 'settings', 'storage', 'about'][e.control.selected_index]}"),
         )
         
         app.content_area.expand = True

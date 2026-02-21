@@ -74,7 +74,7 @@ class RecordingDialog:
             ],
             width=245,
             value=default_record_type,
-            on_change=update_format_options
+            on_select=update_format_options
         )
 
         if default_record_type == "video":
@@ -146,7 +146,7 @@ class RecordingDialog:
             border_radius=5,
             filled=False,
             value=self._["yes"] if segment_record else self._["no"],
-            on_change=on_segment_setting_change,
+            on_select=on_segment_setting_change,
             width=500,
         )
 
@@ -242,7 +242,7 @@ class RecordingDialog:
             border_radius=5,
             filled=False,
             value="true" if scheduled_recording else "false",
-            on_change=on_scheduled_setting_change,
+            on_select=on_scheduled_setting_change,
             width=500,
         )
 
@@ -309,38 +309,48 @@ class RecordingDialog:
         )
 
         tabs = ft.Tabs(
+            length=2,
             selected_index=0,
             animation_duration=300,
             height=500,
-            tabs=[
-                ft.Tab(
-                    text=self._["single_input"],
-                    content=ft.Container(
-                        content=ft.Column(
-                            [
-                                ft.Container(margin=ft.margin.only(top=10)),
-                                url_field,
-                                streamer_name_field,
-                                format_row,
-                                quality_row,
-                                recording_dir_field,
-                                segment_setting_dropdown,
-                                segment_input,
-                                scheduled_setting_dropdown,
-                                *time_rows,
-                                message_push_dropdown,
-                                no_record_dropdown
-                            ],
-                            tight=True,
-                            spacing=10,
-                            scroll=ft.ScrollMode.AUTO,
-                        )
+            content=ft.Column(
+                [
+                    ft.TabBar(
+                        tabs=[
+                            ft.Tab(label=self._["single_input"]),
+                            ft.Tab(label=self._["batch_input"]),
+                        ]
                     ),
-                ),
-                ft.Tab(
-                    text=self._["batch_input"], content=ft.Container(content=batch_input, margin=ft.margin.only(top=15))
-                ),
-            ],
+                    ft.TabBarView(
+                        controls=[
+                            ft.Container(
+                                content=ft.Column(
+                                    [
+                                        ft.Container(margin=ft.margin.only(top=10)),
+                                        url_field,
+                                        streamer_name_field,
+                                        format_row,
+                                        quality_row,
+                                        recording_dir_field,
+                                        segment_setting_dropdown,
+                                        segment_input,
+                                        scheduled_setting_dropdown,
+                                        *time_rows,
+                                        message_push_dropdown,
+                                        no_record_dropdown
+                                    ],
+                                    tight=True,
+                                    spacing=10,
+                                    scroll=ft.ScrollMode.AUTO,
+                                )
+                            ),
+                            ft.Container(content=batch_input, margin=ft.margin.only(top=15)),
+                        ],
+                        expand=True,
+                    )
+                ],
+                expand=True,
+            )
         )
 
         async def not_supported(url):
@@ -504,8 +514,8 @@ class RecordingDialog:
             ),
             content=tabs,
             actions=[
-                ft.TextButton(text=self._["cancel"], on_click=close_dialog),
-                ft.TextButton(text=self._["sure"], on_click=on_confirm, disabled=self.recording is None),
+                ft.TextButton(content=self._["cancel"], on_click=close_dialog),
+                ft.TextButton(content=self._["sure"], on_click=on_confirm, disabled=self.recording is None),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
             shape=ft.RoundedRectangleBorder(radius=10)

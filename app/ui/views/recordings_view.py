@@ -301,13 +301,13 @@ class RecordingsPage(PageBase):
         platform_dropdown = ft.Dropdown(
             options=platform_options,
             value=self.current_platform_filter,
-            on_change=self.on_platform_dropdown_change,
+            on_select=self.on_platform_dropdown_change,
             width=120,
             text_size=14,
             content_padding=ft.padding.only(top=8, bottom=8, left=10, right=10),
             border_radius=5,
             border_color=ft.Colors.OUTLINE,
-            focused_border_color=ft.colors.PRIMARY,
+            focused_border_color=ft.Colors.PRIMARY,
             dense=True,
         )
         if len(current_platform_keys) > 8:
@@ -458,7 +458,7 @@ class RecordingsPage(PageBase):
                 ft.Divider(height=1),
                 ft.Container(
                     content=self.loading_indicator,
-                    alignment=ft.alignment.center
+                    alignment=ft.Alignment.CENTER
                 ),
                 self.recording_card_area,
             ],
@@ -466,6 +466,9 @@ class RecordingsPage(PageBase):
         )
 
     async def add_record_cards(self, is_initial_load=False):
+        INITIAL_BATCH = 25  # Cards to render immediately for fast first paint
+        BATCH_SIZE = 25     # Cards per subsequent batch
+
         if not is_initial_load:
             self.loading_indicator.visible = True
             self.loading_indicator.update()
@@ -489,20 +492,56 @@ class RecordingsPage(PageBase):
             return _card, _recording
         
         if cards_to_create:
-            results = await asyncio.gather(*[
-                create_card_with_time_range(recording)
-                for recording in cards_to_create
+            # --- First batch: render immediately for fast initial paint ---
+            first_batch = cards_to_create[:INITIAL_BATCH]
+            rest_batches = cards_to_create[INITIAL_BATCH:]
+
+            first_results = await asyncio.gather(*[
+                create_card_with_time_range(r) for r in first_batch
             ])
-            
-            for card, recording in results:
+            for card, recording in first_results:
                 self.recording_card_area.content.controls.append(card)
                 self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
-            
+
+            # Show first batch immediately
+            if is_initial_load and first_results:
+                safe_update(self.recording_card_area)
+
+            # --- Remaining batches: load in background without blocking UI ---
+            async def load_remaining():
+                for i in range(0, len(rest_batches), BATCH_SIZE):
+                    if not is_page_active(self.app, self):
+                        return
+                    batch = rest_batches[i:i + BATCH_SIZE]
+                    results = await asyncio.gather(*[
+                        create_card_with_time_range(r) for r in batch
+                    ])
+                    for card, recording in results:
+                        self.recording_card_area.content.controls.append(card)
+                        self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
+                    safe_update(self.recording_card_area)
+                    await asyncio.sleep(0)  # yield to event loop between batches
+
+                if existing_cards:
+                    for card in existing_cards:
+                        self.recording_card_area.content.controls.append(card)
+                await self._resort_cards(update_ui=True)
+                await self.apply_filter(update_ui=True)
+
+            if rest_batches or existing_cards:
+                self.app.page.run_task(load_remaining)
+            else:
+                if existing_cards:
+                    for card in existing_cards:
+                        self.recording_card_area.content.controls.append(card)
+                await self._resort_cards(update_ui=False)
+
+        else:
+            # All cards already exist
             if existing_cards:
                 for card in existing_cards:
                     self.recording_card_area.content.controls.append(card)
-
-        await self._resort_cards(update_ui=False)
+            await self._resort_cards(update_ui=False)
 
         if not is_initial_load:
             self.loading_indicator.visible = False
@@ -515,7 +554,9 @@ class RecordingsPage(PageBase):
                 self.app.record_manager.loop_time_seconds
             )
         
-        await self.apply_filter(update_ui=not is_initial_load)
+        if not cards_to_create or not cards_to_create[INITIAL_BATCH:]:
+            await self.apply_filter(update_ui=not is_initial_load)
+
 
     async def show_all_cards(self):
         cards_obj = self.app.record_card_manager.cards_obj
@@ -690,8 +731,8 @@ class RecordingsPage(PageBase):
             title=ft.Text(self._["confirm"]),
             content=ft.Text(tips),
             actions=[
-                ft.TextButton(text=self._["cancel"], on_click=close_dialog),
-                ft.TextButton(text=self._["sure"], on_click=confirm_dlg),
+                ft.TextButton(content=self._["cancel"], on_click=close_dialog),
+                ft.TextButton(content=self._["sure"], on_click=confirm_dlg),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
             modal=False,

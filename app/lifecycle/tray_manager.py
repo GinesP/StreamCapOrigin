@@ -42,16 +42,22 @@ class TrayManager:
             import pystray
             
             def on_restore(_icon, _item):
-                page.window.visible = True
-                page.window.minimized = False
-                page.update()
+                async def _restore():
+                    page.window.visible = True
+                    page.window.minimized = False
+                    page.update()
+                page.run_task(_restore)
 
             def on_exit(_icon, _item):
                 self.is_running = False
-                on_restore(_icon, _item)
-                if hasattr(self.app, "close_confirm_dialog"):
-                    self.app.close_confirm_dialog.open = True
+                async def _exit():
+                    page.window.visible = True
+                    page.window.minimized = False
                     page.update()
+                    if hasattr(self.app, "close_confirm_dialog"):
+                        self.app.close_confirm_dialog.open = True
+                        page.update()
+                page.run_task(_exit)
 
             language = self.app.language_manager.language
             _ = {}
@@ -69,7 +75,7 @@ class TrayManager:
         except ImportError as e:
             logger.error(e)
             self.is_running = False
-            page.window.destroy()
+            page.run_task(page.window.destroy)
             raise e
 
     def start(self, page: ft.Page):
