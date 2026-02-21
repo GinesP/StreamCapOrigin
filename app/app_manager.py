@@ -18,6 +18,8 @@ from .ui.views.about_view import AboutPage
 from .ui.views.home_view import HomePage
 from .ui.views.recordings_view import RecordingsPage
 from .ui.views.settings_view import SettingsPage
+from .utils.ui_utils import is_page_active, safe_update
+from .utils.logger import logger
 from .ui.views.storage_view import StoragePage
 from .utils import utils
 from .utils.logger import logger
@@ -34,11 +36,10 @@ class App:
         self.is_web_mode = False
         self.auth_manager = None
         self.current_username = None
-        self.content_area = ft.Column(
-            controls=[],
+        self.content_area = ft.Container(
+            content=ft.Column(),
             expand=True,
-            alignment=ft.MainAxisAlignment.START,
-            horizontal_alignment=ft.CrossAxisAlignment.START,
+            alignment=ft.alignment.top_left,
         )
 
         self.settings = SettingsPage(self)
@@ -67,6 +68,7 @@ class App:
         self.record_card_manager = RecordingCardManager(self)
         self.record_manager = RecordingManager(self)
         self.current_page = None
+        self._nav_lock = asyncio.Lock()
         self._loading_page = False
         self.recording_enabled = True
         self.install_manager = InstallationManager(self)
@@ -88,40 +90,50 @@ class App:
         if self.current_page and hasattr(self.current_page, "on_keyboard"):
             await self.current_page.on_keyboard(e)
 
-    async def switch_page(self, page_name):
-        if self._loading_page:
-            return
+    async def switch_page(self, page_name, force_reload=False):
+        async with self._nav_lock:
+            if self.current_page and self.current_page.page_name == page_name and not force_reload:
+                logger.debug(f"Already on page: {page_name}, skipping reload")
+                return
 
-        self._loading_page = True
-        logger.debug(f"Switching page to: {page_name}")
-        try:
-            self.content_area.controls.clear()
-            self.content_area.update()
-            
-            if page := self.pages.get(page_name):
-                # Timeout safety for potentially slow operations
-                try:
-                    await asyncio.wait_for(self.settings.is_changed(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    logger.warning("Settings save timed out during page switch")
-                except Exception as e:
-                    logger.error(f"Error in is_changed during switch: {e}")
+            logger.debug(f"Switching page to: {page_name}")
+            try:
+                if page := self.pages.get(page_name):
+                    # Timeout safety for potentially slow operations in previous page
+                    try:
+                        await asyncio.wait_for(self.settings.is_changed(), timeout=3.0)
+                    except asyncio.TimeoutError:
+                        logger.warning("Settings save timed out during page switch")
+                    except Exception as e:
+                        logger.error(f"Error in is_changed during switch: {e}")
 
-                self.current_page = page
-                
-                try:
-                    await asyncio.wait_for(page.load(), timeout=10.0)
-                    self.content_area.update()
-                except asyncio.TimeoutError:
-                    logger.error(f"Page load timed out: {page_name}")
-                except Exception as e:
-                    logger.error(f"Error loading page {page_name}: {e}")
-        except Exception as e:
-            logger.error(f"Critical error in switch_page: {e}")
-        finally:
-            self._loading_page = False
-            self.page.update()
-            logger.debug(f"Finished switching page to: {page_name}")
+                    # Mark current page before loading to allow gating
+                    self.current_page = page
+
+                    try:
+                        # Pages now populate their own self.view_container
+                        await asyncio.wait_for(page.load(), timeout=10.0)
+                    except asyncio.TimeoutError:
+                        logger.error(f"Page load timed out: {page_name}")
+                        if is_page_active(self, page):
+                            page.view_container.controls.clear()
+                            page.view_container.controls.append(ft.Text(f"Failed to load page: {page_name} (Timeout)"))
+                    except Exception as e:
+                        logger.error(f"Error loading page {page_name}: {e}")
+                        if is_page_active(self, page):
+                            page.view_container.controls.clear()
+                            page.view_container.controls.append(ft.Text(f"Error loading page: {e}"))
+                    
+                    # Atomic swap: replace the whole content of the container
+                    if is_page_active(self, page):
+                        self.content_area.content = page.view_container
+                        safe_update(self.content_area)
+            except Exception as e:
+                logger.error(f"Critical error in switch_page: {e}")
+            finally:
+                # Ensure the sidebar highlight updates etc.
+                safe_update(self.page)
+                logger.debug(f"Finished switching page to: {page_name}")
 
     async def clear_content_area(self, update=True):
         self.content_area.clean()

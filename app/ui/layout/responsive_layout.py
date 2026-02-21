@@ -1,7 +1,7 @@
 import flet as ft
 
 from ...app_manager import App
-from ...utils.logger import logger
+from ...utils.ui_utils import logger, safe_update
 
 
 def is_mobile_device(page: ft.Page) -> bool:

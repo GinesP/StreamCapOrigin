@@ -10,6 +10,7 @@ class PageBase:
         self.app = app
         self.page: ft.Page = app.page
         self.content_area = app.content_area
+        self.view_container = ft.Column(expand=True)
         self._ = {}
 
     async def load(self):

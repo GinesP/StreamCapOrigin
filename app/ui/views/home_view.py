@@ -3,6 +3,7 @@ from datetime import datetime
 
 import flet as ft
 
+from ...utils.ui_utils import is_page_active
 from ..base_page import PageBase
 
 
@@ -68,7 +69,10 @@ class HomePage(PageBase):
         return sorted_recordings[:10]
 
     async def load(self):
-        self.content_area.controls.clear()
+        self.view_container.controls.clear()
+        
+        if not is_page_active(self.app, self):
+            return
 
         # Fetch top 10 recordings dynamically each time the home view is loaded
         top_recordings = await self.fetch_top_recordings()
@@ -87,8 +91,7 @@ class HomePage(PageBase):
             expand=True,
         )
 
-        self.content_area.controls.append(home_content)
-        self.content_area.update()
+        self.view_container.controls.append(home_content)
 
     async def on_view_activated(self):
         """

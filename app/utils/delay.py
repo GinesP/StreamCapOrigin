@@ -1,3 +1,5 @@
+import asyncio
+
 class DelayedTaskExecutor:
     def __init__(self, app, settings, delay=3):
         self.app = app
@@ -5,9 +7,25 @@ class DelayedTaskExecutor:
         self.save_timer = None
         self.delay = delay
 
-    async def start_task_timer(self, task, delay: int | None = None):
+    async def start_task_timer(self, task, *args):
         """Start a timer to save the configuration after a short delay."""
         if self.save_timer:
             self.save_timer.cancel()
+            try:
+                await self.save_timer
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"Error cancelling previous save timer: {e}")
 
-        self.save_timer = self.app.page.run_task(task, delay or self.delay)
+        async def _timer_task():
+            await asyncio.sleep(self.delay)
+            try:
+                if asyncio.iscoroutinefunction(task):
+                    await task(*args)
+                else:
+                    task(*args)
+            except Exception as e:
+                logger.error(f"Error executing delayed task {task.__name__}: {e}")
+
+        self.save_timer = asyncio.create_task(_timer_task())

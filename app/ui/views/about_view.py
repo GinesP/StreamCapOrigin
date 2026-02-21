@@ -2,6 +2,7 @@ import flet as ft
 
 from ..base_page import PageBase
 from ...utils.logger import logger
+from ...utils.ui_utils import is_page_active, safe_update
 from ..components.dialogs.help_dialog import HelpDialog
 
 
@@ -19,8 +20,10 @@ class AboutPage(PageBase):
 
     async def load(self):
         """Load the about page content."""
+        self.view_container.controls.clear()
+        if not is_page_active(self.app, self):
+            return
         logger.debug("Loading AboutPage...")
-        self.content_area.clean()
 
         is_mobile = self.app.is_mobile
 
@@ -357,8 +360,7 @@ class AboutPage(PageBase):
             padding=20,
         )
 
-        self.content_area.controls.append(about_page_layout)
-        self.content_area.update()
+        self.view_container.controls.append(about_page_layout)
         logger.debug("AboutPage loaded.")
 
     @staticmethod
@@ -377,10 +379,14 @@ class AboutPage(PageBase):
             
     async def _check_for_updates(self, _):
         _ = self.app.language_manager.language.get("update", {})
-        await self.app.snack_bar.show_snack_bar(_.get("checking_update"))
+        if is_page_active(self.app, self):
+            await self.app.snack_bar.show_snack_bar(_.get("checking_update"))
         
         update_info = await self.app.update_checker.check_for_updates()
         
+        if not is_page_active(self.app, self):
+            return
+
         if update_info.get("has_update", False):
             await self.app.update_checker.show_update_dialog(update_info)
         else:

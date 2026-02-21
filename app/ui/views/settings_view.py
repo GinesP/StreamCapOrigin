@@ -11,6 +11,7 @@ from ...utils.logger import logger
 from ..base_page import PageBase
 from ..components.dialogs.help_dialog import HelpDialog
 from ...utils.cookie_importer import load_json_cookies, convert_json_to_cookie_string
+from ...utils.ui_utils import is_page_active, safe_update
 
 
 class SettingsPage(PageBase):
@@ -39,7 +40,9 @@ class SettingsPage(PageBase):
         self.init_unsaved_changes()
 
     async def load(self):
-        self.content_area.clean()
+        self.view_container.controls.clear()
+        if not is_page_active(self.app, self):
+            return
         language = self.app.language_manager.language
         self._ = language["settings_page"] | language["video_quality"] | language["base"]
         self.tab_recording = self.create_recording_settings_tab()
@@ -91,8 +94,7 @@ class SettingsPage(PageBase):
             width=float("inf") if self.app.is_mobile else None,
         )
 
-        self.content_area.controls.append(column_layout)
-        self.content_area.update()
+        self.view_container.controls.append(column_layout)
 
     def init_unsaved_changes(self):
         self.has_unsaved_changes = {
@@ -1396,7 +1398,7 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
             )
 
     async def is_changed(self):
-        if self.app.current_page != self:
+        if not is_page_active(self.app, self):
             return
 
         show_snack_bar = False
@@ -1410,10 +1412,11 @@ tooltip=self._.get('check_live_on_browser_refresh_tip', 'Check live status on br
             if should_save and config_key in save_methods:
                 save_method, config_value = save_methods[config_key]
                 await save_method(config_value)
-                self.has_unsaved_changes[config_key] = False
-                show_snack_bar = True
+                if is_page_active(self.app, self):
+                    self.has_unsaved_changes[config_key] = False
+                    show_snack_bar = True
 
-        if show_snack_bar:
+        if show_snack_bar and is_page_active(self.app, self):
             await self.app.snack_bar.show_snack_bar(
                 self._["success_save_config_tip"], duration=1500, bgcolor=ft.Colors.GREEN
             )
