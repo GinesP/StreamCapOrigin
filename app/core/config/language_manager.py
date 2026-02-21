@@ -20,10 +20,11 @@ class LanguageManager:
         """
         Initialize the LanguageManager with settings and load the language configuration.
         """
+        from ... import bundle_dir
         config_manager = ConfigManager(self.app.run_path)
         logger.info(f"Language Code: {self.app.settings.language_code}")
         i18n_filename = f"{self.app.settings.language_code}.json"
-        i18n_file_path = os.path.join(self.app.run_path, "locales", i18n_filename)
+        i18n_file_path = os.path.join(bundle_dir, "locales", i18n_filename)
         self.language = config_manager.load_i18n_config(i18n_file_path)
         i18n.load_translations(self.language)
         return self.language

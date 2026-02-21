@@ -14,24 +14,31 @@ T = TypeVar("T")
 
 
 class ConfigManager:
-    def __init__(self, run_path):
+    def __init__(self, run_path, bundle_path=None):
+        # user-writable data dir (beside the exe, or project root)
         self.config_path = os.path.join(run_path, "config")
+        # read-only bundled resources dir (sys._MEIPASS when frozen, else same as run_path)
+        bundle_config_path = os.path.join(bundle_path or run_path, "config")
+
         self.language_config_path = os.path.join(self.config_path, "language.json")
+        self.language_config_bundle_path = os.path.join(bundle_config_path, "language.json")
         self.default_config_path = os.path.join(self.config_path, "default_settings.json")
+        self.default_config_bundle_path = os.path.join(bundle_config_path, "default_settings.json")
         self.user_config_path = os.path.join(self.config_path, "user_settings.json")
         self.cookies_config_path = os.path.join(self.config_path, "cookies.json")
-        self.about_config_path = os.path.join(self.config_path, "version.json")
+        self.about_config_path = os.path.join(bundle_config_path, "version.json")
         self.recordings_config_path = os.path.join(self.config_path, "recordings.json")
         self.recordings_db_path = os.path.join(self.config_path, "recordings.db")
         self.accounts_config_path = os.path.join(self.config_path, "accounts.json")
         self.web_auth_config_path = os.path.join(self.config_path, "web_auth.json")
 
         self._cache = {}
-        os.makedirs(os.path.dirname(self.default_config_path), exist_ok=True)
+        os.makedirs(self.config_path, exist_ok=True)
         self.init()
 
     def init(self):
         self.init_default_config()
+        self.init_language_config()
         self.init_user_config()
         self.init_cookies_config()
         self.init_accounts_config()
@@ -63,13 +70,28 @@ class ConfigManager:
                 logger.error(f"Failed to initialize configuration file {config_path}: {e}")
 
     def init_default_config(self):
-        default_config = {}
-        self._init_config(self.default_config_path, default_config)
+        """Copy default_settings from bundle if not present in user data dir."""
+        if not os.path.exists(self.default_config_path):
+            if os.path.exists(self.default_config_bundle_path):
+                shutil.copy(self.default_config_bundle_path, self.default_config_path)
+            else:
+                self._init_config(self.default_config_path, {})
+
+    def init_language_config(self):
+        """Copy language.json from bundle if not present in user data dir."""
+        if not os.path.exists(self.language_config_path):
+            if os.path.exists(self.language_config_bundle_path):
+                shutil.copy(self.language_config_bundle_path, self.language_config_path)
+            else:
+                self._init_config(self.language_config_path, {})
 
     def init_user_config(self):
         if os.path.exists(self.user_config_path) and self._load_config(self.user_config_path, "Check user config"):
             return
-        shutil.copy(self.default_config_path, self.user_config_path)
+        if os.path.exists(self.default_config_path):
+            shutil.copy(self.default_config_path, self.user_config_path)
+        elif os.path.exists(self.default_config_bundle_path):
+            shutil.copy(self.default_config_bundle_path, self.user_config_path)
 
     def init_cookies_config(self):
         cookies_config = {}
