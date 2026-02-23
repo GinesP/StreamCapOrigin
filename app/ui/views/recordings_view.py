@@ -447,6 +447,9 @@ class RecordingsPage(PageBase):
                 if card_info["card"].page:
                     card_info["card"].update()
 
+            self.recording_card_area.update()
+            self.view_container.update()
+
             if not filtered_ids:
                 await self.app.snack_bar.show_snack_bar(self._["not_search_result"], duration=2000)
             return filtered_ids
@@ -640,8 +643,8 @@ class RecordingsPage(PageBase):
             await self._resort_cards(update_ui=False)
             self.recording_card_area.update()
             
-            self.content_area.controls[1] = self.create_filter_area()
-            self.content_area.update()
+            self.view_container.controls[1] = self.create_filter_area()
+            self.view_container.update()
 
             await self.app.snack_bar.show_snack_bar(self._["add_recording_success_tip"], bgcolor=ft.Colors.GREEN)
 
@@ -716,8 +719,8 @@ class RecordingsPage(PageBase):
             )
             # Batch updates at the end
             self.recording_card_area.update()
-            self.content_area.controls[1] = self.create_filter_area()
-            self.content_area.update()
+            self.view_container.controls[1] = self.create_filter_area()
+            self.view_container.update()
             await close_dialog(None)
 
         async def close_dialog(_):
@@ -745,8 +748,8 @@ class RecordingsPage(PageBase):
         
         self.current_platform_filter = "all"
         
-        self.content_area.controls[1] = self.create_filter_area()
-        self.content_area.update()
+        self.view_container.controls[1] = self.create_filter_area()
+        self.view_container.update()
 
     async def subscribe_del_all_cards(self, *_):
         await self.delete_all_recording_cards()
@@ -771,8 +774,8 @@ class RecordingsPage(PageBase):
             
             self.recording_card_area.update()
             
-            self.content_area.controls[1] = self.create_filter_area()
-            self.content_area.update()
+            self.view_container.controls[1] = self.create_filter_area()
+            self.view_container.update()
 
     async def update_grid_layout(self, _):
         self.page.run_task(self.recalculate_grid_columns)
