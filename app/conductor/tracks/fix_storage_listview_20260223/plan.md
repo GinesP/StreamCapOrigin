@@ -3,11 +3,11 @@
 This plan outlines the steps to resolve the `ListView Control must be added to the page first` error in the Storage page.
 
 ## Phase 1: Reproduction and Testing
-- [ ] Task: Reproduce the error with a unit test
-    - [ ] Create a test file `tests/ui/views/test_storage_view_bug.py`
-    - [ ] Write a test that instantiates `StoragePage` and calls `load()` in a way that triggers the error
-    - [ ] Confirm the test fails with the reported error
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Reproduction and Testing' (Protocol in workflow.md)
+- [x] Task: Reproduce the error with a unit test
+    - [x] Create a test file `tests/ui/views/test_storage_view_bug.py`
+    - [x] Write a test that instantiates `StoragePage` and calls `load()` in a way that triggers the error
+    - [x] Confirm the test fails with the reported error
+- [~] Task: Conductor - User Manual Verification 'Phase 1: Reproduction and Testing' (Protocol in workflow.md)
 
 ## Phase 2: Implementation
 - [ ] Task: Fix the error in `app/ui/views/storage_view.py`
