@@ -2,7 +2,7 @@
 
 This plan outlines the steps to research and prototype a native UI replacement for Flet, focusing on performance and responsiveness.
 
-## Phase 1: Research and Setup
+## Phase 1: Research and Setup [checkpoint: c1b6a0f]
 - [x] Task: Evaluate and select the primary native framework
     - [x] Research **PySide6 (Qt)**: Selected for its LGPL license, high performance, and robust feature set.
     - [x] Research **PyQt6**: Similar to PySide6 but restricted by GPL license.
@@ -12,17 +12,17 @@ This plan outlines the steps to research and prototype a native UI replacement f
     - [x] Create a new branch `feature/native-ui-research`.
     - [x] Install the selected framework (e.g., `pip install PySide6`).
     - [x] Create a basic "Hello World" app to verify the setup.
-- [~] Task: Conductor - User Manual Verification 'Phase 1: Research and Setup' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Research and Setup' (Protocol in workflow.md) [c1b6a0f]
 
 ## Phase 2: Core Architecture & Home View
-- [ ] Task: Implement the main application window
-    - [ ] Create `MainWindow` class using native widgets.
-    - [ ] Implement the layout structure (Sidebar, Main Content Area).
-- [ ] Task: Implement the Home View
-    - [ ] Create `HomeView` widget.
-    - [ ] Add basic dashboard components (e.g., "Start Recording" button, status labels) using native widgets.
-    - [ ] Bind "Start Recording" button to a dummy function to test event handling.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Core Architecture & Home View' (Protocol in workflow.md)
+- [x] Task: Implement the main application window
+    - [x] Create `MainWindow` class using native widgets.
+    - [x] Implement the layout structure (Sidebar, Main Content Area).
+- [x] Task: Implement the Home View
+    - [x] Create `HomeView` widget.
+    - [x] Add basic dashboard components (e.g., "Start Recording" button, status labels) using native widgets.
+    - [x] Bind "Start Recording" button to a dummy function to test event handling.
+- [~] Task: Conductor - User Manual Verification 'Phase 2: Core Architecture & Home View' (Protocol in workflow.md)
 
 ## Phase 3: Recordings View & Async Integration
 - [ ] Task: Implement the Recordings View
