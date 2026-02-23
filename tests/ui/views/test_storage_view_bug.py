@@ -5,7 +5,7 @@ import flet as ft
 from app.ui.views.storage_view import StoragePage
 
 @pytest.mark.asyncio
-async def test_storage_page_load_triggers_listview_error():
+async def test_storage_page_load_no_longer_triggers_listview_error():
     # Mock app and its components
     mock_app = MagicMock()
     mock_app.page = MagicMock(spec=ft.Page)
@@ -37,20 +37,12 @@ async def test_storage_page_load_triggers_listview_error():
     # Set current_page to self so is_page_active returns True
     mock_app.current_page = page
     
-    # We want to catch the error when self.file_list.update() is called
-    # In StoragePage.load(), it calls setup_ui() then update_file_list()
-    # update_file_list() calls self.file_list.update()
-    
     # Mock os.path.exists and os.scandir to avoid real FS calls
     with patch("os.path.exists", return_value=True), \
          patch("os.scandir", return_value=MagicMock()):
         
-        try:
-            await page.load()
-        except Exception as e:
-            print(f"Caught exception: {e}")
-            # Flet's .update() raises an Exception if the control is not on a page.
-            assert "Control must be added to the page first" in str(e)
-            return
+        # This should now complete without raising "Control must be added to the page first"
+        # because we use safe_update()
+        await page.load()
 
-    pytest.fail("Did not raise 'Control must be added to the page first'")
+    assert page.file_list.page is None # Still none, but no error

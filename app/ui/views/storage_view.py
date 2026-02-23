@@ -77,7 +77,7 @@ class StoragePage(BasePage):
             exists, is_empty = await self.check_directory()
             if not exists or is_empty:
                 self.show_empty_folder_message()
-                self.file_list.update()
+                safe_update(self.file_list)
                 return
 
             await self.create_file_buttons()
@@ -86,7 +86,7 @@ class StoragePage(BasePage):
             logger.error(f"Error updating file list: {e}")
             await self.app.snack_bar.show_snack_bar(self._["file_list_update_error"])
         finally:
-            self.file_list.update()
+            safe_update(self.file_list)
 
     async def check_directory(self):
         def _check():
