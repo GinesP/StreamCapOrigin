@@ -3,16 +3,16 @@
 This plan outlines the steps to research and prototype a native UI replacement for Flet, focusing on performance and responsiveness.
 
 ## Phase 1: Research and Setup
-- [ ] Task: Evaluate and select the primary native framework
-    - [ ] Research **PySide6 (Qt)**: Assess start-up time, memory usage, and licensing for a Python desktop app.
-    - [ ] Research **PyQt6**: Compare with PySide6 regarding licensing and API differences.
-    - [ ] Research **Tkinter/CustomTkinter**: Evaluate as a lightweight, built-in alternative (pros/cons vs Qt).
-    - [ ] Select the most promising candidate for the prototype (Decision Point).
-- [ ] Task: Set up the development environment
-    - [ ] Create a new branch `feature/native-ui-research`.
-    - [ ] Install the selected framework (e.g., `pip install PySide6`).
-    - [ ] Create a basic "Hello World" app to verify the setup.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Research and Setup' (Protocol in workflow.md)
+- [x] Task: Evaluate and select the primary native framework
+    - [x] Research **PySide6 (Qt)**: Selected for its LGPL license, high performance, and robust feature set.
+    - [x] Research **PyQt6**: Similar to PySide6 but restricted by GPL license.
+    - [x] Research **Tkinter/CustomTkinter**: Lightweight but limited for complex UIs compared to Qt.
+    - [x] Select the most promising candidate for the prototype: **PySide6**.
+- [x] Task: Set up the development environment
+    - [x] Create a new branch `feature/native-ui-research`.
+    - [x] Install the selected framework (e.g., `pip install PySide6`).
+    - [x] Create a basic "Hello World" app to verify the setup.
+- [~] Task: Conductor - User Manual Verification 'Phase 1: Research and Setup' (Protocol in workflow.md)
 
 ## Phase 2: Core Architecture & Home View
 - [ ] Task: Implement the main application window
