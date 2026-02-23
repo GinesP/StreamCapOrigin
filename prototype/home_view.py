@@ -1,13 +1,18 @@
+import asyncio
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QWidget, QVBoxLayout, QLabel, 
     QPushButton, QFrame, QGridLayout
 )
 from PySide6.QtCore import Qt
+from qasync import asyncSlot
 
 class HomeView(QWidget):
     def __init__(self):
         super().__init__()
+        self.counter = 0
         self.setup_ui()
+        # Start a background task
+        asyncio.create_task(self.update_counter())
 
     def setup_ui(self):
         self.layout = QVBoxLayout(self)
@@ -23,17 +28,22 @@ class HomeView(QWidget):
         self.tagline_label.setStyleSheet("color: #666;")
         self.layout.addWidget(self.tagline_label)
 
-        # Stats Cards (using Grid)
+        # Stats Cards
         self.stats_layout = QGridLayout()
         self.stats_layout.setSpacing(15)
 
-        self.total_rooms_card = self.create_card("Total Rooms", "0")
-        self.active_recordings_card = self.create_card("Active Recordings", "0")
+        self.total_rooms_card, self.total_rooms_val = self.create_card("Total Rooms", "0")
+        self.active_recordings_card, self.active_recordings_val = self.create_card("Active Recordings", "0")
         
         self.stats_layout.addWidget(self.total_rooms_card, 0, 0)
         self.stats_layout.addWidget(self.active_recordings_card, 0, 1)
         
         self.layout.addLayout(self.stats_layout)
+
+        # Async Counter Display
+        self.counter_label = QLabel("Background Task Counter: 0")
+        self.counter_label.setStyleSheet("font-style: italic; color: blue;")
+        self.layout.addWidget(self.counter_label)
 
         # Action Button
         self.start_btn = QPushButton("Start Recording")
@@ -69,7 +79,20 @@ class HomeView(QWidget):
         val_label.setStyleSheet("font-size: 20px; font-weight: bold;")
         card_layout.addWidget(val_label)
         
-        return card
+        return card, val_label
 
-    def on_start_clicked(self):
-        print("Start Recording clicked (Dummy Action)")
+    @asyncSlot()
+    async def on_start_clicked(self):
+        print("Start Recording clicked (Simulating Async Call)")
+        self.start_btn.setEnabled(False)
+        self.start_btn.setText("Starting...")
+        await asyncio.sleep(2) # Simulate async work
+        self.start_btn.setText("Start Recording")
+        self.start_btn.setEnabled(True)
+        print("Recording Started (Simulated)")
+
+    async def update_counter(self):
+        while True:
+            self.counter += 1
+            self.counter_label.setText(f"Background Task Counter: {self.counter}")
+            await asyncio.sleep(1)
