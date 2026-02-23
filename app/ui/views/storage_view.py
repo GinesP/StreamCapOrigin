@@ -16,6 +16,11 @@ VIDEO_API_EXTERNAL_URL = os.getenv("VIDEO_API_EXTERNAL_URL")
 
 class StoragePage(BasePage):
     def __init__(self, app):
+        """Initialize the storage page.
+
+        Args:
+            app: The main application instance.
+        """
         super().__init__(app)
         self.page_name = "storage"
         self.root_path = None
@@ -29,6 +34,7 @@ class StoragePage(BasePage):
         self.app.language_manager.add_observer(self)
 
     async def load(self):
+        """Load page content and initialize UI."""
         self.view_container.controls.clear()
         if not is_page_active(self.app, self):
             return
@@ -38,6 +44,7 @@ class StoragePage(BasePage):
         await self.update_file_list()
 
     def setup_ui(self):
+        """Setup the initial UI components for the storage page."""
         self.path_display = ft.Text(
             self._["storage_path"] + ": " + self.current_path,
             size=14,
@@ -49,11 +56,13 @@ class StoragePage(BasePage):
         self.view_container.controls.append(self.content)
 
     def load_language(self):
+        """Load localized strings for the storage page."""
         language = self.app.language_manager.language
         for key in ("storage_page", "base"):
             self._.update(language.get(key, {}))
 
     async def update_file_list(self):
+        """Update the file list displayed in the ListView."""
         try:
             self.path_display.value = self._["current_path"] + ":" + self.current_path
             self.file_list.controls.clear()
@@ -62,7 +71,7 @@ class StoragePage(BasePage):
                 back_button = ft.ElevatedButton(
                     self._["go_back"],
                     icon=ft.icons.ARROW_BACK,
-                    on_click=lambda _: self.app.page.run_task(self.navigate_to_parent)
+                    on_click=lambda _: self.app.page.run_task(self.navigate_to_parent),
                 )
                 if self.app.is_mobile:
                     back_item = ft.ListTile(
@@ -81,7 +90,7 @@ class StoragePage(BasePage):
                 return
 
             await self.create_file_buttons()
-            
+
         except Exception as e:
             logger.error(f"Error updating file list: {e}")
             await self.app.snack_bar.show_snack_bar(self._["file_list_update_error"])
@@ -89,6 +98,12 @@ class StoragePage(BasePage):
             safe_update(self.file_list)
 
     async def check_directory(self):
+        """Check if the current directory exists and if it is empty.
+
+        Returns:
+            Tuple[bool, bool]: (exists, is_empty)
+        """
+
         def _check():
             if not os.path.exists(self.current_path):
                 return False, True
@@ -101,6 +116,8 @@ class StoragePage(BasePage):
         return await asyncio.get_event_loop().run_in_executor(self.executor, _check)
 
     async def create_file_buttons(self):
+        """Scan directory and create UI buttons for files and folders."""
+
         def _get_items():
             try:
                 _items = []
@@ -113,7 +130,7 @@ class StoragePage(BasePage):
                 return []
 
         items = await asyncio.get_event_loop().run_in_executor(self.executor, _get_items)
-        
+
         buttons = []
         is_mobile = self.app.is_mobile
         for name, is_dir, full_path in items:
@@ -123,46 +140,49 @@ class StoragePage(BasePage):
                     leading=icon,
                     title=ft.Text(name),
                     on_click=lambda e, path=full_path, is_directory=is_dir: self.app.page.run_task(
-                        self.navigate_to if is_directory else self.preview_file, 
-                        path
+                        self.navigate_to if is_directory else self.preview_file, path
                     ),
                 )
                 buttons.append(item)
             else:
                 if is_dir:
                     btn = ft.ElevatedButton(
-                        f"📁 {name}",
-                        on_click=lambda e, path=full_path: self.app.page.run_task(self.navigate_to, path)
+                        f"📁 {name}", on_click=lambda e, path=full_path: self.app.page.run_task(self.navigate_to, path)
                     )
                 else:
                     btn = ft.ElevatedButton(
-                        f"📄 {name}",
-                        on_click=lambda e, path=full_path: self.app.page.run_task(self.preview_file, path)
+                        f"📄 {name}", on_click=lambda e, path=full_path: self.app.page.run_task(self.preview_file, path)
                     )
                 buttons.append(btn)
 
         self.file_list.controls.extend(buttons)
 
     def show_empty_folder_message(self):
+        """Show a message when the current folder is empty."""
         self.file_list.controls.append(
             ft.Card(
                 content=ft.Container(
                     content=ft.Row(
                         controls=[
                             ft.Icon(ft.icons.FOLDER_OPEN),
-                            ft.Text(self._["empty_recording_folder"], size=16, weight=ft.FontWeight.BOLD)
+                            ft.Text(self._["empty_recording_folder"], size=16, weight=ft.FontWeight.BOLD),
                         ],
-                        alignment=ft.MainAxisAlignment.CENTER
+                        alignment=ft.MainAxisAlignment.CENTER,
                     ),
-                    padding=20
+                    padding=20,
                 ),
                 elevation=2,
                 margin=10,
-                width=400
+                width=400,
             )
         )
 
     async def navigate_to(self, path):
+        """Navigate to a specific directory path.
+
+        Args:
+            path: The target directory path.
+        """
         self.current_path = path
         self.path_display.value = self._["current_path"] + ":" + self.current_path
         await self.update_file_list()
@@ -170,6 +190,7 @@ class StoragePage(BasePage):
             safe_update(self.view_container)
 
     async def navigate_to_parent(self):
+        """Navigate to the parent directory."""
         self.current_path = os.path.dirname(self.current_path)
         self.path_display.value = self._["current_path"] + ":" + self.current_path
         await self.update_file_list()
@@ -177,6 +198,12 @@ class StoragePage(BasePage):
             safe_update(self.view_container)
 
     async def preview_file(self, file_path, room_url=None):
+        """Open a video player to preview a recorded file.
+
+        Args:
+            file_path: Path to the video file.
+            room_url: Optional URL of the live room.
+        """
         import urllib.parse
 
         from ..components.business.video_player import VideoPlayer
