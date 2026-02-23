@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Investigate creating a new lightweight native UI to replace Flet**
+- [x] **Track: Investigate creating a new lightweight native UI to replace Flet**
   *Link: [./tracks/native_ui_investigation_20260223/](./tracks/native_ui_investigation_20260223/)*
