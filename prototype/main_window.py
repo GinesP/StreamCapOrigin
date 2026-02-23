@@ -1,14 +1,19 @@
 import sys
+import asyncio
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
-    QListWidget, QStackedWidget, QLabel, QPushButton, QFrame
+    QListWidget, QStackedWidget, QLabel, QPushButton, QFrame,
+    QApplication
 )
 from PySide6.QtCore import Qt
+from qasync import QEventLoop, asyncSlot
 
 try:
     from .home_view import HomeView
+    from .recordings_view import RecordingsView
 except ImportError:
     from home_view import HomeView
+    from recordings_view import RecordingsView
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -61,10 +66,8 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self.home_view)
 
         # Recordings
-        self.recordings_page = QWidget()
-        recordings_layout = QVBoxLayout(self.recordings_page)
-        recordings_layout.addWidget(QLabel("Recordings View Placeholder"))
-        self.content_stack.addWidget(self.recordings_page)
+        self.recordings_view = RecordingsView()
+        self.content_stack.addWidget(self.recordings_view)
 
         # Settings
         settings_page = QWidget()
@@ -78,9 +81,19 @@ class MainWindow(QMainWindow):
         about_layout.addWidget(QLabel("About View Placeholder"))
         self.content_stack.addWidget(about_page)
 
-if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication
+async def main():
     app = QApplication(sys.argv)
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+
     window = MainWindow()
     window.show()
-    sys.exit(app.exec())
+
+    with loop:
+        await loop.run_forever()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
