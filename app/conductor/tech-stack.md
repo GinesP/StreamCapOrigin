@@ -2,8 +2,9 @@
 
 ## Core Technologies
 - **Programming Language:** Python
-- **UI Framework:** [Flet](https://flet.dev/) (Flutter for Python)
+- **UI Framework:** [PySide6 (Qt for Python)](https://doc.qt.io/qtforpython-6/)
 - **Asynchronous Runtime:** `asyncio`
+- **Event Loop Integration:** `qasync` (Unified Qt and asyncio loop)
 
 ## Media Processing
 - **Engine:** `ffmpeg` (via custom builders and process management)
