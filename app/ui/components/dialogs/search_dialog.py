@@ -77,10 +77,13 @@ class SearchDialog(ft.AlertDialog):
             self._["filter_error"] = self._["recording_error"]
             self._["filter_stopped"] = self._["stopped"]
 
-    def close_dlg(self, _e):
+    def close_dlg(self, _e=None):
         logger.debug("Attempting to close SearchDialog")
-        self.open = False
-        self.update()
+        if self.page:
+            self.page.close(self)
+        else:
+            self.open = False
+            self.update()
 
     async def submit_query(self, e):
         query = self.query.value.strip()

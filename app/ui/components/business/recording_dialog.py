@@ -398,24 +398,25 @@ class RecordingDialog:
                     }
                 ]
 
-                if live_url in existing_recordings and not rec_id:
-                    async def confirm_duplicate():
+                is_duplicate = False
+                if live_url in existing_recordings:
+                    if not self.recording:
+                        is_duplicate = True
+                    elif self.recording.url != live_url:
+                        is_duplicate = True
+
+                if is_duplicate:
+                    async def alert_duplicate():
                         async def close_duplicate_dialog(_):
                             self.url_duplicate_confirm_dialog.open = False
                             self.page.update()
-                            await close_dialog(e)
-
-                        async def proceed_with_add(_):
-                            await close_duplicate_dialog(e)
-                            await self.on_confirm_callback(recordings_info)
 
                         duplicate_confirm_dialog = ft.AlertDialog(
                             modal=True,
                             title=ft.Text(self._["duplicate_url_title"]),
-                            content=ft.Text(self._["duplicate_url_content"]),
+                            content=ft.Text(self._["duplicate_url_title"]),
                             actions=[
-                                ft.TextButton(self._["cancel"], on_click=close_duplicate_dialog),
-                                ft.TextButton(self._["sure"], on_click=proceed_with_add),
+                                ft.TextButton(self._["sure"], on_click=close_duplicate_dialog),
                             ],
                             actions_alignment=ft.MainAxisAlignment.END,
                         )
@@ -425,7 +426,7 @@ class RecordingDialog:
                         self.page.overlay.append(duplicate_confirm_dialog)
                         self.page.update()
 
-                    await confirm_duplicate()
+                    await alert_duplicate()
                     return
                 else:
                     await self.on_confirm_callback(recordings_info)

@@ -33,6 +33,7 @@ class ConfigManager:
         self.web_auth_config_path = os.path.join(self.config_path, "web_auth.json")
 
         self._cache = {}
+        self._recordings_state_cache = {}
         os.makedirs(self.config_path, exist_ok=True)
         self.init()
 
@@ -151,14 +152,16 @@ class ConfigManager:
         try:
             conn = sqlite3.connect(self.recordings_db_path)
             cursor = conn.cursor()
-            cursor.execute("SELECT data FROM recordings")
+            cursor.execute("SELECT rec_id, data FROM recordings")
             rows = cursor.fetchall()
             conn.close()
             
             recordings = []
             for row in rows:
                 try:
-                    recordings.append(json.loads(row[0]))
+                    rec_id, data_str = row
+                    self._recordings_state_cache[rec_id] = data_str
+                    recordings.append(json.loads(data_str))
                 except Exception as e:
                     logger.error(f"Error parsing recording row from DB: {e}")
             return recordings
@@ -258,39 +261,52 @@ class ConfigManager:
 
     async def save_recordings_config(self, config):
         self._cache["recordings"] = config
+        
+        # 1. Quick check for changes before acquiring lock or opening DB
+        current_ids = {rec["rec_id"] for rec in config if "rec_id" in rec}
+        existing_ids_in_cache = set(self._recordings_state_cache.keys())
+        
+        ids_to_delete = existing_ids_in_cache - current_ids
+        batch_data = []
+        
+        for rec in config:
+            rec_id = rec.get("rec_id")
+            if rec_id:
+                data_str = json.dumps(rec, ensure_ascii=False)
+                if self._recordings_state_cache.get(rec_id) != data_str:
+                    batch_data.append((rec_id, data_str))
+
+        if not ids_to_delete and not batch_data:
+            return
+
         async with self._db_lock:
             try:
                 async with aiosqlite.connect(self.recordings_db_path) as db:
-                    # 1. Get existing IDs efficiently
-                    async with db.execute("SELECT rec_id FROM recordings") as cursor:
-                        existing_ids = {row[0] for row in await cursor.fetchall()}
-                    
-                    current_ids = {rec["rec_id"] for rec in config if "rec_id" in rec}
-                    
-                    # 2. Delete removed recordings
-                    ids_to_delete = existing_ids - current_ids
+                    # Execute deletions
                     if ids_to_delete:
                         await db.executemany(
                             "DELETE FROM recordings WHERE rec_id = ?", 
                             [(del_id,) for del_id in ids_to_delete]
                         )
+                        for del_id in ids_to_delete:
+                            self._recordings_state_cache.pop(del_id, None)
                     
-                    # 3. Prepare batch data for UPSERT
-                    # We use INSERT OR REPLACE as a simple UPSERT
-                    batch_data = []
-                    for rec in config:
-                        rec_id = rec.get("rec_id")
-                        if rec_id:
-                            batch_data.append((rec_id, json.dumps(rec, ensure_ascii=False)))
-                    
+                    # Execute upserts
                     if batch_data:
                         await db.executemany(
                             "INSERT OR REPLACE INTO recordings (rec_id, data) VALUES (?, ?)",
                             batch_data
                         )
+                        for rec_id, data_str in batch_data:
+                            self._recordings_state_cache[rec_id] = data_str
                     
                     await db.commit()
-                logger.info(f"Recordings database saved successfully ({len(batch_data)} records updated/inserted).")
+                
+                change_summary = []
+                if ids_to_delete: change_summary.append(f"{len(ids_to_delete)} deleted")
+                if batch_data: change_summary.append(f"{len(batch_data)} updated/inserted")
+                
+                logger.info(f"Recordings database saved successfully ({', '.join(change_summary)}).")
             except Exception as e:
                 logger.error(f"An error occurred while saving recordings config: {e}")
 
