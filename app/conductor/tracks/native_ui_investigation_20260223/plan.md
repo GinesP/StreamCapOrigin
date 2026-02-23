@@ -24,7 +24,7 @@ This plan outlines the steps to research and prototype a native UI replacement f
     - [x] Bind "Start Recording" button to a dummy function to test event handling.
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Core Architecture & Home View' (Protocol in workflow.md) [5edd44d]
 
-## Phase 3: Recordings View & Async Integration
+## Phase 3: Recordings View & Async Integration [checkpoint: 9179295]
 - [x] Task: Implement the Recordings View
     - [x] Create `RecordingsView` widget.
     - [x] Implement a native List/Table widget to display recording tasks.
@@ -33,10 +33,10 @@ This plan outlines the steps to research and prototype a native UI replacement f
     - [x] Research integrating `asyncio` loop with the native framework's event loop (e.g., `qasync` for Qt).
     - [x] Implement a background task simulator (e.g., a non-blocking timer) that updates the UI.
     - [x] Verify that the UI remains responsive while the background task runs.
-- [~] Task: Conductor - User Manual Verification 'Phase 3: Recordings View & Async Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Recordings View & Async Integration' (Protocol in workflow.md) [9179295]
 
 ## Phase 4: Performance Benchmarking & Reporting
-- [ ] Task: Conduct Performance Benchmarks
+- [~] Task: Conduct Performance Benchmarks
     - [ ] Measure Start-up Time (Flet vs Prototype).
     - [ ] Measure Idle Memory Usage (Flet vs Prototype).
     - [ ] Measure CPU Usage during a simulated update loop.
