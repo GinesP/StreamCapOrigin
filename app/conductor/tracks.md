@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Fix Storage Page ListView Error**
+- [x] **Track: Fix Storage Page ListView Error**
   *Link: [./tracks/fix_storage_listview_20260223/](./tracks/fix_storage_listview_20260223/)*
