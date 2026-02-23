@@ -7,6 +7,7 @@
 - **Clarity over Decoration:** The interface design prioritizes readability and functional layout. Aesthetic choices are made to support the user's ability to quickly find and use features, rather than for purely decorative purposes.
 
 ## User Experience (UX) Principles
+- **Native and Responsive:** The application utilizes native OS components to ensure high performance, low memory footprint, and a snappy, integrated user experience.
 - **Error Prevention and Recovery:** The application is designed to proactively validate user input and environmental factors (like disk space). When issues arise, it provides clear, actionable guidance to help the user resolve the problem and resume their workflow.
 
 ## Notification Strategy
