@@ -620,10 +620,11 @@ class RecordingManager:
         await self.remove_recordings(recordings)
 
         # update the filter area of the recording list page
-        if hasattr(self.app, 'current_page') and hasattr(self.app.current_page, 'content_area'):
-            if len(self.app.current_page.content_area.controls) > 1:
-                self.app.current_page.content_area.controls[1] = self.app.current_page.create_filter_area()
-                self.app.current_page.content_area.update()
+        if hasattr(self.app, 'current_page') and hasattr(self.app.current_page, 'view_container'):
+            current_page = self.app.current_page
+            if hasattr(current_page, 'create_filter_area') and len(current_page.view_container.controls) > 1:
+                current_page.view_container.controls[1] = current_page.create_filter_area()
+                current_page.view_container.update()
 
     async def check_free_space(self, output_dir: str | None = None):
         disk_space_limit = float(self.settings.user_config.get("recording_space_threshold") or 0)
