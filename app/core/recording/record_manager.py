@@ -469,10 +469,14 @@ class RecordingManager:
                 recording.increment_live_counts(is_live=True, alpha_active=alpha_active, alpha_offline=alpha_offline)
                 
                 recording.live_title = stream_info.title
+                if stream_info.extra:
+                    recording.avatar_url = stream_info.extra.get('avatar')
+                    recording.cover_url = stream_info.extra.get('cover')
+
                 if recording.streamer_name.strip() == self._["live_room"]:
                     recording.streamer_name = stream_info.anchor_name
                 recording.title = f"{recording.streamer_name} - {self._[recording.quality]}"
-                recording.display_title = f"[{self._['is_live']}] {recording.title}"
+                recording.display_title = f"[{self._['is_live']}] {recording.live_title or recording.title}"
 
                 if not recording.is_live:
                     recording.is_live = stream_info.is_live

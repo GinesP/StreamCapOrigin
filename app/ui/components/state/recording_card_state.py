@@ -83,7 +83,15 @@ class RecordingCardState:
         status_prefix = ""
         if not recording.monitor_status:
             status_prefix = f"[{language_dict.get('monitor_stopped')}] "
-        return f"{status_prefix}{recording.title}"
+        elif recording.is_live:
+            status_prefix = f"[{language_dict.get('is_live', 'LIVE')}] "
+            
+        if recording.is_live and getattr(recording, "live_title", None):
+            title = f"{recording.streamer_name} - {recording.live_title}"
+        else:
+            title = recording.title
+            
+        return f"{status_prefix}{title}"
     
     @staticmethod
     def get_title_weight(recording: Recording) -> ft.FontWeight:
