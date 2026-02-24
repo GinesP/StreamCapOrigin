@@ -78,7 +78,32 @@ class TikTokHandler(PlatformHandler):
         if not self.live_stream:
             self.live_stream = streamget.TikTokLiveStream(proxy_addr=self.proxy, cookies=self.cookies)
         json_data = await self.live_stream.fetch_web_stream_data(url=live_url)
-        return await self.live_stream.fetch_stream_url(json_data, self.record_quality)
+        stream_data = await self.live_stream.fetch_stream_url(json_data, self.record_quality)
+
+        # Extraer avatar y cover si están disponibles
+        try:
+            if json_data and 'LiveRoom' in json_data:
+                live_room = json_data['LiveRoom']
+                avatar = None
+                cover = None
+
+                if 'liveRoomUserInfo' in live_room and 'user' in live_room['liveRoomUserInfo']:
+                    user = live_room['liveRoomUserInfo']['user']
+                    if 'avatarThumb' in user and 'url_list' in user['avatarThumb']:
+                        avatar = user['avatarThumb']['url_list'][0]
+
+                if 'liveRoom' in live_room and 'cover' in live_room['liveRoom']:
+                    if 'url_list' in live_room['liveRoom']['cover']:
+                        cover = live_room['liveRoom']['cover']['url_list'][0]
+
+                if not stream_data.extra:
+                    stream_data.extra = {}
+                stream_data.extra['avatar'] = avatar
+                stream_data.extra['cover'] = cover
+        except Exception:
+            pass
+
+        return stream_data
 
 
 class KuaishouHandler(PlatformHandler):

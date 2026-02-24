@@ -26,7 +26,9 @@ class Recording:
         last_active_at=None,
         historical_intervals=None,
         last_seen_live=None,
-        consistency_score=0.0
+        consistency_score=0.0,
+        avatar_url=None,
+        cover_url=None
     ):
         """
         Initialize a recording object.
@@ -73,6 +75,8 @@ class Recording:
         self.historical_intervals = historical_intervals or {}  # Format: {"0": [8, 9, 20], "1": ...} (day: [hours])
         self.last_seen_live = last_seen_live  # ISO format string
         self.consistency_score = consistency_score
+        self.avatar_url = avatar_url
+        self.cover_url = cover_url
         
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
@@ -130,7 +134,9 @@ class Recording:
             "last_active_at": self.last_active_at,
             "historical_intervals": self.historical_intervals,
             "last_seen_live": self.last_seen_live,
-            "consistency_score": self.consistency_score
+            "consistency_score": self.consistency_score,
+            "avatar_url": self.avatar_url,
+            "cover_url": self.cover_url
         }
 
     @classmethod
@@ -159,7 +165,9 @@ class Recording:
             last_active_at=data.get("last_active_at"),
             historical_intervals=data.get("historical_intervals"),
             last_seen_live=data.get("last_seen_live"),
-            consistency_score=data.get("consistency_score", 0.0)
+            consistency_score=data.get("consistency_score", 0.0),
+            avatar_url=data.get("avatar_url"),
+            cover_url=data.get("cover_url")
         )
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)
