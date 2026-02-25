@@ -30,12 +30,12 @@ class RecordingCardState:
     def get_border_color(recording: Recording) -> ft.Colors:
         state = RecordingCardState.get_card_state(recording)
         color_map = {
-            CardStateType.RECORDING: ft.Colors.GREEN,
-            CardStateType.ERROR: ft.Colors.RED,
-            CardStateType.LIVE: ft.Colors.BLUE,
-            CardStateType.OFFLINE: ft.Colors.AMBER,
-            CardStateType.STOPPED: ft.Colors.GREY,
-            CardStateType.CHECKING: ft.Colors.PURPLE,
+            CardStateType.RECORDING: "#2ECC71",
+            CardStateType.ERROR: "#F39C12",
+            CardStateType.LIVE: "#E74C3C",
+            CardStateType.OFFLINE: "#95A5A6",
+            CardStateType.STOPPED: "#34495E",
+            CardStateType.CHECKING: "#9B59B6",
         }
         return color_map.get(state, ft.Colors.TRANSPARENT)
     
@@ -46,32 +46,32 @@ class RecordingCardState:
         configs = {
             CardStateType.RECORDING: {
                 "text": language_dict.get("recording"),
-                "bgcolor": ft.Colors.GREEN,
+                "bgcolor": "#2ECC71",
                 "text_color": ft.Colors.WHITE,
             },
             CardStateType.ERROR: {
                 "text": language_dict.get("recording_error"),
-                "bgcolor": ft.Colors.RED,
+                "bgcolor": "#F39C12",
                 "text_color": ft.Colors.WHITE,
             },
             CardStateType.LIVE: {
                 "text": language_dict.get("live_broadcasting"),
-                "bgcolor": ft.Colors.BLUE,
+                "bgcolor": "#E74C3C",
                 "text_color": ft.Colors.WHITE,
             },
             CardStateType.OFFLINE: {
                 "text": language_dict.get("offline"),
-                "bgcolor": ft.Colors.AMBER,
-                "text_color": ft.Colors.BLACK,
+                "bgcolor": "#95A5A6",
+                "text_color": ft.Colors.WHITE,
             },
             CardStateType.STOPPED: {
                 "text": language_dict.get("no_monitor"),
-                "bgcolor": ft.Colors.GREY,
+                "bgcolor": "#34495E",
                 "text_color": ft.Colors.WHITE,
             },
             CardStateType.CHECKING: {
                 "text": language_dict.get("checking"),
-                "bgcolor": ft.Colors.PURPLE,
+                "bgcolor": "#9B59B6",
                 "text_color": ft.Colors.WHITE,
             },
         }
@@ -80,18 +80,12 @@ class RecordingCardState:
     
     @staticmethod
     def get_display_title(recording: Recording, language_dict: dict) -> str:
-        status_prefix = ""
-        if not recording.monitor_status:
-            status_prefix = f"[{language_dict.get('monitor_stopped')}] "
-        elif recording.is_live:
-            status_prefix = f"[{language_dict.get('is_live', 'LIVE')}] "
-            
         if recording.is_live and getattr(recording, "live_title", None):
             title = f"{recording.streamer_name} - {recording.live_title}"
         else:
-            title = recording.title
+            title = recording.streamer_name
             
-        return f"{status_prefix}{title}"
+        return title
     
     @staticmethod
     def get_title_weight(recording: Recording) -> ft.FontWeight:

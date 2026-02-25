@@ -50,7 +50,7 @@ class RecordingsPage(PageBase):
                 runs_count=3,
                 spacing=10,
                 run_spacing=10,
-                child_aspect_ratio=2.3,
+                child_aspect_ratio=3.2,
                 controls=[]
             )
         else:
@@ -134,7 +134,7 @@ class RecordingsPage(PageBase):
                 runs_count=runs_count,
                 spacing=10,
                 run_spacing=10,
-                child_aspect_ratio=2.3,
+                child_aspect_ratio=3.2,
                 controls=current_controls
             )
         else:
@@ -671,10 +671,11 @@ class RecordingsPage(PageBase):
                 to_remove.append(card)
                 continue
             if card_id in selected_cards:
-                selected_cards[card_id].selected = False
-                card["card"].content.bgcolor = None
-                if card["card"].page:
-                    card["card"].update()
+                recording = self.app.record_manager.find_recording_by_id(card_id)
+                if recording:
+                    recording.selected = False
+                    await self.app.record_card_manager.update_card(recording)
+                selected_cards.pop(card_id)
 
         for card in to_remove:
             card_key = card["card"].key
@@ -789,7 +790,7 @@ class RecordingsPage(PageBase):
             child_aspect_ratio = 2.5
         else:
             column_width = 350
-            child_aspect_ratio = 2.3
+            child_aspect_ratio = 3.2
 
         runs_count = max(1, int(self.page.width / column_width))
 
