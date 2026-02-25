@@ -447,8 +447,8 @@ class RecordingsPage(PageBase):
                 if card_info["card"].page:
                     card_info["card"].update()
 
-            self.recording_card_area.update()
-            self.view_container.update()
+            safe_update(self.recording_card_area)
+            safe_update(self.view_container)
 
             if not filtered_ids:
                 await self.app.snack_bar.show_snack_bar(self._["not_search_result"], duration=2000)
@@ -474,7 +474,7 @@ class RecordingsPage(PageBase):
 
         if not is_initial_load:
             self.loading_indicator.visible = True
-            self.loading_indicator.update()
+            safe_update(self.loading_indicator)
 
         cards_to_create = []
         existing_cards = []
@@ -648,18 +648,20 @@ class RecordingsPage(PageBase):
 
             await self.app.snack_bar.show_snack_bar(self._["add_recording_success_tip"], bgcolor=ft.Colors.GREEN)
 
+    async def add_recording_on_click(self, _e):
+        await self.add_recording_dialog.show_dialog()
+
     async def search_on_click(self, _e):
         """Open the search dialog when the search button is clicked."""
         search_dialog = SearchDialog(recordings_page=self)
         self.page.open(search_dialog)
 
-    async def add_recording_on_click(self, _e):
-        await self.add_recording_dialog.show_dialog()
-
     async def refresh_cards_on_click(self, _e):
-        
+        if not is_page_active(self.app, self):
+            return
+
         self.loading_indicator.visible = True
-        self.loading_indicator.update()
+        safe_update(self.loading_indicator)
         
         cards_obj = self.app.record_card_manager.cards_obj
         recordings = self.app.record_manager.recordings
@@ -686,7 +688,7 @@ class RecordingsPage(PageBase):
         await self.show_all_cards()
         
         self.loading_indicator.visible = False
-        self.loading_indicator.update()
+        safe_update(self.loading_indicator)
         
         await self.app.snack_bar.show_snack_bar(self._["refresh_success_tip"], bgcolor=ft.Colors.GREEN)
 
@@ -719,9 +721,9 @@ class RecordingsPage(PageBase):
                 self._["delete_recording_success_tip"], bgcolor=ft.Colors.GREEN, duration=2000
             )
             # Batch updates at the end
-            self.recording_card_area.update()
+            safe_update(self.recording_card_area)
             self.view_container.controls[1] = self.create_filter_area()
-            self.view_container.update()
+            safe_update(self.view_container)
             await close_dialog(None)
 
         async def close_dialog(_):
@@ -747,10 +749,8 @@ class RecordingsPage(PageBase):
         self.recording_card_area.update()
         self.app.record_card_manager.cards_obj = {}
         
-        self.current_platform_filter = "all"
-        
         self.view_container.controls[1] = self.create_filter_area()
-        self.view_container.update()
+        safe_update(self.view_container)
 
     async def subscribe_del_all_cards(self, *_):
         await self.delete_all_recording_cards()
@@ -759,7 +759,7 @@ class RecordingsPage(PageBase):
         """Handle the subscription of adding cards from other clients"""
         
         self.loading_indicator.visible = True
-        self.loading_indicator.update()
+        safe_update(self.loading_indicator)
         
         if recording.rec_id not in self.app.record_card_manager.cards_obj:
             card = await self.app.record_card_manager.create_card(recording, subscribe_add_cards=True)
@@ -771,7 +771,7 @@ class RecordingsPage(PageBase):
             self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
             
             self.loading_indicator.visible = False
-            self.loading_indicator.update()
+            safe_update(self.loading_indicator)
             
             self.recording_card_area.update()
             

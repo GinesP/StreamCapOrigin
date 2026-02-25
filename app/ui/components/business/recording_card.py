@@ -484,6 +484,20 @@ class RecordingCardManager:
                 card_info["likelihood_label"].bgcolor = l_color
                 card_info["likelihood_label"].visible = bool(recording.historical_intervals)
 
+            # Update queue label
+            if card_info.get("queue_label"):
+                interval = recording.loop_time_seconds or 300
+                if interval <= 60:
+                    q_text, q_color, q_tip = "F", ft.Colors.GREEN_400, "Fast Queue"
+                elif interval <= 180:
+                    q_text, q_color, q_tip = "M", ft.Colors.BLUE_400, "Medium Queue"
+                else:
+                    q_text, q_color, q_tip = "S", ft.Colors.AMBER_400, "Slow Queue"
+                
+                card_info["queue_label"].content.value = q_text
+                card_info["queue_label"].bgcolor = q_color
+                card_info["queue_label"].tooltip = q_tip
+
             # Update buttons
             if card_info.get("record_button"):
                 card_info["record_button"].icon = self.get_icon_for_recording_state(recording)
