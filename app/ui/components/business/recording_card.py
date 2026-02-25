@@ -48,83 +48,145 @@ class RecordingCardManager:
             
         return card_data["card"]
 
+    def _format_date(self, date_str):
+        if not date_str:
+            return ""
+        try:
+            from datetime import datetime
+            # Date can be "YYYY-MM-DD HH:MM:SS" or just "YYYY-MM-DD"
+            if " " in date_str:
+                dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            else:
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+            
+            now = datetime.now()
+            diff = now - dt
+            
+            is_es = self.app.language_manager.language_code == "es"
+            
+            if diff.days == 0:
+                if diff.seconds < 60: return "Ahora" if is_es else "Just now"
+                if diff.seconds < 3600: 
+                    m = diff.seconds // 60
+                    return f"Hace {m}m" if is_es else f"{m}m ago"
+                h = diff.seconds // 3600
+                return f"Hace {h}h" if is_es else f"{h}h ago"
+            if diff.days == 1: return "Ayer" if is_es else "Yesterday"
+            if diff.days < 7: return f"Hace {diff.days}d" if is_es else f"{diff.days}d ago"
+            if diff.days < 30: 
+                w = diff.days // 7
+                if w == 1: return "Hace 1 sem." if is_es else "1w ago"
+                return f"Hace {w} sem." if is_es else f"{w}w ago"
+            if diff.days < 365:
+                m = diff.days // 30
+                if m == 1: return "Hace 1 mes" if is_es else "1mo ago"
+                return f"Hace {m} meses" if is_es else f"{m}mo ago"
+            y = diff.days // 365
+            if y == 1: return "Hace 1 año" if is_es else "1y ago"
+            return f"Hace {y} años" if is_es else f"{y}y ago"
+        except:
+            return date_str.split(" ")[0] if " " in date_str else date_str
+
     def _create_card_components(self, recording: Recording):
         """create card components."""
-        speed = recording.speed
-        duration_text_label = ft.Text(self.app.record_manager.get_duration(recording), size=12)
+        # --- 1. Basic Controls & Labels ---
+        duration_text_label = ft.Text(
+            self.app.record_manager.get_duration(recording),
+            size=12,
+            color=ft.Colors.ON_SURFACE_VARIANT,
+            visible=recording.is_recording or recording.is_live
+        )
 
         record_button = ft.IconButton(
             icon=self.get_icon_for_recording_state(recording),
             tooltip=self.get_tip_for_recording_state(recording),
+            icon_size=20,
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_button_on_click, e, rec),
         )
 
+        open_folder_button = ft.IconButton(
+            icon=ft.Icons.FOLDER_OUTLINED,
+            tooltip=self._["open_folder"],
+            icon_size=20,
+            on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_dir_button_on_click, e, rec),
+        )
+
+        # Secondary buttons (hidden by default)
         edit_button = ft.IconButton(
-            icon=ft.Icons.EDIT,
+            icon=ft.Icons.EDIT_OUTLINED,
             tooltip=self._["edit_record_config"],
+            icon_size=18,
+            visible=False,
             on_click=lambda e, rec=recording: self.app.page.run_task(self.edit_recording_button_click, e, rec),
         )
 
         preview_button = ft.IconButton(
-            icon=ft.Icons.VIDEO_LIBRARY,
+            icon=ft.Icons.VIDEO_LIBRARY_OUTLINED,
             tooltip=self._["preview_video"],
+            icon_size=18,
+            visible=False,
             on_click=lambda e, rec=recording: self.app.page.run_task(self.preview_video_button_on_click, e, rec),
         )
 
         monitor_button = ft.IconButton(
             icon=self.get_icon_for_monitor_state(recording),
             tooltip=self.get_tip_for_monitor_state(recording),
+            icon_size=18,
+            visible=False,
             on_click=lambda e, rec=recording: self.app.page.run_task(self.monitor_button_on_click, e, rec),
         )
 
         delete_button = ft.IconButton(
-            icon=ft.Icons.DELETE,
+            icon=ft.Icons.DELETE_OUTLINE,
             tooltip=self._["delete_monitor"],
+            icon_size=18,
+            visible=False,
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_delete_button_click, e, rec),
         )
 
+        recording_info_button = ft.IconButton(
+            icon=ft.Icons.INFO_OUTLINE,
+            tooltip=self._["recording_info"],
+            icon_size=18,
+            visible=False,
+            on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_info_button_on_click, e, rec),
+        )
+
+        # --- 2. Title & Metadata ---
         display_title = RecordingCardState.get_display_title(recording, self._)
         display_title_label = ft.Text(
             display_title,
-            size=14,
+            size=15,
+            weight=ft.FontWeight.W_600,
             selectable=True,
             max_lines=1,
             no_wrap=True,
             overflow=ft.TextOverflow.ELLIPSIS,
-            expand=True,
-            weight=RecordingCardState.get_title_weight(recording),
         )
-
-        open_folder_button = ft.IconButton(
-            icon=ft.Icons.FOLDER,
-            tooltip=self._["open_folder"],
-            on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_dir_button_on_click, e, rec),
-        )
-        recording_info_button = ft.IconButton(
-            icon=ft.Icons.INFO,
-            tooltip=self._["recording_info"],
-            on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_info_button_on_click, e, rec),
-        )
-        priority_score = getattr(recording, "priority_score", 0.0)
-        priority_text = f"{self._.get('priority', 'Priority')}: {priority_score:.1%}" if priority_score > 0 else ""
-        priority_label = ft.Text(priority_text, size=12, color=ft.Colors.GREY_500, visible=priority_score > 0)
 
         status_label = self.create_status_label(recording)
 
         added_at = getattr(recording, "added_at", None)
-        added_at_text = f"{self._.get('added_at', 'Added at')}: {added_at}" if added_at else ""
-        added_at_label = ft.Text(added_at_text, size=11, color=ft.Colors.GREY_500, visible=bool(added_at))
+        added_at_text = f"{self._.get('added_at', 'Added')}: {self._format_date(added_at)}" if added_at else ""
+        added_at_label = ft.Text(added_at_text, size=11, color=ft.Colors.ON_SURFACE_VARIANT, visible=bool(added_at))
 
         last_active = getattr(recording, "last_active_at", None)
-        last_active_text = f"{self._.get('last_active_at', 'Last active')}: {last_active}" if last_active else ""
-        last_active_label = ft.Text(last_active_text, size=11, color=ft.Colors.GREY_500, visible=bool(last_active))
+        last_active_text = f"{self._.get('last_active_at', 'Last active')}: {self._format_date(last_active)}" if last_active else ""
+        last_active_label = ft.Text(last_active_text, size=11, color=ft.Colors.ON_SURFACE_VARIANT, visible=bool(last_active))
 
-        # 4. Consistency Label (Intelligence)
-        consistency_score = getattr(recording, "consistency_score", 0.0)
-        consistency_text = f"{self._.get('consistency', 'Consistency')}: {consistency_score:.0%}"
-        consistency_label = ft.Text(consistency_text, size=12, color=ft.Colors.GREY_500, visible=consistency_score > 0)
+        priority_score = getattr(recording, "priority_score", 0.0)
+        priority_badge = ft.Container(
+            content=ft.Text(f"{priority_score:.0%}", size=12, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+            bgcolor=ft.Colors.BLUE_GREY_400,
+            padding=ft.padding.symmetric(horizontal=8, vertical=4),
+            border_radius=5,
+            height=26,
+            alignment=ft.alignment.center,
+            visible=priority_score > 0,
+            tooltip=self._.get('priority', 'Priority Score')
+        )
 
-        # 3. Likelihood Tag (Intelligence)
+        # --- 3. Badges (Intelligence) ---
         from ....core.recording.history_manager import HistoryManager
         likelihood_score = HistoryManager.get_likelihood_score(recording)
         
@@ -138,8 +200,17 @@ class RecordingCardManager:
             l_text = self._.get("likelihood_low", "Low")
             l_color = ft.Colors.AMBER_400
 
-        # 5. Queue Indicator (Intelligence)
-        # Low overhead: uses already present loop_time_seconds
+        likelihood_label = ft.Container(
+            content=ft.Text(l_text, size=12, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+            bgcolor=l_color,
+            padding=ft.padding.symmetric(horizontal=8, vertical=4),
+            border_radius=5,
+            height=26,
+            alignment=ft.alignment.center,
+            visible=bool(recording.historical_intervals),
+            tooltip=self._.get('likelihood', 'Likelihood')
+        )
+
         interval = recording.loop_time_seconds
         if interval <= 60:
             q_text, q_color, q_tip = "F", ft.Colors.GREEN_400, "Fast Queue"
@@ -149,105 +220,158 @@ class RecordingCardManager:
             q_text, q_color, q_tip = "S", ft.Colors.AMBER_400, "Slow Queue"
 
         queue_label = ft.Container(
-            content=ft.Text(q_text, size=10, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+            content=ft.Text(q_text, size=12, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
             bgcolor=q_color,
-            padding=ft.padding.all(2),
-            border_radius=10,
-            width=18,
-            height=18,
+            padding=ft.padding.symmetric(horizontal=8, vertical=4),
+            border_radius=5,
+            height=26,
             alignment=ft.alignment.center,
             tooltip=q_tip
         )
 
-        likelihood_label = ft.Container(
-            content=ft.Text(f"{self._.get('likelihood', 'Likelihood')}: {l_text}", size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
-            bgcolor=l_color,
-            padding=ft.padding.symmetric(horizontal=8, vertical=2),
-            border_radius=10,
-            visible=bool(recording.historical_intervals)
-        )
 
+        # --- 4. Layout ---
         avatar_image = ft.CircleAvatar(
             foreground_image_src=recording.avatar_url,
             content=ft.Text(recording.streamer_name[0] if recording.streamer_name else "?"),
-            radius=16,
+            radius=20,
         )
 
-        title_row = ft.Row(
-            [avatar_image, display_title_label, status_label] if status_label else [avatar_image, display_title_label],
+        # Status Bar (Left indicator)
+        status_bar = ft.VerticalDivider(
+            width=4,
+            thickness=4,
+            color=self.get_card_border_color(recording),
+            visible=True
+        )
+
+        action_icons = ft.Row(
+            [
+                open_folder_button,
+                record_button,
+                recording_info_button,
+                preview_button,
+                edit_button,
+                monitor_button,
+                delete_button,
+            ],
+            spacing=0,
             alignment=ft.MainAxisAlignment.START,
-            spacing=5,
-            tight=True,
         )
 
-        cover_image = ft.Image(
-            src=recording.cover_url,
-            width=300,
-            height=150,
-            fit=ft.ImageFit.COVER,
-            border_radius=5,
-            visible=bool(recording.cover_url)
+        # Header: Avatar | (Title, Status, Duration) | Badges
+        title_col = ft.Column(
+            [
+                display_title_label,
+                ft.Row([status_label, duration_text_label], spacing=10) if status_label else duration_text_label,
+            ],
+            spacing=2,
+            expand=True,
         )
+
+        header_row = ft.Row(
+            [
+                avatar_image,
+                title_col,
+                ft.Column(
+                    [
+                        ft.Row([queue_label, likelihood_label, priority_badge], spacing=5),
+                    ],
+                    alignment=ft.MainAxisAlignment.START,
+                    horizontal_alignment=ft.CrossAxisAlignment.END,
+                )
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=12,
+        )
+
+        # Hover handler
+        async def on_hover(e):
+            is_hovered = e.data == "true"
+            # Optimization: avoid redundant updates if state hasn't changed
+            if getattr(card_container, "_is_hovered", False) == is_hovered:
+                return
+            card_container._is_hovered = is_hovered
+            
+            recording_info_button.visible = is_hovered
+            preview_button.visible = is_hovered
+            edit_button.visible = is_hovered
+            monitor_button.visible = is_hovered
+            delete_button.visible = is_hovered
+            
+            # Subtle background change on hover
+            if is_hovered:
+                if not recording.selected:
+                    card_container.bgcolor = ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE)
+            else:
+                card_container.bgcolor = self.get_card_background_color(recording)
+            
+            if card_container.page:
+                card_container.update()
 
         card_container = ft.Container(
-            content=ft.Column(
+            content=ft.Row(
                 [
-                    cover_image,
-                    title_row,
-                    duration_text_label,
-                    ft.Row([queue_label, priority_label, consistency_label, likelihood_label], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                    ft.Row([added_at_label, last_active_label], spacing=10),
-                    ft.Row(
+                    status_bar,
+                    ft.Column(
                         [
-                            record_button,
-                            open_folder_button,
-                            recording_info_button,
-                            preview_button,
-                            edit_button,
-                            delete_button,
-                            monitor_button
+                            header_row,
+                            ft.Row([added_at_label, last_active_label], spacing=15),
+                            action_icons,
                         ],
-                        spacing=3,
-                        alignment=ft.MainAxisAlignment.START,
-                        scroll=ft.ScrollMode.HIDDEN
+                        spacing=8,
+                        expand=True,
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
                 ],
-                spacing=3,
-                tight=True
+                spacing=10,
             ),
-            padding=8,
+            padding=ft.padding.only(left=0, top=12, right=12, bottom=8),
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_card_on_click, e, rec),
+            on_hover=on_hover,
             bgcolor=self.get_card_background_color(recording),
-            border_radius=5,
-            border=ft.border.all(2, self.get_card_border_color(recording)),
+            border_radius=8,
+            shadow=ft.BoxShadow(
+                blur_radius=10,
+                spread_radius=1,
+                color=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
+                offset=ft.Offset(0, 2),
+            ),
         )
-        card = ft.Card(key=str(recording.rec_id), content=card_container)
+
+        card = ft.Card(
+            key=str(recording.rec_id),
+            content=card_container,
+            elevation=0,
+        )
 
         return {
             "card": card,
             "display_title_label": display_title_label,
             "duration_label": duration_text_label,
-            "priority_label": priority_label,
-            "consistency_label": consistency_label,
+            "priority_badge": priority_badge,
             "record_button": record_button,
             "open_folder_button": open_folder_button,
             "recording_info_button": recording_info_button,
             "edit_button": edit_button,
             "monitor_button": monitor_button,
+            "preview_button": preview_button,
+            "delete_button": delete_button,
             "status_label": status_label,
             "added_at_label": added_at_label,
             "last_active_label": last_active_label,
             "likelihood_label": likelihood_label,
             "queue_label": queue_label,
             "avatar_image": avatar_image,
-            "cover_image": cover_image,
+            "status_bar": status_bar,
+            "action_icons": action_icons,
+            "title_col": title_col,
         }
 
     def get_card_background_color(self, recording: Recording):
-        is_dark_mode = self.app.page.theme_mode == ft.ThemeMode.DARK
         if recording.selected:
-            return ft.Colors.GREY_800 if is_dark_mode else ft.Colors.GREY_400
-        return None
+            return ft.colors.SECONDARY_CONTAINER
+        return ft.colors.SURFACE_VARIANT
 
     @staticmethod
     def get_card_border_color(recording: Recording):
@@ -268,132 +392,123 @@ class RecordingCardManager:
             ),
             bgcolor=config["bgcolor"],
             border_radius=5,
-            padding=5,
-            width=60,
+            padding=ft.padding.symmetric(horizontal=8, vertical=4),
             height=26,
             alignment=ft.alignment.center,
         )
 
-    async def update_card(self, recording):
+    async def update_card(self, recording: Recording):
         """Update only the recordings cards in the scrollable content area."""
-        if recording.rec_id in self.cards_obj:
-            try:
-                recording_card = self.cards_obj[recording.rec_id]
+        if recording.rec_id not in self.cards_obj:
+            return
 
-                display_title = RecordingCardState.get_display_title(recording, self._)
-                if recording_card.get("display_title_label"):
-                    recording_card["display_title_label"].value = display_title
-                    recording_card["display_title_label"].weight = RecordingCardState.get_title_weight(recording)
+        try:
+            card_info = self.cards_obj[recording.rec_id]
+            
+            # Update background and border based on selection/state
+            if card_info.get("card") and card_info["card"].content:
+                card_container = card_info["card"].content
+                card_container.bgcolor = self.get_card_background_color(recording)
+                
+                # Update status bar color
+                if card_info.get("status_bar"):
+                    card_info["status_bar"].color = self.get_card_border_color(recording)
 
-                new_status_label = self.create_status_label(recording)
+            # Update title
+            if card_info.get("display_title_label"):
+                card_info["display_title_label"].value = RecordingCardState.get_display_title(recording, self._)
+                # weight is now fixed in the component creation
 
-                if recording_card["card"] and recording_card["card"].content and recording_card["card"].content.content:
-                    # title_row is now at index 1 because cover_image is at index 0
-                    title_row = recording_card["card"].content.content.controls[1]
-                    title_row.alignment = ft.MainAxisAlignment.START
-                    title_row.spacing = 5
-                    title_row.tight = True
-
-                    # Update the status label if it exists
-                    # Controls in title_row are: [avatar_image, display_title_label, (optional) status_label]
-                    if new_status_label:
-                        if len(title_row.controls) > 2:
-                            title_row.controls[2] = new_status_label
+            # Update status label
+            new_status_label = self.create_status_label(recording)
+            if card_info.get("status_label") != new_status_label:
+                try:
+                    title_col = card_info.get("title_col")
+                    if title_col:
+                        # title_col.controls[0] is display_title_label
+                        # title_col.controls[1] is the status/duration component
+                        if new_status_label:
+                            if isinstance(title_col.controls[1], ft.Text): # Only duration present
+                                duration_label = title_col.controls.pop()
+                                title_col.controls.append(ft.Row([new_status_label, duration_label], spacing=10))
+                            else: # Status row already exists
+                                status_duration_row = title_col.controls[1]
+                                status_duration_row.controls[0] = new_status_label
                         else:
-                            title_row.controls.append(new_status_label)
-                    else:
-                        if len(title_row.controls) > 2:
-                            title_row.controls.pop()
-
-                if recording_card.get("duration_label"):
-                    recording_card["duration_label"].value = self.app.record_manager.get_duration(recording)
-
-                if recording_card.get("priority_label"):
-                    priority_score = getattr(recording, "priority_score", 0.0)
-                    priority_text = f"{self._['priority']}: {priority_score:.1%}" if priority_score > 0 else ""
-                    recording_card["priority_label"].value = priority_text
-                    recording_card["priority_label"].visible = priority_score > 0
-
-                if recording_card.get("consistency_label"):
-                    consistency_score = getattr(recording, "consistency_score", 0.0)
-                    consistency_text = f"{self._['consistency']}: {consistency_score:.0%}"
-                    recording_card["consistency_label"].value = consistency_text
-                    recording_card["consistency_label"].visible = consistency_score > 0
-
-                if recording_card.get("added_at_label"):
-                    added_at = getattr(recording, "added_at", None)
-                    recording_card["added_at_label"].value = f"{self._['added_at']}: {added_at}" if added_at else ""
-                    recording_card["added_at_label"].visible = bool(added_at)
-
-                if recording_card.get("last_active_label"):
-                    last_active = getattr(recording, "last_active_at", None)
-                    recording_card["last_active_label"].value = f"{self._['last_active_at']}: {last_active}" if last_active else ""
-                    recording_card["last_active_label"].visible = bool(last_active)
-
-                if recording_card.get("likelihood_label"):
-                    from ....core.recording.history_manager import HistoryManager
-                    likelihood_score = HistoryManager.get_likelihood_score(recording)
-                    if likelihood_score >= 0.9:
-                        l_text = self._["likelihood_high"]
-                        l_color = ft.Colors.GREEN_400
-                    elif likelihood_score >= 0.5:
-                        l_text = self._["likelihood_normal"]
-                        l_color = ft.Colors.BLUE_400
-                    else:
-                        l_text = self._["likelihood_low"]
-                        l_color = ft.Colors.AMBER_400
+                            # Remove status label if it exists
+                            if not isinstance(title_col.controls[1], ft.Text):
+                                status_duration_row = title_col.controls[1]
+                                duration_label = status_duration_row.controls[1]
+                                title_col.controls[1] = duration_label
                     
-                    recording_card["likelihood_label"].content.value = f"{self._['likelihood']}: {l_text}"
-                    recording_card["likelihood_label"].bgcolor = l_color
-                    recording_card["likelihood_label"].visible = bool(recording.historical_intervals)
+                    card_info["status_label"] = new_status_label
+                except Exception as e:
+                    logger.debug(f"Update status label failed: {e}")
 
-                if recording_card.get("queue_label"):
-                    interval = recording.loop_time_seconds
-                    if interval <= 60:
-                        q_text, q_color, q_tip = "F", ft.Colors.GREEN_400, "Fast Queue"
-                    elif interval <= 180:
-                        q_text, q_color, q_tip = "M", ft.Colors.BLUE_400, "Medium Queue"
-                    else:
-                        q_text, q_color, q_tip = "S", ft.Colors.AMBER_400, "Slow Queue"
-                    
-                    recording_card["queue_label"].content.value = q_text
-                    recording_card["queue_label"].bgcolor = q_color
-                    recording_card["queue_label"].tooltip = q_tip
+            # Update duration
+            if card_info.get("duration_label"):
+                card_info["duration_label"].value = self.app.record_manager.get_duration(recording)
+                card_info["duration_label"].visible = recording.is_recording or recording.is_live
 
-                if recording_card.get("avatar_image"):
-                    recording_card["avatar_image"].foreground_image_src = recording.avatar_url
-                    if not recording.avatar_url:
-                        recording_card["avatar_image"].content = ft.Text(recording.streamer_name[0] if recording.streamer_name else "?")
-                    else:
-                        recording_card["avatar_image"].content = None
+            # Update metadata labels
+            if card_info.get("added_at_label"):
+                added_at = getattr(recording, "added_at", None)
+                card_info["added_at_label"].value = f"{self._.get('added_at', 'Added')}: {self._format_date(added_at)}" if added_at else ""
+                card_info["added_at_label"].visible = bool(added_at)
 
-                if recording_card.get("cover_image"):
-                    recording_card["cover_image"].src = recording.cover_url
-                    recording_card["cover_image"].visible = bool(recording.cover_url)
+            if card_info.get("last_active_label"):
+                last_active = getattr(recording, "last_active_at", None)
+                card_info["last_active_label"].value = f"{self._.get('last_active_at', 'Last active')}: {self._format_date(last_active)}" if last_active else ""
+                card_info["last_active_label"].visible = bool(last_active)
 
-                if recording_card.get("record_button"):
-                    recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)
-                    recording_card["record_button"].tooltip = self.get_tip_for_recording_state(recording)
+            if card_info.get("priority_badge"):
+                priority_score = getattr(recording, "priority_score", 0.0)
+                card_info["priority_badge"].content.value = f"{priority_score:.0%}"
+                card_info["priority_badge"].visible = priority_score > 0
 
-                if recording_card.get("monitor_button"):
-                    recording_card["monitor_button"].icon = self.get_icon_for_monitor_state(recording)
-                    recording_card["monitor_button"].tooltip = self.get_tip_for_monitor_state(recording)
+            # Update likelihood
+            if card_info.get("likelihood_label"):
+                from ....core.recording.history_manager import HistoryManager
+                likelihood_score = HistoryManager.get_likelihood_score(recording)
+                if likelihood_score >= 0.9:
+                    l_text = self._.get("likelihood_high", "High")
+                    l_color = ft.Colors.GREEN_400
+                elif likelihood_score >= 0.5:
+                    l_text = self._.get("likelihood_normal", "Normal")
+                    l_color = ft.Colors.BLUE_400
+                else:
+                    l_text = self._.get("likelihood_low", "Low")
+                    l_color = ft.Colors.AMBER_400
+                
+                card_info["likelihood_label"].content.value = l_text
+                card_info["likelihood_label"].bgcolor = l_color
+                card_info["likelihood_label"].visible = bool(recording.historical_intervals)
 
-                if recording_card["card"] and recording_card["card"].content:
-                    recording_card["card"].content.bgcolor = self.get_card_background_color(recording)
-                    recording_card["card"].content.border = ft.border.all(2, self.get_card_border_color(recording))
-                    try:
-                        if recording_card["card"].page:
-                            recording_card["card"].update()
-                    except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                        logger.debug(f"Update card failed: {e}")
-                        return
+            # Update buttons
+            if card_info.get("record_button"):
+                card_info["record_button"].icon = self.get_icon_for_recording_state(recording)
+                card_info["record_button"].tooltip = self.get_tip_for_recording_state(recording)
 
-            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                logger.debug(f"Update card failed: {e}")
-                return
+            if card_info.get("monitor_button"):
+                card_info["monitor_button"].icon = self.get_icon_for_monitor_state(recording)
+                card_info["monitor_button"].tooltip = self.get_tip_for_monitor_state(recording)
+
+            if card_info.get("avatar_image"):
+                card_info["avatar_image"].foreground_image_src = recording.avatar_url
+                if not recording.avatar_url:
+                    card_info["avatar_image"].content = ft.Text(recording.streamer_name[0] if recording.streamer_name else "?")
+                else:
+                    card_info["avatar_image"].content = None
+
+            # Refresh card
+            try:
+                if card_info["card"].page:
+                    card_info["card"].update()
             except Exception as e:
-                logger.debug(f"Update card failed: {e}")
+                pass
+
+        except Exception as e:
+            logger.debug(f"Update card failed: {e}")
 
     async def update_monitor_state(self, recording: Recording):
         """Update the monitor button state based on the current monitoring status."""
@@ -536,21 +651,22 @@ class RecordingCardManager:
         return self._["stop_monitor"] if recording.monitor_status else self._["start_monitor"]
 
     async def global_update_durations(self):
-        """Update all active recording durations in a single background task."""
+        """Update active recording durations in a single background task."""
         while True:
             await asyncio.sleep(1)
             try:
                 # Iterate over a copy of recordings to avoid concurrent modification issues
                 for recording in list(self.app.record_manager.recordings):
-                    if recording.is_recording and recording.rec_id in self.cards_obj:
+                    if recording.rec_id in self.cards_obj:
                         card_info = self.cards_obj[recording.rec_id]
-                        if card_info.get("duration_label"):
-                            try:
-                                card_info["duration_label"].value = self.app.record_manager.get_duration(recording)
+                        
+                        # Optimization: Only update duration if values changed
+                        if (recording.is_recording or recording.is_live) and card_info.get("duration_label"):
+                            new_duration = self.app.record_manager.get_duration(recording)
+                            if card_info["duration_label"].value != new_duration:
+                                card_info["duration_label"].value = new_duration
                                 if card_info["duration_label"].page:
                                     card_info["duration_label"].update()
-                            except:
-                                pass
             except Exception as e:
                 logger.debug(f"Global duration update failed: {e}")
 
@@ -563,13 +679,7 @@ class RecordingCardManager:
         try:
             recording.selected = not recording.selected
             self.selected_cards[recording.rec_id] = recording
-            self.cards_obj[recording.rec_id]["card"].content.bgcolor = await self.update_record_hover(recording)
-            try:
-                self.cards_obj[recording.rec_id]["card"].update()
-            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                logger.debug(f"Update card click state failed: {e}")
-        except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-            logger.debug(f"Handle card click event failed: {e}")
+            await self.update_card(recording)
         except Exception as e:
             logger.debug(f"Handle card click event failed: {e}")
 

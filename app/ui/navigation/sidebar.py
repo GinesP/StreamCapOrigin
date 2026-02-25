@@ -17,21 +17,40 @@ class NavigationItem(ft.Container):
     def __init__(self, destination, item_clicked):
         super().__init__()
         self.ink = True
-        self.padding = 10
-        self.border_radius = 5
+        self.padding = ft.padding.symmetric(horizontal=15, vertical=12)
+        self.margin = ft.margin.symmetric(horizontal=8, vertical=2)
+        self.border_radius = 10
         self.destination = destination
         self.icon = destination.icon
         self.text = destination.label
-        self.content = ft.Row([ft.Icon(self.icon), ft.Text(self.text)])
+        
+        # Icon and text with more spacing
+        self.content = ft.Row(
+            [
+                ft.Icon(self.icon, size=20, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(self.text, size=14, weight=ft.FontWeight.W_500, color=ft.Colors.ON_SURFACE_VARIANT)
+            ],
+            spacing=15,
+        )
         self.on_click = lambda e: item_clicked(e)
+        self.on_hover = self.handle_hover
+
+    def handle_hover(self, e):
+        if e.data == "true":
+            if self.bgcolor != ft.Colors.SECONDARY_CONTAINER:
+                self.bgcolor = ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE)
+        else:
+            if self.bgcolor != ft.Colors.SECONDARY_CONTAINER:
+                self.bgcolor = None
+        self.update()
 
 
 class NavigationColumn(ft.Column):
     def __init__(self, sidebar, page, app):
         super().__init__()
-        self.expand = 4
-        self.spacing = 0
-        self.scroll = ft.ScrollMode.ALWAYS
+        self.expand = True
+        self.spacing = 5
+        self.scroll = ft.ScrollMode.HIDDEN
         self.sidebar = sidebar
         self.selected_index = 0
         self.page = page
@@ -52,11 +71,17 @@ class NavigationColumn(ft.Column):
         for item in self.controls:
             item.bgcolor = None
             item.content.controls[0].icon = item.destination.icon
+            item.content.controls[0].color = ft.Colors.ON_SURFACE_VARIANT
+            item.content.controls[1].color = ft.Colors.ON_SURFACE_VARIANT
+            item.content.controls[1].weight = ft.FontWeight.W_500
+            
         if 0 <= self.selected_index < len(self.controls):
-            self.controls[self.selected_index].bgcolor = ft.Colors.SECONDARY_CONTAINER
-            self.controls[self.selected_index].content.controls[0].icon = self.controls[
-                self.selected_index
-            ].destination.selected_icon
+            item = self.controls[self.selected_index]
+            item.bgcolor = ft.Colors.SECONDARY_CONTAINER
+            item.content.controls[0].icon = item.destination.selected_icon
+            item.content.controls[0].color = ft.Colors.PRIMARY
+            item.content.controls[1].color = ft.Colors.PRIMARY
+            item.content.controls[1].weight = ft.FontWeight.BOLD
         safe_update(self)
 
 
@@ -137,12 +162,16 @@ class LeftNavigationMenu(ft.Column):
         )
 
         self.controls = [
+            ft.Container(height=20), # Top spacing
             self.rail,
             ft.Container(expand=True),
-            self.bottom_controls,
+            ft.Container(
+                content=self.bottom_controls,
+                padding=ft.padding.only(left=8, bottom=20)
+            ),
         ]
 
-        self.width = 160
+        self.width = 200
         self.spacing = 0
         self.alignment = ft.MainAxisAlignment.START
 
