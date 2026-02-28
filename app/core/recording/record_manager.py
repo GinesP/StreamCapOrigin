@@ -153,10 +153,9 @@ class RecordingManager:
                 selected=False,
             )
 
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-            self.app.page.pubsub.send_others_on_topic("update", recording)
-
-            self.app.page.run_task(self.check_if_live, recording)
+            self.app.event_bus.publish("update", recording)
+            self.app.event_bus.publish("update", recording)
+            self.app.event_bus.run_task(self.check_if_live, recording)
 
             await self.persist_recordings()
 
@@ -173,8 +172,8 @@ class RecordingManager:
                 selected=False,
             )
             self.stop_recording(recording, manually_stopped=True)
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-            self.app.page.pubsub.send_others_on_topic("update", recording)
+            self.app.event_bus.publish("update", recording)
+            self.app.event_bus.publish("update", recording)
             await self.persist_recordings()
 
     async def start_monitor_recordings(self):
@@ -186,8 +185,8 @@ class RecordingManager:
         cards_obj = self.app.record_card_manager.cards_obj
         for recording in pre_start_monitor_recordings:
             if cards_obj[recording.rec_id]["card"].visible:
-                self.app.page.run_task(self.start_monitor_recording, recording, auto_save=False)
-        self.app.page.run_task(self.persist_recordings)
+                self.app.event_bus.run_task(self.start_monitor_recording, recording, auto_save=False)
+        self.app.event_bus.run_task(self.persist_recordings)
         logger.info(f"Batch Start Monitor Recordings: {[i.rec_id for i in pre_start_monitor_recordings]}")
 
     async def stop_monitor_recordings(self, selected_recordings: list[Recording | None] | None = None):
@@ -200,8 +199,8 @@ class RecordingManager:
         cards_obj = self.app.record_card_manager.cards_obj
         for recording in pre_stop_monitor_recordings:
             if cards_obj[recording.rec_id]["card"].visible:
-                self.app.page.run_task(self.stop_monitor_recording, recording, auto_save=False)
-        self.app.page.run_task(self.persist_recordings)
+                self.app.event_bus.run_task(self.stop_monitor_recording, recording, auto_save=False)
+        self.app.event_bus.run_task(self.persist_recordings)
         logger.info(f"Batch Stop Monitor Recordings: {[i.rec_id for i in pre_stop_monitor_recordings]}")
 
     async def get_selected_recordings(self):
@@ -250,7 +249,7 @@ class RecordingManager:
                 alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
                 alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
                 recording.increment_live_counts(is_live=True, alpha_active=alpha_active, alpha_offline=alpha_offline)
-                self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                self.app.event_bus.publish("update", recording)
                 continue
 
             # 1. Apply Smart Predictive Polling (Intelligence)
@@ -384,7 +383,7 @@ class RecordingManager:
             if not recording.monitor_status:
                 recording.display_title = f"[{self._['monitor_stopped']}] {recording.title}"
                 recording.status_info = RecordingStatus.STOPPED_MONITORING
-                self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                self.app.event_bus.publish("update", recording)
                 return
 
             recording.detection_time = datetime.now().time()
@@ -408,7 +407,7 @@ class RecordingManager:
                     recording.status_info = RecordingStatus.NOT_IN_SCHEDULED_CHECK
                     recording.is_live = False
                     logger.info(f"Skip Detection: {recording.url} not in scheduled check range {scheduled_time_range_list}")
-                    self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                    self.app.event_bus.publish("update", recording)
                     return
 
             recording.status_info = RecordingStatus.STATUS_CHECKING
@@ -451,8 +450,8 @@ class RecordingManager:
                 logger.error(f"Fetch stream data failed: {recording.url}")
                 recording.status_info = RecordingStatus.LIVE_STATUS_CHECK_ERROR
                 if recording.monitor_status:
-                    self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-                    self.app.page.pubsub.send_others_on_topic("update", recording)
+                    self.app.event_bus.publish("update", recording)
+                    self.app.event_bus.publish("update", recording)
                 return
                 
             if self.settings.user_config.get("remove_emojis"):
@@ -514,7 +513,7 @@ class RecordingManager:
                     recording.status_info = RecordingStatus.PREPARING_RECORDING
                     recording.loop_time_seconds = self.loop_time_seconds
                     self.start_update(recording)
-                    self.app.page.run_task(recorder.start_recording, stream_info)
+                    self.app.event_bus.publish("start_recording", recorder, stream_info)
                 else:
                     if recording.notified_live_start:
                         notify_loop_time = user_config.get("notify_loop_time")
@@ -535,7 +534,7 @@ class RecordingManager:
                 recording.is_recording = False
                 if recording.is_live:
                     recording.is_live = False
-                    self.app.page.run_task(recorder.end_message_push)
+                    self.app.event_bus.publish("end_message_push", recorder)
 
                 recording.status_info = RecordingStatus.MONITORING
                 title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[recording.quality]}"
@@ -551,9 +550,9 @@ class RecordingManager:
 
         finally:
             recording.is_checking = False
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-        self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-        self.app.page.pubsub.send_others_on_topic("update", recording)
+            self.app.event_bus.publish("update", recording)
+        self.app.event_bus.publish("update", recording)
+        self.app.event_bus.publish("update", recording)
         return
 
     @staticmethod
@@ -604,7 +603,7 @@ class RecordingManager:
             recording.status_info = RecordingStatus.NOT_RECORDING
             logger.info(f"Stopped recording for {recording.title}")
 
-            self.app.page.run_task(self.persist_recordings)
+            self.app.event_bus.publish("persist_recordings")
 
     def get_duration(self, recording: Recording):
         """Get the duration of the current recording session in a formatted string."""
@@ -619,8 +618,8 @@ class RecordingManager:
             return str(total_duration).split(".")[0]
 
     async def delete_recording_cards(self, recordings: list[Recording]):
-        self.app.page.run_task(self.app.record_card_manager.remove_recording_card, recordings)
-        self.app.page.pubsub.send_others_on_topic('delete', recordings)
+        self.app.event_bus.publish("update", recordings)
+        self.app.event_bus.publish("delete", recordings)
         await self.remove_recordings(recordings)
 
         # update the filter area of the recording list page

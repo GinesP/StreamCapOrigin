@@ -181,7 +181,10 @@ class InstallationManager:
             await self.get_install_components()
             if self.components_to_install:
                 logger.info(f"Missing components: {[i['name'] for i in self.components_to_install]}")
-                self.page.run_task(self.show_install_dialog)
+                if self.page:
+                    self.app.event_bus.run_task(self.show_install_dialog)
+                else:
+                    self.app.event_bus.publish("missing_components", self.components_to_install)
         else:
             from ..scripts import ffmpeg_install, node_install
             ffmpeg_install.update_env_path()

@@ -4,6 +4,7 @@ import time
 
 import flet as ft
 
+from .event_bus import EventBus
 from . import execute_dir, bundle_dir
 from .core.config.config_manager import ConfigManager
 from .core.config.language_manager import LanguageManager
@@ -27,6 +28,10 @@ from .utils.logger import logger
 
 class App:
     def __init__(self, page: ft.Page):
+        self.event_bus = EventBus(page)
+        if page:
+            self.event_bus.set_loop(page.loop)
+            
         self.install_progress = None
         self.page = page
         self.run_path = execute_dir
