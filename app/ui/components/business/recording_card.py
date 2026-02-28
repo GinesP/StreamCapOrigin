@@ -32,8 +32,15 @@ class RecordingCardManager:
             self._.update(language.get(key, {}))
 
     def pubsub_subscribe(self):
-        self.app.page.pubsub.subscribe_topic("update", self.subscribe_update_card)
-        self.app.page.pubsub.subscribe_topic("delete", self.subscribe_remove_cards)
+        # Subscribe to both systems during transition
+        try:
+            self.app.page.pubsub.subscribe_topic("update", self.subscribe_update_card)
+            self.app.page.pubsub.subscribe_topic("delete", self.subscribe_remove_cards)
+        except:
+            pass
+            
+        self.app.event_bus.subscribe("update", self.subscribe_update_card)
+        self.app.event_bus.subscribe("delete", self.subscribe_remove_cards)
 
     async def create_card(self, recording: Recording, subscribe_add_cards: bool = False):
         """Create a card for a given recording."""

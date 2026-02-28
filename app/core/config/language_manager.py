@@ -46,3 +46,7 @@ class LanguageManager:
                 observer.load_language()
             else:
                 observer.load()
+        
+        # Also notify via EventBus
+        if hasattr(self.app, "event_bus"):
+            self.app.event_bus.publish("language_changed", self.language)
