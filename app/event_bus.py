@@ -133,7 +133,7 @@ class EventBus:
 
     # ── run_task replacement ─────────────────────────────────────────
 
-    def run_task(self, coro_func: Callable, *args):
+    def run_task(self, coro_func: Callable, *args, **kwargs):
         """Schedule an async coroutine for execution.
 
         Replaces: page.run_task(coro, *args)
@@ -141,6 +141,7 @@ class EventBus:
         Args:
             coro_func: An async function (not a coroutine object).
             *args: Arguments to pass to the coroutine function.
+            **kwargs: Keyword arguments to pass to the coroutine function.
         """
         loop = self._loop
         if loop is None:
@@ -153,7 +154,7 @@ class EventBus:
         try:
             if loop.is_running():
                 loop.call_soon_threadsafe(
-                    asyncio.ensure_future, coro_func(*args)
+                    asyncio.ensure_future, coro_func(*args, **kwargs)
                 )
             else:
                 logger.warning(

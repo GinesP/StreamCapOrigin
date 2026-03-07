@@ -1,10 +1,15 @@
 import asyncio
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from ..models.recording.recording_model import Recording
-from ..ui.views.settings_view import SettingsPage
 from ..utils.logger import logger
 from .notification_service import NotificationService
+
+if TYPE_CHECKING:
+    # Only imported for type checking — NOT at runtime.
+    # Importing SettingsPage at runtime would trigger `import flet as ft`
+    # which starts the Flet server and causes spurious windows in the Qt context.
+    from ..ui.views.settings_view import SettingsPage
 
 
 class MessagePusher:

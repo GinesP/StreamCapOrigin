@@ -3,7 +3,6 @@ import json
 import os
 from typing import Any, Literal, TypedDict
 
-import flet as ft
 import httpx
 
 from ...utils.logger import logger
@@ -259,6 +258,7 @@ class UpdateChecker:
         return 0
     
     async def show_update_dialog(self, update_info: dict[str, Any]) -> None:
+        import flet as ft  # Lazy import: only used in Flet context
         _ = self.app.language_manager.language.get("update", {})
 
         dialog = ft.AlertDialog(
@@ -284,6 +284,7 @@ class UpdateChecker:
 
     def open_download_page(self, update_info: dict[str, Any]) -> None:
         import platform
+        import webbrowser
 
         url = update_info.get("download_url", "https://github.com/ihmily/StreamCap/releases/latest")
         
@@ -297,5 +298,9 @@ class UpdateChecker:
             elif system == "linux" and "linux" in download_urls:
                 url = download_urls["linux"]
         
-        self.app.page.launch_url(url)
+        # If Flet page available, use it; otherwise open in system browser
+        if self.app.page:
+            self.app.page.launch_url(url)
+        else:
+            webbrowser.open(url)
         self.close_dialog()

@@ -132,7 +132,8 @@ class LiveStreamRecorder:
                 output_dir = os.path.join(output_dir, f"{now[:10]}_{live_title}")
         os.makedirs(output_dir, exist_ok=True)
         self.recording.recording_dir = output_dir
-        self.app.page.run_task(self.app.record_manager.persist_recordings)
+        # Use event_bus instead of page to be framework-agnostic
+        self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
         return output_dir
 
     def _get_save_path(self, filename: str, use_direct_download: bool = False) -> str:

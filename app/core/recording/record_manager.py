@@ -154,7 +154,6 @@ class RecordingManager:
             )
 
             self.app.event_bus.publish("update", recording)
-            self.app.event_bus.publish("update", recording)
             self.app.event_bus.run_task(self.check_if_live, recording)
 
             await self.persist_recordings()
@@ -391,7 +390,7 @@ class RecordingManager:
             
             # Always update UI to show "Checking" status at the start of detection
             recording.status_info = RecordingStatus.STATUS_CHECKING
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+            self.app.event_bus.publish("update", recording)
 
             if recording.scheduled_recording:
                 scheduled_time_range_list = await self.get_scheduled_time_range(
@@ -551,8 +550,6 @@ class RecordingManager:
         finally:
             recording.is_checking = False
             self.app.event_bus.publish("update", recording)
-        self.app.event_bus.publish("update", recording)
-        self.app.event_bus.publish("update", recording)
         return
 
     @staticmethod
@@ -622,8 +619,8 @@ class RecordingManager:
         self.app.event_bus.publish("delete", recordings)
         await self.remove_recordings(recordings)
 
-        # update the filter area of the recording list page
-        if hasattr(self.app, 'current_page') and hasattr(self.app.current_page, 'view_container'):
+        # update the filter area of the recording list page (Flet specific)
+        if self.app.page and hasattr(self.app, 'current_page') and hasattr(self.app.current_page, 'view_container'):
             current_page = self.app.current_page
             if hasattr(current_page, 'create_filter_area') and len(current_page.view_container.controls) > 1:
                 current_page.view_container.controls[1] = current_page.create_filter_area()
@@ -637,12 +634,16 @@ class RecordingManager:
             logger.error(
                 f"Disk space remaining is below {disk_space_limit} GB. Recording function disabled"
             )
-            self.app.page.run_task(
-                self.app.snack_bar.show_snack_bar,
-                self._["not_disk_space_tip"],
-                duration=86400,
-                show_close_icon=True
-            )
+            if self.app.page and hasattr(self.app, "snack_bar"):
+                self.app.page.run_task(
+                    self.app.snack_bar.show_snack_bar,
+                    self._["not_disk_space_tip"],
+                    duration=86400,
+                    show_close_icon=True
+                )
+            else:
+                # In Qt or if page is missing, just log it; Qt version of snackbar is not yet implemented
+                logger.warning(self._["not_disk_space_tip"])
 
         else:
             self.app.recording_enabled = True
