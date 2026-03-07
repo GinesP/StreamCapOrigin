@@ -6,6 +6,7 @@ It provides the application shell: sidebar + content area.
 """
 
 import asyncio
+import ctypes
 import sys
 
 from PySide6.QtCore import Qt, QSize, QTimer
@@ -23,9 +24,14 @@ from PySide6.QtWidgets import (
 )
 
 from app.qt.navigation.sidebar import Sidebar
-from app.qt.themes.theme import apply_theme, DARK_COLORS, LIGHT_COLORS
+from app.qt.themes.theme import theme_manager, apply_theme, DARK_COLORS, LIGHT_COLORS
 from app.qt.views.recordings_view import QtRecordingsView
 from app.qt.views.settings_view import QtSettingsView
+from app.qt.views.home_view import QtHomeView
+from app.qt.components.toast import QtToastManager
+# NOTE: QtStorageView, QtAboutView, QtVideoPlayer are imported lazily
+# to avoid loading PySide6.QtMultimedia at module level, which activates
+# the DirectShow backend on Windows and causes a brief spurious window.
 
 
 class MainWindow(QMainWindow):
@@ -54,6 +60,15 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._apply_theme()
+        self._enable_dwm_shadow()
+        self.toast_manager = QtToastManager(self)
+
+        # Subscribe to external theme changes (hot-reload via theme.json)
+        theme_manager.themeChanged.connect(self._on_theme_manager_changed)
+
+        # NOTE: video_player is created lazily on first use to avoid
+        # it appearing as a spurious window during startup (QDialog bug).
+        # Do NOT instantiate QtVideoPlayer here.
 
     # ── UI Setup ─────────────────────────────────────────────────────
 
@@ -92,18 +107,18 @@ class MainWindow(QMainWindow):
 
     def _register_pages(self):
         """Register all pages in the content stack."""
-        # Migrated views
-        self.register_page("recordings", QtRecordingsView(self.app))
-        self.register_page("settings", QtSettingsView(self.app))
-        
-        # Placeholders
-        page_names = ["home", "storage", "about"]
-        for name in page_names:
-            page = self._create_placeholder(name)
-            self.register_page(name, page)
+        from app.qt.views.storage_view import QtStorageView  # lazy: avoids QtMultimedia at startup
+        from app.qt.views.about_view import QtAboutView       # lazy
 
-        # Show recordings by default for now to check card loading
-        self.show_page("recordings")
+        # Migrated views
+        self.register_page("home",       QtHomeView(self.app))
+        self.register_page("recordings", QtRecordingsView(self.app))
+        self.register_page("settings",   QtSettingsView(self.app))
+        self.register_page("storage",    QtStorageView(self.app))
+        self.register_page("about",      QtAboutView(self.app))
+
+        # Default landing page
+        self.show_page("home")
 
     def _create_placeholder(self, name: str) -> QWidget:
         """Create a simple placeholder widget for a page not yet migrated."""
@@ -146,7 +161,17 @@ class MainWindow(QMainWindow):
         """Handle sidebar navigation click."""
         self.show_page(name)
 
+    # ── Video Player (lazy) ──────────────────────────────────────────
+
+    def get_video_player(self):
+        """Return the shared video player, creating it on first use."""
+        if self.app.video_player is None:
+            from app.qt.components.video_player import QtVideoPlayer  # lazy: QtMultimedia
+            self.app.video_player = QtVideoPlayer(self.app, parent=self)
+        return self.app.video_player
+
     # ── Events ───────────────────────────────────────────────────────
+
 
     def _on_language_changed(self, topic, language_data):
         """Update the UI when the language changes."""
@@ -164,22 +189,63 @@ class MainWindow(QMainWindow):
     # ── Theme ────────────────────────────────────────────────────────
 
     def _toggle_theme(self):
-        """Toggle between dark and light mode."""
+        """Toggle between dark and light mode via the ThemeManager singleton."""
         self._dark_mode = not self._dark_mode
-        self._apply_theme()
+        theme_manager.set_mode(self._dark_mode)  # emits themeChanged
+        self._update_theme_btn()
 
     def _apply_theme(self):
-        """Apply the current theme to the application."""
-        app = QApplication.instance()
-        if app:
-            apply_theme(app, dark=self._dark_mode)
+        """Apply the current theme at startup."""
+        theme_manager._dark = self._dark_mode
+        theme_manager._rebuild_colors()
+        theme_manager._apply_to_app()
+        self._update_theme_btn()
+
+    def _update_theme_btn(self):
         emoji = "☀️" if self._dark_mode else "🌙"
         label = "Light" if self._dark_mode else "Dark"
         self.sidebar.set_theme_text(f"{emoji}  {label}")
 
+    def _on_theme_manager_changed(self):
+        """Called by ThemeManager when theme.json changes (hot-reload)."""
+        self._dark_mode = theme_manager.is_dark
+        self._update_theme_btn()
+
     @property
     def is_dark_mode(self) -> bool:
         return self._dark_mode
+
+    def show_toast(self, message, toast_type="info", duration=4000):
+        """Show a floating notification."""
+        self.toast_manager.show_toast(message, toast_type, duration)
+
+    # ── Native DWM Shadow (Windows §4) ──────────────────────────────
+
+    def _enable_dwm_shadow(self):
+        """Enable the native DWM drop shadow for this window (guide §4).
+
+        Uses DwmExtendFrameIntoClientArea with 1-px margins — the simplest
+        approach that activates the GPU-accelerated DWM shadow without
+        intercepting any native messages.  Safe no-op on non-Windows.
+        """
+        if sys.platform != "win32":
+            return
+        try:
+            class MARGINS(ctypes.Structure):
+                _fields_ = [
+                    ("cxLeftWidth",    ctypes.c_int),
+                    ("cxRightWidth",   ctypes.c_int),
+                    ("cyTopHeight",    ctypes.c_int),
+                    ("cyBottomHeight", ctypes.c_int),
+                ]
+
+            hwnd = int(self.winId())
+            margins = MARGINS(1, 1, 1, 1)
+            ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(
+                hwnd, ctypes.byref(margins)
+            )
+        except Exception:
+            pass  # DWM unavailable (RDP, VM, older Windows)
 
     # ── Window Events ────────────────────────────────────────────────
 

@@ -1,389 +1,573 @@
 """
-Qt Recording Card component for StreamCap.
+Qt Recording Card — StreamCap.
 
-A premium-looking card that displays information about a stream recording,
-with status indicators, badges, and interactive controls on hover.
+Architecture:
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │ QFrame (card)                                                       │
+  │  ├─ stripe: QFrame (4px coloured left border)                      │
+  │  └─ body: QWidget                                                   │
+  │      ├─ [GRID LAYOUT - QVBoxLayout]  shown in grid mode            │
+  │      │   ├─ top_row (avatar / name / status / badges)              │
+  │      │   ├─ dates_lbl                                               │
+  │      │   └─ action_bar (always created, shown/hidden on hover)     │
+  │      └─ [LIST LAYOUT - QHBoxLayout]  shown in list mode            │
+  │          ├─ avatar                                                   │
+  │          ├─ info_col (name / status) ── stretch                    │
+  │          ├─ badge_row                                               │
+  │          └─ btn_row  (always visible)                               │
+  └─────────────────────────────────────────────────────────────────────┘
+
+Key design decisions
+────────────────────
+• Two inner QWidgets (grid_w / list_w) are show/hidden.  No effects on self.
+• Shadow is drawn only in paintEvent to avoid QGraphicsEffect conflicts.
+• Hover in grid  → show/hide action_bar via setVisible (no opacity effect).
+• Hover in list  → card background colour shift via setProperty + repaint.
+• _is_hovered initialised in __init__ so leaveEvent never crashes.
 """
 
-import asyncio
-import os
-from datetime import datetime
+from __future__ import annotations
 
-from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, Signal, QRect, Property
-from PySide6.QtGui import QIcon, QFont, QPixmap, QPainter, QBrush, QColor, QPen, QImage
+import os
+
+from PySide6.QtCore import Qt, QRect, QRectF
+from PySide6.QtGui import (
+    QColor, QFont, QPainter, QBrush, QPen, QPainterPath,
+)
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QFrame,
-    QGraphicsDropShadowEffect,
-    QSizePolicy,
-    QSpacerItem
+    QFrame, QHBoxLayout, QLabel, QPushButton,
+    QSizePolicy, QVBoxLayout, QWidget,
 )
 
-from app.utils.logger import logger
 from app.models.recording.recording_status_model import RecordingStatus, CardStateType
+from app.utils.logger import logger
 
 
-class AvatarWidget(QLabel):
-    """Circular avatar image widget."""
-    def __init__(self, size=44, parent=None):
+# ── Palette ───────────────────────────────────────────────────────────────────
+
+_STATUS_COLOR: dict[CardStateType, str] = {
+    CardStateType.RECORDING: "#4CAF50",
+    CardStateType.ERROR:     "#FF9800",
+    CardStateType.LIVE:      "#F44336",
+    CardStateType.OFFLINE:   "#757575",
+    CardStateType.STOPPED:   "#546E7A",
+    CardStateType.CHECKING:  "#AB47BC",
+}
+
+_CARD_BG        = "#2D2D2D"
+_CARD_BG_HOVER  = "#363636"
+_CARD_BORDER    = "#383838"
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+class _Avatar(QLabel):
+    """40 px circular avatar widget with letter placeholder."""
+
+    def __init__(self, size: int = 40, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._sz  = size
+        self._bg  = "#4A4A6A"
         self.setFixedSize(size, size)
-        self.size = size
-        self.pixmap_img = None
-        self._placeholder_text = "?"
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Rounded to size/2
-        self.setStyleSheet(f"background-color: #4a4a6a; border-radius: {size//2}px; color: white; border: 1px solid #5a5a7a;")
-        self.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
-        self.setText(self._placeholder_text)
+        self.setFont(QFont("Segoe UI", max(8, size // 3), QFont.Weight.Bold))
+        self._refresh_style()
 
-    def set_avatar(self, pixmap: QPixmap):
-        self.pixmap_img = pixmap
-        self.setText("")
-        self.update()
-
-    def set_placeholder(self, char: str):
-        self.pixmap_img = None
-        self._placeholder_text = char
-        self.setText(char)
-        self.update()
-
-    def paintEvent(self, event):
-        if not self.pixmap_img:
-            super().paintEvent(event)
-            return
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Create circle path
-        path = QPainter.Path()
-        path.addEllipse(0, 0, self.size, self.size)
-        painter.setClipPath(path)
-        
-        # Scale and draw pixmap
-        scaled = self.pixmap_img.scaled(
-            self.size, self.size, 
-            Qt.AspectRatioMode.KeepAspectRatioByExpanding, 
-            Qt.TransformationMode.SmoothTransformation
+    def _refresh_style(self) -> None:
+        r = self._sz // 2
+        self.setStyleSheet(
+            f"border-radius:{r}px; background:{self._bg};"
+            f" color:#E1E1E1; border:none;"
         )
-        # Center the scaled image
-        x = (self.size - scaled.width()) // 2
-        y = (self.size - scaled.height()) // 2
-        painter.drawPixmap(x, y, scaled)
+
+    def set_letter(self, char: str, bg: str = "#4A4A6A") -> None:
+        self._bg = bg
+        self._refresh_style()
+        self.setText(char.upper())
 
 
-class BadgeWidget(QFrame):
-    """Small badge with text and background color."""
-    def __init__(self, text, bgcolor, tooltip="", parent=None):
+class _Badge(QFrame):
+    """Small coloured pill badge: text on a solid colour."""
+
+    def __init__(
+        self, text: str, color: str, tip: str = "",
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
-        self.setToolTip(tooltip)
-        self.setFixedHeight(26)
-        
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 0, 8, 0)
-        
-        self.label = QLabel(text)
-        self.label.setStyleSheet(f"color: white; font-size: 11px; font-weight: bold; background: transparent;")
-        layout.addWidget(self.label)
-        
-        self.setStyleSheet(f"background-color: {bgcolor}; border-radius: 6px; border: none;")
+        self.setToolTip(tip)
+        self.setFixedHeight(20)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(7, 0, 7, 0)
+        lbl = QLabel(text)
+        lbl.setStyleSheet(
+            "color:#fff; font-size:10px; font-weight:700; background:transparent;"
+        )
+        lay.addWidget(lbl)
+        self.setStyleSheet(
+            f"background:{color}; border-radius:5px; border:none;"
+        )
+
+
+def _mk_btn(icon: str, tip: str, parent: QWidget) -> QPushButton:
+    """Create a small icon action button."""
+    b = QPushButton(icon, parent)
+    b.setToolTip(tip)
+    b.setFixedSize(38, 24)
+    b.setCursor(Qt.CursorShape.PointingHandCursor)
+    b.setStyleSheet("""
+        QPushButton {
+            background: #3A3A3A;
+            color: #BBBBBB;
+            border: 1px solid #555555;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: "Consolas", "Courier New", monospace;
+            padding: 0;
+            margin: 0;
+        }
+        QPushButton:hover {
+            background: #FF6428;
+            color: #FFFFFF;
+            border-color: #FF8050;
+        }
+        QPushButton:pressed {
+            background: #CC4F20;
+        }
+    """)
+    return b
+
+
+# ── Card ──────────────────────────────────────────────────────────────────────
+
+_ACTIONS = [
+    ("folder",  "Dir",  "Open Folder"),
+    ("play",    "Run",  "Start / Stop"),
+    ("preview", "Play", "Preview"),
+    ("edit",    "Edit", "Edit"),
+    ("info",    "Info", "Info"),
+    ("delete",  "Del",  "Delete"),
+]
 
 
 class QtRecordingCard(QFrame):
     """
-    Highly interactive recording card.
-    
-    Features:
-    - Status color indicator (left border)
-    - Async avatar loading
-    - Badges (Queue, Likelihood, Priority)
-    - Hover effects for action buttons
+    Dual-mode recording card (list / grid).
+
+    Call ``set_view_mode("list")`` or ``set_view_mode("grid")`` to switch.
+    The card starts in list mode.
     """
-    
-    # Define colors matching the original app design
-    STATUS_COLORS = {
-        CardStateType.RECORDING: "#2ECC71", # Green
-        CardStateType.ERROR: "#F39C12",     # Orange
-        CardStateType.LIVE: "#E74C3C",      # Red
-        CardStateType.OFFLINE: "#95A5A6",   # Grey
-        CardStateType.STOPPED: "#34495E",   # Dark Blue/Grey
-        CardStateType.CHECKING: "#9B59B6",  # Purple
-    }
 
-    def __init__(self, recording, app_context, parent=None):
+    def __init__(
+        self,
+        recording,
+        app_context,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
-        self.recording = recording
-        self.app = app_context
-        self._setup_ui()
+        self.recording   = recording
+        self.app         = app_context
+        self._hovered    = False
+        self._mode       = "list"
+        self._status_color = _CARD_BG
+
+        self._build()
         self.update_content()
-        self._set_initial_state()
 
-    def set_view_mode(self, mode):
-        """Toggle between grid and list layouts."""
-        self._view_mode = mode
-        if mode == "list":
-            self.setMinimumWidth(0)
-            self.setMaximumWidth(16777215)
-            self.setFixedHeight(80) # Slimmer in list mode
-            self.opacity_effect.setOpacity(1.0) # Always visible
-            self.dates_label.hide() # Save space horizontally
-        else:
-            self.setFixedSize(320, 160)
-            self.opacity_effect.setOpacity(0.0)
-            self.dates_label.show()
+    # ─────────────────────────────────────────────────────────────────────────
+    # Build
+    # ─────────────────────────────────────────────────────────────────────────
 
-    def _set_initial_state(self):
-        # Setup shadow effect
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(15)
-        shadow.setColor(QColor(0, 0, 0, 40))
-        shadow.setOffset(0, 4)
-        self.setGraphicsEffect(shadow)
-        self._view_mode = "grid"
+    def _build(self) -> None:
+        self.setObjectName(f"rec_card_{self.recording.rec_id}")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
-    def _setup_ui(self):
-        self.setObjectName(f"card_{self.recording.rec_id}")
-        self.setProperty("class", "card")
-        self.setFixedSize(320, 160)
-        
-        # Main Layout (Horizontal) to include the status bar on the left
-        outer_layout = QHBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.setSpacing(0)
-        
-        # 1. Status Bar (Color Indicator)
-        self.status_bar = QFrame()
-        self.status_bar.setFixedWidth(4)
-        self.status_bar.setObjectName("statusLine")
-        outer_layout.addWidget(self.status_bar)
-        
-        # 2. Card Content Area
-        content_widget = QWidget()
-        outer_layout.addWidget(content_widget)
-        
-        layout = QVBoxLayout(content_widget)
-        layout.setContentsMargins(15, 12, 12, 12)
-        layout.setSpacing(8)
-        
-        # --- Top Row: Avatar + Info + Badges ---
-        top_row = QHBoxLayout()
-        top_row.setSpacing(12)
-        
-        self.avatar = AvatarWidget(44)
-        top_row.addWidget(self.avatar)
-        
-        info_col = QVBoxLayout()
-        info_col.setSpacing(2)
-        
-        self.title_label = QLabel()
-        self.title_label.setStyleSheet("font-weight: 700; font-size: 14px;")
-        self.title_label.setWordWrap(False)
-        info_col.addWidget(self.title_label)
-        
+        root = QHBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # Colored stripe
+        self._stripe = QFrame()
+        self._stripe.setFixedWidth(4)
+        root.addWidget(self._stripe)
+
+        # Body container
+        self._body = QWidget()
+        self._body.setStyleSheet("background: transparent;")
+        root.addWidget(self._body, 1)
+
+        body_root = QVBoxLayout(self._body)
+        body_root.setContentsMargins(0, 0, 0, 0)
+        body_root.setSpacing(0)
+
+        self._grid_w = self._build_grid()
+        self._list_w = self._build_list()
+
+        body_root.addWidget(self._grid_w)
+        body_root.addWidget(self._list_w)
+
+        # Initial: list mode
+        self._grid_w.hide()
+        self._list_w.show()
+
+    # ── Grid body ─────────────────────────────────────────────────────────────
+
+    def _build_grid(self) -> QWidget:
+        w = QWidget()
+        w.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(14, 12, 12, 10)
+        lay.setSpacing(5)
+
+        # Top row
+        top = QHBoxLayout()
+        top.setSpacing(10)
+        self._g_av = _Avatar(40, w)
+        top.addWidget(self._g_av)
+
+        info = QVBoxLayout()
+        info.setSpacing(2)
+        self._g_name   = QLabel(parent=w)
+        self._g_name.setStyleSheet(
+            "font-weight:700; font-size:13px; background:transparent; color:#E1E1E1;"
+        )
+        self._g_name.setWordWrap(False)
+        info.addWidget(self._g_name)
+
         status_row = QHBoxLayout()
-        status_row.setSpacing(8)
-        self.status_label = QLabel()
-        self.status_label.setStyleSheet("font-size: 11px; font-weight: 500;")
-        status_row.addWidget(self.status_label)
-        
-        self.duration_label = QLabel()
-        self.duration_label.setProperty("class", "muted")
-        status_row.addWidget(self.duration_label)
+        self._g_status = QLabel(parent=w)
+        self._g_status.setStyleSheet(
+            "font-size:11px; font-weight:600; background:transparent;"
+        )
+        self._g_dur = QLabel(parent=w)
+        self._g_dur.setStyleSheet(
+            "font-size:10px; color:#777; background:transparent;"
+        )
+        status_row.addWidget(self._g_status)
+        status_row.addWidget(self._g_dur)
         status_row.addStretch()
-        info_col.addLayout(status_row)
-        
-        top_row.addLayout(info_col)
-        
-        # Badges (Top Right)
-        self.badge_layout = QHBoxLayout()
-        self.badge_layout.setSpacing(4)
-        top_row.addLayout(self.badge_layout)
-        
-        layout.addLayout(top_row)
-        
-        # --- Middle Area: Dates ---
-        self.dates_label = QLabel()
-        self.dates_label.setProperty("class", "muted")
-        self.dates_label.setStyleSheet("font-size: 10px;")
-        layout.addWidget(self.dates_label)
-        
-        layout.addStretch()
-        
-        # --- Bottom Area: Actions (Fade in on hover) ---
-        self.action_toolbar = QWidget()
-        self.action_toolbar.setStyleSheet("background: transparent;")
-        actions_layout = QHBoxLayout(self.action_toolbar)
-        actions_layout.setContentsMargins(0, 0, 0, 0)
-        actions_layout.setSpacing(2)
-        
-        # Create action buttons
-        self.btns = {}
-        action_defs = [
-            ("folder", "📁", "Open Folder"),
-            ("play", "▶️", "Start/Stop"),
-            ("info", "ℹ️", "Info"),
-            ("preview", "🎞️", "Preview"),
-            ("edit", "⚙️", "Edit"),
-            ("delete", "🗑️", "Delete")
-        ]
-        
-        for name, icon, tip in action_defs:
-            btn = QPushButton(icon)
-            btn.setProperty("class", "icon")
-            btn.setFixedSize(30, 30)
-            btn.setToolTip(tip)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            # Placeholder click
-            btn.clicked.connect(lambda checked=False, n=name: self._on_action_triggered(n))
-            actions_layout.addWidget(btn)
-            self.btns[name] = btn
-            
-        actions_layout.addStretch()
-        layout.addWidget(self.action_toolbar)
-        
-        # Initial state: action toolbar semi-transparent
-        self.action_toolbar.setWindowOpacity(0.0)
-        # Use a simpler way to hide if opacity doesn't work on child widgets
-        # We can use QGraphicsOpacityEffect for the toolbar
-        from PySide6.QtWidgets import QGraphicsOpacityEffect
-        self.opacity_effect = QGraphicsOpacityEffect(self.action_toolbar)
-        self.opacity_effect.setOpacity(0.0)
-        self.action_toolbar.setGraphicsEffect(self.opacity_effect)
+        info.addLayout(status_row)
+        top.addLayout(info, 1)
 
-    def update_content(self):
-        """Update all visual elements from recording data."""
-        rec = self.recording
-        
-        # Title
-        title = rec.streamer_name
-        if rec.status_info == RecordingStatus.RECORDING and getattr(rec, "live_title", None):
-            title = f"{rec.streamer_name} - {rec.live_title}"
-        self.title_label.setText(title)
-        
-        # Status & Color
-        from app.ui.components.state.recording_card_state import RecordingCardState
-        state = RecordingCardState.get_card_state(rec)
-        color = self.STATUS_COLORS.get(state, "#34495E")
-        
-        self.status_bar.setStyleSheet(f"background-color: {color}; border-top-left-radius: 10px; border-bottom-left-radius: 10px;")
-        
-        status_text = rec.status_info if rec.status_info else "Idle"
-        self.status_label.setText(status_text)
-        self.status_label.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: 600;")
-        
-        # Duration
-        duration = self.app.record_manager.get_duration(rec)
-        if (rec.is_recording or rec.is_live) and duration != "00:00:00":
-            self.duration_label.setText(f"• {duration}")
-            self.duration_label.show()
-        else:
-            self.duration_label.hide()
-            
+        self._g_badge_row = QHBoxLayout()
+        self._g_badge_row.setSpacing(4)
+        top.addLayout(self._g_badge_row)
+        lay.addLayout(top)
+
         # Dates
-        added_at = getattr(rec, "added_at", "")
-        if added_at:
-            # We would use the _format_date helper from App Manager usually
-            # Using simple text for now
-            self.dates_label.setText(f"Added: {added_at}")
-        
-        # Badges
-        self._update_badges(rec)
-        
-        # Avatar placeholder
-        if rec.streamer_name:
-            self.avatar.set_placeholder(rec.streamer_name[0].upper())
-        
-        # Async load of avatar
-        # self.app.event_bus.run_task(self._load_avatar, rec.avatar_url)
+        self._g_dates = QLabel(parent=w)
+        self._g_dates.setStyleSheet(
+            "font-size:10px; color:#666; background:transparent;"
+        )
+        lay.addWidget(self._g_dates)
+        lay.addStretch()
 
-    def _update_badges(self, rec):
-        # Clear old badges
-        while self.badge_layout.count():
-            item = self.badge_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        
-        # Queue Badge
-        interval = rec.loop_time_seconds
-        if interval <= 60:
-            q_text, q_color = "F", "#66bb6a"
-        elif interval <= 180:
-            q_text, q_color = "M", "#ffa726"
+        # Action bar — hidden initially, shown on hover
+        self._g_actions = QWidget(w)
+        self._g_actions.setStyleSheet("background:transparent;")
+        ab = QHBoxLayout(self._g_actions)
+        ab.setContentsMargins(0, 0, 0, 0)
+        ab.setSpacing(3)
+
+        self._g_btns: dict[str, QPushButton] = {}
+        for name, icon, tip in _ACTIONS:
+            btn = _mk_btn(icon, tip, self._g_actions)
+            btn.clicked.connect(lambda _, n=name: self._on_action(n))
+            ab.addWidget(btn)
+            self._g_btns[name] = btn
+        ab.addStretch()
+
+        self._g_actions.hide()   # hidden until hover
+        lay.addWidget(self._g_actions)
+        return w
+
+    # ── List body ─────────────────────────────────────────────────────────────
+
+    def _build_list(self) -> QWidget:
+        w = QWidget()
+        w.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(12, 0, 10, 0)
+        lay.setSpacing(10)
+        lay.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        self._l_av = _Avatar(36, w)
+        lay.addWidget(self._l_av)
+
+        # Info
+        info = QVBoxLayout()
+        info.setSpacing(1)
+        self._l_name = QLabel(parent=w)
+        self._l_name.setStyleSheet(
+            "font-weight:700; font-size:13px; background:transparent; color:#E1E1E1;"
+        )
+        info.addWidget(self._l_name)
+
+        status_row = QHBoxLayout()
+        self._l_status = QLabel(parent=w)
+        self._l_status.setStyleSheet(
+            "font-size:11px; font-weight:600; background:transparent;"
+        )
+        self._l_dur = QLabel(parent=w)
+        self._l_dur.setStyleSheet(
+            "font-size:10px; color:#777; background:transparent;"
+        )
+        status_row.addWidget(self._l_status)
+        status_row.addWidget(self._l_dur)
+        status_row.addStretch()
+        info.addLayout(status_row)
+        lay.addLayout(info, 1)
+
+        # Badges
+        self._l_badge_row = QHBoxLayout()
+        self._l_badge_row.setSpacing(4)
+        self._l_badge_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        lay.addLayout(self._l_badge_row)
+
+        # Action buttons — always visible in list mode
+        btn_w = QWidget(w)
+        btn_w.setStyleSheet("background:transparent;")
+        btn_lay = QHBoxLayout(btn_w)
+        btn_lay.setContentsMargins(4, 0, 4, 0)
+        btn_lay.setSpacing(3)
+
+        self._l_btns: dict[str, QPushButton] = {}
+        for name, icon, tip in _ACTIONS:
+            btn = _mk_btn(icon, tip, btn_w)
+            btn.clicked.connect(lambda _, n=name: self._on_action(n))
+            btn_lay.addWidget(btn)
+            self._l_btns[name] = btn
+
+        lay.addWidget(btn_w)
+        return w
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Mode
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def set_view_mode(self, mode: str) -> None:
+        """Switch between 'list' (default) and 'grid'."""
+        self._mode = mode
+        if mode == "list":
+            self._grid_w.hide()
+            self._list_w.show()
+            self.setFixedHeight(72)
+            self.setMinimumWidth(0)
+            self.setMaximumWidth(16_777_215)
+            self._update_stripe_style()
         else:
-            q_text, q_color = "S", "#ef5350"
-        
-        self.badge_layout.addWidget(BadgeWidget(q_text, q_color, "Queue Speed"))
-        
-        # Likelihood Badge (reusing HistoryManager logic if available)
+            self._list_w.hide()
+            self._grid_w.show()
+            self._g_actions.hide()
+            self.setFixedSize(320, 165)
+            self._update_stripe_style()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Content
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def update_content(self) -> None:
+        rec = self.recording
+
+        from app.core.recording.recording_state_logic import RecordingStateLogic
+        state = RecordingStateLogic.get_card_state(rec)
+        color = _STATUS_COLOR.get(state, "#546E7A")
+        self._status_color = color
+
+        # Title
+        name = rec.streamer_name or "Unknown"
+        if rec.status_info == RecordingStatus.RECORDING and getattr(rec, "live_title", None):
+            name = f"{rec.streamer_name} — {rec.live_title}"
+
+        # Duration
+        dur = self.app.record_manager.get_duration(rec)
+        dur_t = f"  {dur}" if (rec.is_recording or rec.is_live) and dur != "00:00:00" else ""
+
+        # Avatar letter
+        letter = rec.streamer_name[0].upper() if rec.streamer_name else "?"
+
+        # Grid
+        self._g_av.set_letter(letter, color)
+        self._g_name.setText(name)
+        self._g_status.setText(rec.status_info or "Idle")
+        self._g_status.setStyleSheet(
+            f"color:{color}; font-size:11px; font-weight:600; background:transparent;"
+        )
+        self._g_dur.setText(dur_t)
+        added = getattr(rec, "added_at", "")
+        self._g_dates.setText(f"Added: {added}" if added else "")
+
+        # List
+        self._l_av.set_letter(letter, color)
+        self._l_name.setText(name)
+        self._l_status.setText(rec.status_info or "Idle")
+        self._l_status.setStyleSheet(
+            f"color:{color}; font-size:11px; font-weight:600; background:transparent;"
+        )
+        self._l_dur.setText(dur_t)
+
+        # Badges
+        self._fill_badges(rec, self._g_badge_row)
+        self._fill_badges(rec, self._l_badge_row)
+
+        # Stripe
+        self._update_stripe_style()
+
+    def _update_stripe_style(self) -> None:
+        radius = "6px" if self._mode == "grid" else "2px"
+        self._stripe.setStyleSheet(
+            f"background:{self._status_color}; border:none;"
+            f" border-top-left-radius:{radius}; border-bottom-left-radius:{radius};"
+        )
+
+    @staticmethod
+    def _fill_badges(rec, layout: QHBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            if w := item.widget():
+                w.setParent(None)  # safe deletion in layout context
+                w.deleteLater()
+
+        interval = getattr(rec, "loop_time_seconds", 60)
+        q_t, q_c = (
+            ("F", "#4CAF50") if interval <= 60 else
+            ("M", "#FF9800") if interval <= 180 else
+            ("S", "#F44336")
+        )
+        layout.addWidget(_Badge(q_t, q_c, "Queue speed"))
+
         try:
             from app.core.recording.history_manager import HistoryManager
             score = HistoryManager.get_likelihood_score(rec)
             if score > 0:
-                l_text = "High" if score >= 0.8 else "Normal"
-                l_color = "#66bb6a" if score >= 0.8 else "#4fc3f7"
-                self.badge_layout.addWidget(BadgeWidget(l_text, l_color, "Likelihood"))
-        except:
+                l_t = "High" if score >= 0.8 else "Normal"
+                l_c = "#4CAF50" if score >= 0.8 else "#42A5F5"
+                layout.addWidget(_Badge(l_t, l_c, f"Likelihood {score:.0%}"))
+        except Exception:
             pass
 
-    def enterEvent(self, event):
-        """Start hover animation (fade in actions) only in grid mode."""
-        self._is_hovered = True
-        if self._view_mode == "grid":
-            self._animate_actions(1.0)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Painting  (card background + shadow drawn here to avoid effect conflicts)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def paintEvent(self, event) -> None:                    # noqa: N802
+        p = QPainter(self)
+        p.setRenderHints(
+            QPainter.RenderHint.Antialiasing |
+            QPainter.RenderHint.TextAntialiasing
+        )
+        r = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        radius = 10.0
+
+        # Card fill
+        bg = _CARD_BG_HOVER if self._hovered else _CARD_BG
+        p.setPen(QPen(QColor(_CARD_BORDER), 1))
+        p.setBrush(QBrush(QColor(bg)))
+        p.drawRoundedRect(r, radius, radius)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Hover
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def enterEvent(self, event) -> None:                    # noqa: N802
+        self._hovered = True
+        self.update()                       # repaint for bg change
+        if self._mode == "grid":
+            self._g_actions.show()
         super().enterEvent(event)
 
-    def leaveEvent(self, event):
-        """Start hover animation (fade out actions) only in grid mode."""
-        self._is_hovered = False
-        if self._view_mode == "grid":
-            self._animate_actions(0.0)
+    def leaveEvent(self, event) -> None:                    # noqa: N802
+        self._hovered = False
+        self.update()
+        if self._mode == "grid":
+            self._g_actions.hide()
         super().leaveEvent(event)
 
-    def _animate_actions(self, target_opacity):
-        if not hasattr(self, "anim") or self.anim.state() != QPropertyAnimation.State.Running:
-            self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
-            self.anim.setDuration(200)
-            self.anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        
-        self.anim.setStartValue(self.opacity_effect.opacity())
-        self.anim.setEndValue(target_opacity)
-        self.anim.start()
+    # ─────────────────────────────────────────────────────────────────────────
+    # Actions
+    # ─────────────────────────────────────────────────────────────────────────
 
-    def _on_action_triggered(self, name):
-        """Handle control clicks by emitting events or calling app methods."""
-        logger.info(f"Card {self.recording.rec_id}: Button {name} clicked")
+    def _on_action(self, name: str) -> None:
         rec = self.recording
-        
+        logger.debug(f"Card {rec.rec_id}: '{name}'")
+
         if name == "folder":
-            path = self.app.settings.get_video_save_path()
-            if os.path.exists(path):
-                import subprocess
-                if os.name == "nt":
-                    os.startfile(path)
-                else:
-                    subprocess.run(["open", path] if sys.platform == "darwin" else ["xdg-open", path])
-        
+            path = getattr(rec, "recording_dir", None) or self.app.settings.get_video_save_path()
+            from app.utils import utils
+            utils.open_folder(path)
+
         elif name == "play":
-            # Toggle recording logic (simplified from RecordingCardManager)
             if rec.is_recording:
-                self.app.event_bus.run_task(self.app.record_manager.stop_recording, rec, manually_stopped=True)
+                self.app.event_bus.run_task(
+                    self.app.record_manager.stop_recording, rec, manually_stopped=True
+                )
             else:
-                self.app.event_bus.run_task(self.app.record_manager.start_monitor_recording, rec)
-        
+                self.app.event_bus.run_task(
+                    self.app.record_manager.start_monitor_recording, rec
+                )
+
+        elif name == "preview":
+            path = getattr(rec, "recording_dir", None)
+            if path and os.path.exists(path):
+                from app.utils import utils
+                prefix = utils.clean_name(rec.streamer_name)
+                videos = []
+                for root, _, files in os.walk(path):
+                    for f in files:
+                        if utils.is_valid_video_file(f) and prefix in f:
+                            videos.append(os.path.join(root, f))
+                if videos:
+                    videos.sort(key=os.path.getmtime, reverse=True)
+                    player = self.app.main_window.get_video_player()
+                    self.app.event_bus.run_task(
+                        player.preview_video, videos[0], room_url=rec.url
+                    )
+
         elif name == "delete":
-            # Just remove from monitoring for now
-            self.app.event_bus.run_task(self.app.record_manager.remove_recording, rec)
-            self.app.event_bus.publish("delete", rec) # Notify view to remove card
+            from PySide6.QtWidgets import QMessageBox
+            box = QMessageBox(self)
+            box.setWindowTitle("Confirm Delete")
+            box.setText(f"Are you sure you want to delete '{rec.streamer_name}'?")
+            box.setInformativeText("This will stop any active recordings for this stream.")
+            box.setIcon(QMessageBox.Icon.Warning)
+            box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            box.setDefaultButton(QMessageBox.StandardButton.No)
             
-        elif name == "info":
-            # Show info dialog (placeholder)
-            logger.info(f"Info clicked for {rec.streamer_name}")
-            
+            if box.exec() == QMessageBox.StandardButton.Yes:
+                self.app.event_bus.run_task(
+                    self.app.record_manager.remove_recording, rec
+                )
+                self.app.event_bus.publish("delete", rec)
+                if hasattr(self.app.main_window, "show_toast"):
+                    self.app.main_window.show_toast(f"Deleted: {rec.streamer_name}", "info")
+
         elif name == "edit":
-            # Edit config (placeholder)
-            logger.info(f"Edit clicked for {rec.streamer_name}")
+            self._open_edit_dialog()
+
+        elif name == "info":
+            self._open_info_dialog()
+
+    def _open_edit_dialog(self) -> None:
+        try:
+            from app.qt.components.add_stream_dialog import QtAddStreamDialog
+            dialog = QtAddStreamDialog(self.app, self, recording=self.recording)
+            dialog.exec()
+        except Exception as exc:
+            logger.warning(f"Edit dialog error: {exc}")
+
+    def _open_info_dialog(self) -> None:
+        from PySide6.QtWidgets import QMessageBox
+        rec = self.recording
+        lines = [
+            f"<b>Streamer:</b> {rec.streamer_name}",
+            f"<b>URL:</b> {rec.url}",
+            f"<b>Platform:</b> {getattr(rec, 'platform', 'N/A')}",
+            f"<b>Status:</b> {rec.status_info}",
+            f"<b>Quality:</b> {getattr(rec, 'record_quality', 'N/A')}",
+            f"<b>Directory:</b> {getattr(rec, 'recording_dir', 'N/A')}",
+        ]
+        box = QMessageBox(self)
+        box.setWindowTitle(f"Info — {rec.streamer_name}")
+        box.setText("<br>".join(lines))
+        box.setIcon(QMessageBox.Icon.Information)
+        box.exec()

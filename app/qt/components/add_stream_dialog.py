@@ -21,13 +21,18 @@ from app.core.platforms.platform_handlers import get_platform_info
 
 
 class QtAddStreamDialog(QDialog):
-    def __init__(self, app_context, parent=None):
+    def __init__(self, app_context, parent=None, recording=None):
         super().__init__(parent)
         self.app = app_context
-        self.setWindowTitle("Add New Stream")
+        self.recording = recording
+        self.is_edit = self.recording is not None
+        
+        self.setWindowTitle("Edit Stream" if self.is_edit else "Add New Stream")
         self.setMinimumWidth(450)
         
         self._setup_ui()
+        if self.is_edit:
+            self._fill_data()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -35,7 +40,7 @@ class QtAddStreamDialog(QDialog):
         layout.setSpacing(15)
 
         # Title
-        title = QLabel("Add New Stream")
+        title = QLabel("Edit Stream" if self.is_edit else "Add New Stream")
         title.setProperty("class", "heading")
         layout.addWidget(title)
 
@@ -43,6 +48,9 @@ class QtAddStreamDialog(QDialog):
         layout.addWidget(QLabel("Stream URL (Twitch, YouTube, etc.)"))
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("https://twitch.tv/example")
+        if self.is_edit:
+            self.url_input.setReadOnly(True)  # Usually URL is the ID
+            self.url_input.setStyleSheet("color: #777; background: #252525;")
         layout.addWidget(self.url_input)
 
         # Quality Selection
@@ -69,7 +77,7 @@ class QtAddStreamDialog(QDialog):
         self.cancel_btn.setProperty("class", "secondary")
         self.cancel_btn.clicked.connect(self.reject)
         
-        self.add_btn = QPushButton("Add Stream")
+        self.add_btn = QPushButton("Save Changes" if self.is_edit else "Add Stream")
         self.add_btn.setProperty("class", "primary")
         self.add_btn.clicked.connect(self._on_add_clicked)
         
@@ -79,12 +87,34 @@ class QtAddStreamDialog(QDialog):
         
         layout.addLayout(btn_layout)
 
+    def _fill_data(self):
+        """Pre-fill fields with existing recording data."""
+        self.url_input.setText(self.recording.url)
+        # Find quality
+        q_val = getattr(self.recording, "record_quality", "OD")
+        for label, key in self.qualities.items():
+            if key == q_val:
+                self.quality_combo.setCurrentText(label)
+                break
+
     def _on_add_clicked(self):
         url = self.url_input.text().strip()
         quality_label = self.quality_combo.currentText()
         quality_key = self.qualities.get(quality_label, "OD")
         
         if not url:
+            return
+
+        if self.is_edit:
+            logger.info(f"Updating stream: {url} with quality {quality_key}")
+            # Update local object
+            self.recording.record_quality = quality_key
+            # Save to manager
+            self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
+            
+            if hasattr(self.app.main_window, "show_toast"):
+                self.app.main_window.show_toast(f"Updated: {self.recording.streamer_name}", "success")
+            self.accept()
             return
 
         # Validate platform
@@ -117,4 +147,8 @@ class QtAddStreamDialog(QDialog):
         # Publish event
         self.app.event_bus.publish("add", new_rec)
         
+        # Show toast
+        if hasattr(self.app.main_window, "show_toast"):
+            self.app.main_window.show_toast(f"Stream added: {streamer_name}", "success")
+            
         self.accept()

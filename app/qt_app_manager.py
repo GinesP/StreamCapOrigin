@@ -47,6 +47,7 @@ class QtApp:
         self.record_manager = None
         self.install_manager = None
         self.update_checker = None
+        self.video_player = None
         
         # Flet compatibility attributes (placeholders)
         self.is_web_mode = False
@@ -54,6 +55,13 @@ class QtApp:
         self.recording_enabled = True
         self.page = None  # None for Qt
         self.subprocess_start_up_info = utils.get_startup_info()
+
+    @property
+    def language_code(self):
+        """Proxy property to get language_code from settings."""
+        if self.settings:
+            return self.settings.language_code
+        return "en"
 
     async def initialize(self):
         """Asynchronously initialize all core managers."""
@@ -95,6 +103,7 @@ class QtApp:
                 await self.config_manager.save_user_config(self.settings.user_config)
 
                 if update_info.get("has_update", False):
+                    logger.debug(f"DEBUG: Update found: {update_info.get('latest_version')}. Publishing update_found.")
                     # In Qt, we emit an event instead of calling show_update_dialog directly
                     self.event_bus.publish("update_found", update_info)
         except Exception as e:

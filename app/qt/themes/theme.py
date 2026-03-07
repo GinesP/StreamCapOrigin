@@ -1,210 +1,243 @@
 """
-Qt Theme system for StreamCap.
+Qt ThemeManager for StreamCap — Elite Level 10.
 
-Provides dark and light themes using Qt StyleSheets (QSS),
-replacing the Flet theme system.
+Implements the reactive Data-Driven JSON theme architecture:
+- ThemeManager watches theme.json via QFileSystemWatcher (hot-reload)
+- Emits themeChanged signal so every subscriber can unpolish/polish itself
+- Dual palettes: Neutral Dark (default) and Neutral Light (professional)
+- Accent color: #FF6428 (brand orange)
 """
 
-from PySide6.QtGui import QColor, QPalette, QFont
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+from __future__ import annotations
+
+import json
+import os
+
+from PySide6.QtCore import QFileSystemWatcher, QObject, Signal
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QApplication, QWidget
 
 
-# ── Color Palettes ───────────────────────────────────────────────────
+# ── Design Token Palettes ────────────────────────────────────────────────────
+# Based on Pyside6_Native_Design_Guide.md  §5 & §8
 
-DARK_COLORS = {
-    "background": "#1e1e2e",
-    "surface": "#282840",
-    "surface_variant": "#313148",
-    "card": "#2a2a3d",
-    "card_hover": "#32324a",
-    "primary": "#7c6ff7",
-    "primary_light": "#9d93f9",
-    "primary_dark": "#5a4fd4",
-    "secondary": "#4fc3f7",
-    "accent": "#f06292",
-    "text": "#e0e0e0",
-    "text_secondary": "#a0a0b0",
-    "text_muted": "#707085",
-    "border": "#3a3a55",
-    "divider": "#2e2e45",
-    "success": "#66bb6a",
-    "warning": "#ffa726",
-    "error": "#ef5350",
-    "info": "#42a5f5",
-    "scrollbar": "#3a3a55",
-    "scrollbar_hover": "#50507a",
-    "input_bg": "#252540",
-    "input_border": "#3a3a55",
-    "input_focus": "#7c6ff7",
-    "sidebar_bg": "#1a1a2e",
-    "sidebar_item_hover": "#2a2a45",
-    "sidebar_item_selected": "#35355a",
-    "tooltip_bg": "#3a3a55",
-    "tooltip_text": "#e0e0e0",
+NEUTRAL_DARK: dict[str, str] = {
+    # Backgrounds
+    "bg":          "#252525",
+    "sidebar":     "#1A1A1A",
+    "surface":     "#2D2D2D",
+    "surface2":    "#333333",  # Hover state
+    # Brand
+    "accent":      "#FF6428",
+    "accent_l":    "#FF8050",  # lighter 20 %
+    "accent_d":    "#CC4F20",  # darker  20 %
+    # Text
+    "text":        "#E1E1E1",
+    "text_sec":    "#A0A0A0",
+    "text_muted":  "#666666",
+    # Lines
+    "border":      "#383838",
+    "border_h":    "#484848",  # Highlighted border
+    "divider":     "#2A2A2A",
+    # Inputs
+    "input_bg":    "#1E1E1E",
+    "input_border":"#383838",
+    "input_focus": "#FF6428",
+    # Sidebar items
+    "sb_hover":    "#2A2A2A",
+    "sb_selected": "#332218",  # Tinted with accent
+    # Scrollbar
+    "scroll":      "#3A3A3A",
+    "scroll_h":    "#505050",
+    # Feedback
+    "success":     "#4CAF50",
+    "warning":     "#FF9800",
+    "error":       "#F44336",
+    "info":        "#2196F3",
+    # Cards
+    "card":        "#2D2D2D",
+    "card_hover":  "#333333",
+    # Tooltip
+    "tooltip_bg":  "#1A1A1A",
+    "tooltip_text":"#E1E1E1",
 }
 
-LIGHT_COLORS = {
-    "background": "#f5f5f8",
-    "surface": "#ffffff",
-    "surface_variant": "#f0f0f5",
-    "card": "#ffffff",
-    "card_hover": "#f8f8ff",
-    "primary": "#5c6bc0",
-    "primary_light": "#8e99d4",
-    "primary_dark": "#3949ab",
-    "secondary": "#00acc1",
-    "accent": "#e91e63",
-    "text": "#2c2c2c",
-    "text_secondary": "#5a5a6e",
-    "text_muted": "#9e9eb0",
-    "border": "#dcdce5",
-    "divider": "#e8e8f0",
-    "success": "#43a047",
-    "warning": "#ef6c00",
-    "error": "#d32f2f",
-    "info": "#1976d2",
-    "scrollbar": "#c0c0d0",
-    "scrollbar_hover": "#a0a0b5",
-    "input_bg": "#fafafe",
-    "input_border": "#dcdce5",
-    "input_focus": "#5c6bc0",
-    "sidebar_bg": "#eeeef5",
-    "sidebar_item_hover": "#e0e0ec",
-    "sidebar_item_selected": "#d5d5e8",
-    "tooltip_bg": "#424252",
-    "tooltip_text": "#ffffff",
+NEUTRAL_LIGHT: dict[str, str] = {
+    # Backgrounds
+    "bg":          "#F5F5F7",
+    "sidebar":     "#EBEBED",
+    "surface":     "#FFFFFF",
+    "surface2":    "#F0F0F2",
+    # Brand
+    "accent":      "#FF6428",
+    "accent_l":    "#FF8050",
+    "accent_d":    "#CC4F20",
+    # Text
+    "text":        "#1D1D1F",
+    "text_sec":    "#555565",
+    "text_muted":  "#9E9EB0",
+    # Lines
+    "border":      "#DCDCE5",
+    "border_h":    "#BDBDCA",
+    "divider":     "#E8E8EF",
+    # Inputs
+    "input_bg":    "#FAFAFE",
+    "input_border":"#DCDCE5",
+    "input_focus": "#FF6428",
+    # Sidebar items
+    "sb_hover":    "#E0E0EC",
+    "sb_selected": "#FFE8DE",
+    # Scrollbar
+    "scroll":      "#C0C0D0",
+    "scroll_h":    "#A0A0B5",
+    # Feedback
+    "success":     "#388E3C",
+    "warning":     "#E65100",
+    "error":       "#C62828",
+    "info":        "#1565C0",
+    # Cards
+    "card":        "#FFFFFF",
+    "card_hover":  "#F8F8FF",
+    # Tooltip
+    "tooltip_bg":  "#2D2D2D",
+    "tooltip_text":"#E1E1E1",
+}
+
+# Status / queue badge colors (shared)
+STATUS_COLORS: dict[str, str] = {
+    "recording": "#F44336",
+    "living":    "#4CAF50",
+    "offline":   "#9E9E9E",
+    "error":     "#FF9800",
+    "stopped":   "#607D8B",
+}
+
+QUEUE_COLORS: dict[str, str] = {
+    "fast":   "#4CAF50",
+    "medium": "#FF9800",
+    "slow":   "#F44336",
 }
 
 
-# ── Status Colors (shared between themes) ───────────────────────────
+# ── Helper ───────────────────────────────────────────────────────────────────
 
-STATUS_COLORS = {
-    "recording": "#ef5350",
-    "living": "#66bb6a",
-    "offline": "#9e9e9e",
-    "error": "#ff7043",
-    "stopped": "#78909c",
-}
-
-QUEUE_COLORS = {
-    "fast": "#66bb6a",
-    "medium": "#ffa726",
-    "slow": "#ef5350",
-}
+def _derive_accent_variants(accent_hex: str) -> tuple[str, str]:
+    """Return (lighter, darker) hex variants of an accent color."""
+    c = QColor(accent_hex)
+    return c.lighter(120).name(), c.darker(120).name()
 
 
-def get_colors(dark: bool = True) -> dict[str, str]:
-    """Return the color dictionary for the given theme mode."""
-    return DARK_COLORS if dark else LIGHT_COLORS
+def update_widget_style(w: QWidget, state: str | None = None) -> None:
+    """Force Qt to re-evaluate CSS for a widget (unpolish → polish).
+
+    Used the 'Elite Unpolish/Polish' technique from the design guide §2
+    to ensure dynamic property changes take effect immediately.
+    """
+    if state is not None:
+        w.setProperty("state", state)
+    w.style().unpolish(w)
+    w.style().polish(w)
+    w.update()
 
 
-# ── StyleSheet Generation ────────────────────────────────────────────
+# ── Stylesheet Generator ─────────────────────────────────────────────────────
 
-def generate_stylesheet(colors: dict[str, str]) -> str:
-    """Generate the full application stylesheet from a color dictionary."""
+def _generate_stylesheet(c: dict[str, str]) -> str:
+    """Build the full application QSS from the token dictionary ``c``."""
     return f"""
-    /* ── Global ─────────────────────────────────────────── */
-    QMainWindow, QWidget {{
-        background-color: {colors["background"]};
-        color: {colors["text"]};
-        font-family: "Segoe UI", "Inter", "Roboto", sans-serif;
+    /* ═══════════════════════════════════════════════════════════
+       STREAMCAP — Elite Neutral Dark Stylesheet
+       Token-driven via ThemeManager (Pyside6_Native_Design_Guide §5)
+    ═══════════════════════════════════════════════════════════ */
+
+    /* ── Global reset ─────────────────────────────────────────── */
+    QMainWindow, QDialog, QWidget {{
+        background-color: {c["bg"]};
+        color: {c["text"]};
+        font-family: "Segoe UI", "Arial", sans-serif;
         font-size: 13px;
     }}
 
-    /* ── Scroll Areas ───────────────────────────────────── */
+    /* ── Scroll areas ──────────────────────────────────────────── */
     QScrollArea {{
         border: none;
         background-color: transparent;
     }}
     QScrollBar:vertical {{
         background: transparent;
-        width: 10px;
+        width: 8px;
         margin: 0;
     }}
     QScrollBar::handle:vertical {{
-        background: {colors["scrollbar"]};
-        min-height: 40px;
-        border-radius: 5px;
+        background: {c["scroll"]};
+        min-height: 36px;
+        border-radius: 4px;
         margin: 2px;
     }}
     QScrollBar::handle:vertical:hover {{
-        background: {colors["scrollbar_hover"]};
+        background: {c["scroll_h"]};
     }}
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-        height: 0px;
-    }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
     QScrollBar:horizontal {{
         background: transparent;
-        height: 10px;
+        height: 8px;
         margin: 0;
     }}
     QScrollBar::handle:horizontal {{
-        background: {colors["scrollbar"]};
-        min-width: 40px;
-        border-radius: 5px;
+        background: {c["scroll"]};
+        min-width: 36px;
+        border-radius: 4px;
         margin: 2px;
     }}
     QScrollBar::handle:horizontal:hover {{
-        background: {colors["scrollbar_hover"]};
+        background: {c["scroll_h"]};
     }}
-    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-        width: 0px;
-    }}
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0px; }}
 
-    /* ── Labels ─────────────────────────────────────────── */
+    /* ── Labels ────────────────────────────────────────────────── */
     QLabel {{
-        color: {colors["text"]};
+        color: {c["text"]};
         background: transparent;
     }}
-    QLabel[class="secondary"] {{
-        color: {colors["text_secondary"]};
-    }}
-    QLabel[class="muted"] {{
-        color: {colors["text_muted"]};
-        font-size: 12px;
-    }}
-    QLabel[class="heading"] {{
-        font-size: 20px;
-        font-weight: 600;
-    }}
-    QLabel[class="subheading"] {{
-        font-size: 15px;
-        font-weight: 500;
-        color: {colors["text_secondary"]};
-    }}
+    QLabel[class="secondary"] {{ color: {c["text_sec"]}; }}
+    QLabel[class="muted"]     {{ color: {c["text_muted"]}; font-size: 12px; }}
+    QLabel[class="heading"]   {{ font-size: 20px; font-weight: 700; color: {c["text"]}; }}
+    QLabel[class="subheading"]{{ font-size: 15px; font-weight: 500; color: {c["text_sec"]}; }}
+    QLabel[class="accent"]    {{ color: {c["accent"]}; font-weight: 600; }}
 
-    /* ── Buttons ────────────────────────────────────────── */
+    /* ── Buttons ───────────────────────────────────────────────── */
     QPushButton {{
-        background-color: {colors["primary"]};
+        background-color: {c["accent"]};
         color: #ffffff;
         border: none;
         border-radius: 6px;
         padding: 8px 18px;
-        font-weight: 500;
+        font-weight: 600;
         font-size: 13px;
     }}
     QPushButton:hover {{
-        background-color: {colors["primary_light"]};
+        background-color: {c["accent_l"]};
     }}
     QPushButton:pressed {{
-        background-color: {colors["primary_dark"]};
+        background-color: {c["accent_d"]};
     }}
     QPushButton:disabled {{
-        background-color: {colors["border"]};
-        color: {colors["text_muted"]};
+        background-color: {c["border"]};
+        color: {c["text_muted"]};
     }}
     QPushButton[class="secondary"] {{
         background-color: transparent;
-        color: {colors["primary"]};
-        border: 1px solid {colors["primary"]};
+        color: {c["accent"]};
+        border: 1px solid {c["accent"]};
     }}
     QPushButton[class="secondary"]:hover {{
-        background-color: {colors["primary"]};
+        background-color: {c["accent"]};
         color: #ffffff;
     }}
     QPushButton[class="danger"] {{
-        background-color: {colors["error"]};
+        background-color: {c["error"]};
+        color: #ffffff;
+        border: none;
     }}
     QPushButton[class="danger"]:hover {{
         background-color: #c62828;
@@ -213,232 +246,392 @@ def generate_stylesheet(colors: dict[str, str]) -> str:
         background-color: transparent;
         border: none;
         padding: 6px;
-        border-radius: 4px;
+        border-radius: 5px;
+        font-size: 15px;
     }}
     QPushButton[class="icon"]:hover {{
-        background-color: {colors["surface_variant"]};
+        background-color: {c["surface2"]};
+    }}
+    QPushButton[class="filter-btn"] {{
+        background-color: transparent;
+        color: {c["text_sec"]};
+        border: 1px solid {c["border"]};
+        border-radius: 6px;
+        padding: 5px 14px;
+        font-weight: 500;
+    }}
+    QPushButton[class="filter-btn"]:hover {{
+        background-color: {c["surface2"]};
+        color: {c["text"]};
+    }}
+    QPushButton[class="filter-btn"]:checked {{
+        background-color: {c["accent"]};
+        color: #ffffff;
+        border: 1px solid {c["accent"]};
     }}
 
-    /* ── Inputs ─────────────────────────────────────────── */
+    /* ── Inputs ────────────────────────────────────────────────── */
     QLineEdit, QTextEdit {{
-        background-color: {colors["input_bg"]};
-        color: {colors["text"]};
-        border: 1px solid {colors["input_border"]};
+        background-color: {c["input_bg"]};
+        color: {c["text"]};
+        border: 1px solid {c["input_border"]};
         border-radius: 6px;
         padding: 8px 12px;
         font-size: 13px;
-        selection-background-color: {colors["primary"]};
+        selection-background-color: {c["accent"]};
     }}
     QLineEdit:focus, QTextEdit:focus {{
-        border-color: {colors["input_focus"]};
+        border-color: {c["input_focus"]};
+    }}
+    QLineEdit:read-only {{
+        color: {c["text_sec"]};
+    }}
+    QLineEdit::placeholder, QTextEdit::placeholder {{
+        color: {c["text_muted"]};
     }}
 
-    /* ── ComboBox ───────────────────────────────────────── */
+    /* ── ComboBox ──────────────────────────────────────────────── */
     QComboBox {{
-        background-color: {colors["input_bg"]};
-        color: {colors["text"]};
-        border: 1px solid {colors["input_border"]};
+        background-color: {c["input_bg"]};
+        color: {c["text"]};
+        border: 1px solid {c["input_border"]};
         border-radius: 6px;
         padding: 6px 12px;
         min-height: 28px;
     }}
-    QComboBox:focus {{
-        border-color: {colors["input_focus"]};
-    }}
-    QComboBox::drop-down {{
-        border: none;
-        width: 24px;
-    }}
+    QComboBox:focus {{ border-color: {c["input_focus"]}; }}
+    QComboBox::drop-down {{ border: none; width: 24px; }}
     QComboBox QAbstractItemView {{
-        background-color: {colors["surface"]};
-        border: 1px solid {colors["border"]};
+        background-color: {c["surface"]};
+        border: 1px solid {c["border"]};
         border-radius: 6px;
         padding: 4px;
-        selection-background-color: {colors["primary"]};
+        selection-background-color: {c["accent"]};
         selection-color: #ffffff;
     }}
 
-    /* ── TabWidget ──────────────────────────────────────── */
+    /* ── TabWidget ─────────────────────────────────────────────── */
     QTabWidget::pane {{
         border: none;
         background-color: transparent;
     }}
     QTabBar::tab {{
         background-color: transparent;
-        color: {colors["text_secondary"]};
-        padding: 10px 18px;
+        color: {c["text_sec"]};
+        padding: 10px 20px;
         border: none;
         border-bottom: 2px solid transparent;
         font-size: 13px;
     }}
     QTabBar::tab:selected {{
-        color: {colors["primary"]};
-        border-bottom: 2px solid {colors["primary"]};
-        font-weight: 600;
+        color: {c["accent"]};
+        border-bottom: 2px solid {c["accent"]};
+        font-weight: 700;
     }}
     QTabBar::tab:hover {{
-        color: {colors["text"]};
-        background-color: {colors["surface_variant"]};
+        color: {c["text"]};
+        background-color: {c["surface2"]};
     }}
 
-    /* ── Cards (QFrame) ────────────────────────────────── */
+    /* ── Cards (QFrame[class="card"]) ──────────────────────────── */
     QFrame[class="card"] {{
-        background-color: {colors["card"]};
-        border: 1px solid {colors["border"]};
+        background-color: {c["card"]};
+        border: 1px solid {c["border"]};
         border-radius: 10px;
     }}
     QFrame[class="card"]:hover {{
-        background-color: {colors["card_hover"]};
-        border-color: {colors["primary"]};
+        background-color: {c["card_hover"]};
+        border-color: {c["accent"]};
     }}
 
-    /* ── Sidebar ───────────────────────────────────────── */
+    /* ── Sidebar ───────────────────────────────────────────────── */
     QFrame[class="sidebar"] {{
-        background-color: {colors["sidebar_bg"]};
-        border-right: 1px solid {colors["divider"]};
+        background-color: {c["sidebar"]};
+        border-right: 1px solid {c["divider"]};
     }}
     QPushButton[class="sidebar-item"] {{
         background-color: transparent;
-        color: {colors["text_secondary"]};
+        color: {c["text_sec"]};
         text-align: left;
-        padding: 12px 16px;
+        padding: 10px 14px;
         border: none;
-        border-radius: 8px;
+        border-radius: 7px;
         font-size: 13px;
     }}
     QPushButton[class="sidebar-item"]:hover {{
-        background-color: {colors["sidebar_item_hover"]};
-        color: {colors["text"]};
+        background-color: {c["sb_hover"]};
+        color: {c["text"]};
     }}
     QPushButton[class="sidebar-item"][selected="true"] {{
-        background-color: {colors["sidebar_item_selected"]};
-        color: {colors["primary"]};
-        font-weight: 600;
+        background-color: {c["sb_selected"]};
+        color: {c["accent"]};
+        font-weight: 700;
     }}
 
-    /* ── Dividers ───────────────────────────────────────── */
+    /* ── Dividers ──────────────────────────────────────────────── */
     QFrame[class="divider-h"] {{
-        background-color: {colors["divider"]};
-        max-height: 1px;
-        min-height: 1px;
+        background-color: {c["divider"]};
+        max-height: 1px; min-height: 1px;
     }}
     QFrame[class="divider-v"] {{
-        background-color: {colors["divider"]};
-        max-width: 1px;
-        min-width: 1px;
+        background-color: {c["divider"]};
+        max-width: 1px; min-width: 1px;
     }}
 
-    /* ── ToolTip ────────────────────────────────────────── */
+    /* ── ToolTip ───────────────────────────────────────────────── */
     QToolTip {{
-        background-color: {colors["tooltip_bg"]};
-        color: {colors["tooltip_text"]};
-        border: 1px solid {colors["border"]};
-        border-radius: 4px;
-        padding: 4px 8px;
+        background-color: {c["tooltip_bg"]};
+        color: {c["tooltip_text"]};
+        border: 1px solid {c["border_h"]};
+        border-radius: 5px;
+        padding: 5px 10px;
         font-size: 12px;
     }}
 
-    /* ── Progress Bar ──────────────────────────────────── */
+    /* ── ProgressBar ───────────────────────────────────────────── */
     QProgressBar {{
-        background-color: {colors["surface_variant"]};
+        background-color: {c["surface2"]};
         border: none;
         border-radius: 4px;
         height: 6px;
         text-align: center;
+        color: transparent;
     }}
     QProgressBar::chunk {{
-        background-color: {colors["primary"]};
+        background-color: {c["accent"]};
         border-radius: 4px;
     }}
 
-    /* ── CheckBox ───────────────────────────────────────── */
+    /* ── CheckBox ──────────────────────────────────────────────── */
     QCheckBox {{
-        color: {colors["text"]};
+        color: {c["text"]};
         spacing: 8px;
     }}
     QCheckBox::indicator {{
-        width: 18px;
-        height: 18px;
-        border: 2px solid {colors["border"]};
+        width: 18px; height: 18px;
+        border: 2px solid {c["border_h"]};
         border-radius: 4px;
         background-color: transparent;
     }}
     QCheckBox::indicator:checked {{
-        background-color: {colors["primary"]};
-        border-color: {colors["primary"]};
+        background-color: {c["accent"]};
+        border-color: {c["accent"]};
     }}
 
-    /* ── Dialog ─────────────────────────────────────────── */
+    /* ── Dialog ────────────────────────────────────────────────── */
     QDialog {{
-        background-color: {colors["surface"]};
+        background-color: {c["surface"]};
         border-radius: 12px;
     }}
 
-    /* ── StatusBar ──────────────────────────────────────── */
+    /* ── StatusBar ─────────────────────────────────────────────── */
     QStatusBar {{
-        background-color: {colors["surface"]};
-        color: {colors["text_secondary"]};
-        border-top: 1px solid {colors["divider"]};
+        background-color: {c["sidebar"]};
+        color: {c["text_sec"]};
+        border-top: 1px solid {c["divider"]};
         font-size: 12px;
     }}
 
-    /* ── Menu ───────────────────────────────────────────── */
+    /* ── Menu ──────────────────────────────────────────────────── */
     QMenu {{
-        background-color: {colors["surface"]};
-        border: 1px solid {colors["border"]};
+        background-color: {c["surface"]};
+        border: 1px solid {c["border"]};
         border-radius: 8px;
         padding: 4px 0;
     }}
     QMenu::item {{
         padding: 8px 24px;
-        color: {colors["text"]};
+        color: {c["text"]};
     }}
     QMenu::item:selected {{
-        background-color: {colors["primary"]};
+        background-color: {c["accent"]};
         color: #ffffff;
         border-radius: 4px;
     }}
 
-    /* ── GroupBox ───────────────────────────────────────── */
+    /* ── GroupBox ──────────────────────────────────────────────── */
     QGroupBox {{
         font-weight: 600;
-        font-size: 14px;
-        color: {colors["primary"]};
-        border: 1px solid {colors["border"]};
+        font-size: 13px;
+        color: {c["text_sec"]};
+        border: 1px solid {c["border"]};
         border-radius: 8px;
-        margin-top: 15px;
-        padding-top: 25px;
-        background-color: {colors["surface"]};
+        margin-top: 14px;
+        padding-top: 22px;
+        background-color: {c["surface"]};
     }}
     QGroupBox::title {{
         subcontrol-origin: margin;
         subcontrol-position: top left;
         padding: 0 8px;
         left: 10px;
+        color: {c["accent"]};
+    }}
+
+    /* ── ListWidget ────────────────────────────────────────────── */
+    QListWidget {{
+        background-color: {c["surface"]};
+        border: 1px solid {c["border"]};
+        border-radius: 8px;
+        padding: 6px;
+        outline: none;
+    }}
+    QListWidget::item {{
+        padding: 10px 12px;
+        border-radius: 6px;
+        color: {c["text"]};
+    }}
+    QListWidget::item:hover {{
+        background-color: {c["surface2"]};
+    }}
+    QListWidget::item:selected {{
+        background-color: {c["accent"]};
+        color: #ffffff;
     }}
     """
 
 
-# ── Apply Theme ──────────────────────────────────────────────────────
+# ── ThemeManager ─────────────────────────────────────────────────────────────
 
-def apply_theme(app: QApplication, dark: bool = True, accent_color: str | None = None):
-    """Apply the selected theme to the entire application.
+class ThemeManager(QObject):
+    """Reactive theme engine.
 
-    Args:
-        app: The QApplication instance.
-        dark: True for dark mode, False for light mode.
-        accent_color: Optional hex color override for the primary/accent color.
+    - Watches ``theme.json`` with QFileSystemWatcher for live hot-reload
+    - Emits ``themeChanged`` so any subscriber can refresh colours
+    - Maintains the current colour token dict for synchronous reads
     """
-    colors = get_colors(dark)
 
+    themeChanged = Signal()  # §2: "Subscription and Polish" pattern
+
+    # Singleton-ish: modules that import `theme_manager` get the same instance
+    _instance: "ThemeManager | None" = None
+
+    def __new__(cls) -> "ThemeManager":
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self) -> None:
+        if getattr(self, "_initialized", False):
+            return
+        super().__init__()
+        self._initialized = True
+
+        self._dark: bool = True
+        self._accent: str | None = None
+        self.colors: dict[str, str] = {}
+
+        # File watcher for hot-reload
+        self._watcher = QFileSystemWatcher()
+        self._theme_file: str | None = None
+        self._watcher.fileChanged.connect(self._on_file_changed)
+
+        # Apply default palette immediately
+        self._rebuild_colors()
+
+    # ── Public API ───────────────────────────────────────────────
+
+    def set_mode(self, dark: bool) -> None:
+        """Switch between dark and light mode and emit themeChanged."""
+        self._dark = dark
+        self._rebuild_colors()
+        self._apply_to_app()
+        self.themeChanged.emit()
+
+    def set_accent(self, hex_color: str) -> None:
+        """Override the accent/brand colour and emit themeChanged."""
+        self._accent = hex_color
+        self._rebuild_colors()
+        self._apply_to_app()
+        self.themeChanged.emit()
+
+    def set_theme_file(self, path: str) -> None:
+        """Register an external JSON file for hot-reload (§1)."""
+        if self._theme_file:
+            self._watcher.removePath(self._theme_file)
+        self._theme_file = path
+        if os.path.exists(path):
+            self._watcher.addPath(path)
+            self._load_from_file(path)
+
+    def apply(self, app: QApplication | None = None) -> None:
+        """Apply the current stylesheet to the QApplication."""
+        self._apply_to_app(app)
+
+    def get_color(self, token: str, fallback: str = "#FF6428") -> str:
+        """Return a design-token colour for use in QPainter code (§2)."""
+        return self.colors.get(token, fallback)
+
+    @property
+    def is_dark(self) -> bool:
+        return self._dark
+
+    # ── Internal ─────────────────────────────────────────────────
+
+    def _rebuild_colors(self) -> None:
+        base = dict(NEUTRAL_DARK if self._dark else NEUTRAL_LIGHT)
+        if self._accent:
+            l, d = _derive_accent_variants(self._accent)
+            base["accent"]   = self._accent
+            base["accent_l"] = l
+            base["accent_d"] = d
+            base["input_focus"] = self._accent
+        self.colors = base
+
+    def _apply_to_app(self, app: QApplication | None = None) -> None:
+        target = app or QApplication.instance()
+        if target:
+            target.setStyleSheet(_generate_stylesheet(self.colors))
+
+    def _on_file_changed(self, path: str) -> None:
+        """QFileSystemWatcher callback: reload JSON and propagate."""
+        # Some editors write-and-replace (file is briefly missing)
+        if not os.path.exists(path):
+            return
+        # Re-watch (some editors unwatch on save)
+        self._watcher.addPath(path)
+        self._load_from_file(path)
+
+    def _load_from_file(self, path: str) -> None:
+        """Parse theme.json and merge overrides (§1)."""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            mode_key = "neutral_dark" if self._dark else "neutral_light"
+            overrides: dict = data.get(mode_key, {})
+            if overrides:
+                self.colors.update(overrides)
+                self._apply_to_app()
+                self.themeChanged.emit()
+        except Exception:
+            pass  # Never crash on a bad JSON edit
+
+
+# ── Module-level singleton ────────────────────────────────────────────────────
+# Import this from anywhere: `from app.qt.themes.theme import theme_manager`
+theme_manager = ThemeManager()
+
+
+# ── Legacy helpers (backwards compat) ────────────────────────────────────────
+
+def get_colors(dark: bool = True) -> dict[str, str]:
+    """Return a copy of the current colour dictionary."""
+    return dict(NEUTRAL_DARK if dark else NEUTRAL_LIGHT)
+
+
+def apply_theme(
+    app: QApplication,
+    dark: bool = True,
+    accent_color: str | None = None,
+) -> None:
+    """Convenience wrapper — updates the singleton and applies."""
+    theme_manager._dark = dark
     if accent_color:
-        colors = dict(colors)  # shallow copy
-        colors["primary"] = accent_color
-        # Derive light/dark variants
-        qc = QColor(accent_color)
-        colors["primary_light"] = qc.lighter(120).name()
-        colors["primary_dark"] = qc.darker(120).name()
-        colors["input_focus"] = accent_color
+        theme_manager._accent = accent_color
+    theme_manager._rebuild_colors()
+    theme_manager._apply_to_app(app)
 
-    stylesheet = generate_stylesheet(colors)
-    app.setStyleSheet(stylesheet)
+
+# Keep old colour dicts available for components that import them directly
+DARK_COLORS  = NEUTRAL_DARK
+LIGHT_COLORS = NEUTRAL_LIGHT

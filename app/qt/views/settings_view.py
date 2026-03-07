@@ -87,6 +87,7 @@ class QtSettingsView(QWidget):
         
         self.restore_btn = QPushButton("Restore Defaults")
         self.restore_btn.setProperty("class", "secondary")
+        self.restore_btn.clicked.connect(self._on_restore_clicked)
         header.addWidget(self.restore_btn)
         
         main_layout.addLayout(header)
@@ -108,6 +109,30 @@ class QtSettingsView(QWidget):
         self.tabs.addTab(self._create_accounts_tab(), "Accounts")
         
         main_layout.addWidget(self.tabs)
+
+    def _on_restore_clicked(self):
+        from PySide6.QtWidgets import QMessageBox
+        box = QMessageBox(self)
+        box.setWindowTitle("Confirm Restore")
+        box.setText("Are you sure you want to restore all settings to their default values?")
+        box.setInformativeText("This will not affect your cookies or accounts.")
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        box.setDefaultButton(QMessageBox.StandardButton.No)
+        
+        if box.exec() == QMessageBox.StandardButton.Yes:
+            # We don't have a direct 'restore_defaults' in SettingsLogic that is exposed nicely
+            # So we use the same logic as Flet: update the whole dict if needed, or better,
+            # use update_setting for each key. But for now, let's just trigger a logic call.
+            self.app.event_bus.run_task(self.settings.restore_default_config)
+            
+            # Show toast feedback
+            if hasattr(self.app.main_window, "show_toast"):
+                self.app.main_window.show_toast("Settings restored to defaults", "success")
+                
+            # Re-load UI after a short delay to allow settings to persist
+            QTimer.singleShot(200, self._load_settings)
+
 
     def _create_scroll_wrapper(self, widget):
         """Wraps a widget in a scroll area."""
@@ -144,7 +169,28 @@ class QtSettingsView(QWidget):
         path_widget = QWidget()
         path_widget.setLayout(path_row)
         rec_group.add_setting("Save Path:", path_widget)
+
+        # Folder Naming Rules
+        naming_group = SettingsGroup("Folder Naming Rules", "Organize downloads into subfolders.")
         
+        self.name_plat = QCheckBox()
+        self.name_plat.stateChanged.connect(lambda s: self._save_setting("folder_name_platform", s == Qt.CheckState.Checked.value))
+        naming_group.add_setting("Include Platform:", self.name_plat)
+
+        self.name_auth = QCheckBox()
+        self.name_auth.stateChanged.connect(lambda s: self._save_setting("folder_name_author", s == Qt.CheckState.Checked.value))
+        naming_group.add_setting("Include Author:", self.name_auth)
+
+        self.name_time = QCheckBox()
+        self.name_time.stateChanged.connect(lambda s: self._save_setting("folder_name_time", s == Qt.CheckState.Checked.value))
+        naming_group.add_setting("Include Date/Time:", self.name_time)
+
+        self.name_title = QCheckBox()
+        self.name_title.stateChanged.connect(lambda s: self._save_setting("folder_name_title", s == Qt.CheckState.Checked.value))
+        naming_group.add_setting("Include Title:", self.name_title)
+
+        layout.addWidget(naming_group)
+
         self.quality_combo = QComboBox()
         self.quality_combo.addItems(["OD", "UHD", "HD", "SD", "LD"])
         self.quality_combo.currentTextChanged.connect(lambda v: self._save_setting("record_quality", v))
@@ -163,6 +209,40 @@ class QtSettingsView(QWidget):
         self.loop_input.textChanged.connect(lambda v: self._save_setting("loop_time_seconds", v))
         monitor_group.add_setting("Check Interval (seconds):", self.loop_input)
         layout.addWidget(monitor_group)
+
+        # Proxy
+        proxy_group = SettingsGroup("Proxy Settings", "Route traffic through a proxy server.")
+        self.proxy_enabled = QCheckBox()
+        self.proxy_enabled.stateChanged.connect(lambda s: self._save_setting("enable_proxy", s == Qt.CheckState.Checked.value))
+        proxy_group.add_setting("Enable Proxy:", self.proxy_enabled)
+        
+        self.proxy_addr = QLineEdit()
+        self.proxy_addr.setPlaceholderText("http://user:pass@host:port")
+        self.proxy_addr.textChanged.connect(lambda v: self._save_setting("proxy_address", v))
+        proxy_group.add_setting("Proxy Address:", self.proxy_addr)
+        layout.addWidget(proxy_group)
+
+        # Advanced / Post-Processing
+        adv_group = SettingsGroup("Advanced Recording", "Segmenting and Post-processing.")
+        
+        self.seg_check = QCheckBox()
+        self.seg_check.stateChanged.connect(lambda s: self._save_setting("segmented_recording_enabled", s == Qt.CheckState.Checked.value))
+        adv_group.add_setting("Enable Segmented Recording:", self.seg_check)
+        
+        self.seg_time = QLineEdit()
+        self.seg_time.setFixedWidth(80)
+        self.seg_time.textChanged.connect(lambda v: self._save_setting("video_segment_time", v))
+        adv_group.add_setting("Segment Time (seconds):", self.seg_time)
+
+        self.mp4_check = QCheckBox()
+        self.mp4_check.stateChanged.connect(lambda s: self._save_setting("convert_to_mp4", s == Qt.CheckState.Checked.value))
+        adv_group.add_setting("Convert to MP4 (FFmpeg):", self.mp4_check)
+
+        self.del_check = QCheckBox()
+        self.del_check.stateChanged.connect(lambda s: self._save_setting("delete_original", s == Qt.CheckState.Checked.value))
+        adv_group.add_setting("Delete Original (after convert):", self.del_check)
+        
+        layout.addWidget(adv_group)
         
         return self._create_scroll_wrapper(content)
 
@@ -193,6 +273,27 @@ class QtSettingsView(QWidget):
         self.notif_title.textChanged.connect(lambda v: self._save_setting("custom_notification_title", v))
         custom_group.add_setting("Custom Title:", self.notif_title)
         layout.addWidget(custom_group)
+
+        # Telegram
+        tg_group = SettingsGroup("Telegram Bot", "Get alerts via Telegram.")
+        self.tg_token = QLineEdit()
+        self.tg_token.setPlaceholderText("Token (5555:AAAA...)")
+        self.tg_token.textChanged.connect(lambda v: self._save_setting("telegram_bot_token", v))
+        tg_group.add_setting("Bot Token:", self.tg_token)
+        
+        self.tg_chat = QLineEdit()
+        self.tg_chat.setPlaceholderText("Chat ID (-100123...)")
+        self.tg_chat.textChanged.connect(lambda v: self._save_setting("telegram_chat_id", v))
+        tg_group.add_setting("Chat ID:", self.tg_chat)
+        layout.addWidget(tg_group)
+
+        # Generic Webhook
+        hook_group = SettingsGroup("Discord / Webhook", "Route alerts to a Discord channel or custom URL.")
+        self.hook_url = QLineEdit()
+        self.hook_url.setPlaceholderText("https://discord.com/api/webhooks/...")
+        self.hook_url.textChanged.connect(lambda v: self._save_setting("discord_webhook_url", v))
+        hook_group.add_setting("Webhook URL:", self.hook_url)
+        layout.addWidget(hook_group)
         
         return self._create_scroll_wrapper(content)
 
@@ -255,16 +356,37 @@ class QtSettingsView(QWidget):
         idx = self.lang_combo.findText(current_lang if current_lang else "")
         if idx >= 0: self.lang_combo.setCurrentIndex(idx)
         self.path_input.setText(s.get_video_save_path())
+        
+        self.name_plat.setChecked(s.get_config_value("folder_name_platform", False))
+        self.name_auth.setChecked(s.get_config_value("folder_name_author", False))
+        self.name_time.setChecked(s.get_config_value("folder_name_time", False))
+        self.name_title.setChecked(s.get_config_value("folder_name_title", False))
+        
         idx_q = self.quality_combo.findText(s.get_config_value("record_quality", "OD"))
         if idx_q >= 0: self.quality_combo.setCurrentIndex(idx_q)
         self.title_check.setChecked(s.get_config_value("filename_includes_title", False))
         self.loop_input.setText(str(s.get_config_value("loop_time_seconds", "60")))
+        
+        # Proxy
+        self.proxy_enabled.setChecked(s.get_config_value("enable_proxy", False))
+        self.proxy_addr.setText(s.get_config_value("proxy_address", ""))
+        
+        # Advanced
+        self.seg_check.setChecked(s.get_config_value("segmented_recording_enabled", False))
+        self.seg_time.setText(str(s.get_config_value("video_segment_time", "3600")))
+        self.mp4_check.setChecked(s.get_config_value("convert_to_mp4", False))
+        self.del_check.setChecked(s.get_config_value("delete_original", False))
         
         # Push
         self.notif_enabled.setChecked(s.get_config_value("system_notification_enabled", False))
         self.start_notif.setChecked(s.get_config_value("stream_start_notification_enabled", False))
         self.end_notif.setChecked(s.get_config_value("stream_end_notification_enabled", False))
         self.notif_title.setText(s.get_config_value("custom_notification_title", "StreamCap"))
+        
+        # Telegram & Webhook
+        self.tg_token.setText(s.get_config_value("telegram_bot_token", ""))
+        self.tg_chat.setText(s.get_config_value("telegram_chat_id", ""))
+        self.hook_url.setText(s.get_config_value("discord_webhook_url", ""))
         
         # Cookies
         for p, field in self.cookie_fields.items():
