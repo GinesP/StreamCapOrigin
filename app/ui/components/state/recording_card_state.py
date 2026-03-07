@@ -10,21 +10,8 @@ class RecordingCardState:
     
     @staticmethod
     def get_card_state(recording: Recording) -> CardStateType:
-        if recording.is_recording:
-            return CardStateType.RECORDING
-        elif recording.status_info in RecordingCardState.ERROR_STATUSES:
-            return CardStateType.ERROR
-        elif recording.is_checking:
-            return CardStateType.CHECKING
-        elif recording.is_live and recording.monitor_status and not recording.is_recording:
-            return CardStateType.LIVE
-        elif (not recording.is_live and recording.monitor_status and
-              recording.status_info != RecordingStatus.NOT_IN_SCHEDULED_CHECK):
-            return CardStateType.OFFLINE
-        elif (not recording.monitor_status or 
-              recording.status_info == RecordingStatus.NOT_IN_SCHEDULED_CHECK):
-            return CardStateType.STOPPED
-        return CardStateType.UNKNOWN
+        from ....core.recording.recording_state_logic import RecordingStateLogic
+        return RecordingStateLogic.get_card_state(recording)
     
     @staticmethod
     def get_border_color(recording: Recording) -> ft.Colors:

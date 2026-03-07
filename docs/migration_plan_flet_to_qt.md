@@ -9,8 +9,8 @@ Este documento detalla la estrategia para migrar el frontend de StreamCap de **F
 - [x] **Fase 2: Ventana Principal y Navegación** - Shell de Qt con sidebar funcional
 - [x] **Fase 3: Vista de Grabaciones (Grid/List)** - Portando RecordingCard a Qt
 - [x] **Fase 4: Configuración y Diálogos** (SettingsView y AddStream integrados)
-- [ ] **Fase 5: Reproductor y Utilidades de UI**
-- [ ] **Fase 6: Pulido y Limpieza de Flet**
+- [x] **Fase 5: Reproductor y Utilidades de UI** (StorageView y VideoPlayer)
+- [ ] **Fase 6: Diálogos Restantes y Pulido Final**
 
 ---
 
@@ -49,6 +49,31 @@ Se ha creado la estructura base de la aplicación Qt siguiendo el diseño modern
 
 ---
 
+---
+
+## 🎬 Fase 5: Reproductor y Utilidades de UI (Completada)
+
+**Objetivo**: Implementar el navegador de archivos y el reproductor de vídeo nativo.
+
+- [x] **Vista de Almacenamiento (Storage)** (`app/qt/views/storage_view.py`) - Navegación de archivos
+- [x] **Reproductor de Vídeo Nativo** (`app/qt/components/video_player.py`) - Basado en QtMultimedia
+- [x] **Soporte Fullscreen** (Doble clic, tecla Esc y botón dedicado)
+- [x] **Vista About** (`app/qt/views/about_view.py`) - Información del proyecto y enlaces externos
+- [x] **Integración Global** (Acceso al reproductor desde tarjetas y explorador)
+
+---
+
+## 🛠️ Fase 6: Filtros, Diálogos y Pulido (En progreso)
+
+**Objetivo**: Añadir funcionalidades avanzadas de gestión y controles de seguridad.
+
+- [x] **Sistema de Filtros y Búsqueda** - Filtrado por texto, estado y plataforma.
+- [ ] **Diálogo de Edición de Streamers** - Permitir modificar configuración de cada stream.
+- [ ] **Diálogos de Confirmación** - Avisos antes de borrar o cerrar la app.
+- [ ] **Atajos de Teclado Globales** - Navegación rápida por la app.
+
+---
+
 ## ⚙️ Cómo ejecutar el prototipo Qt
 
 Durante la migración, puedes seguir usando la versión Flet con `python main.py`. Para probar la nueva versión Qt, usa:
@@ -56,5 +81,3 @@ Durante la migración, puedes seguir usando la versión Flet con `python main.py
 ```bash
 python main_qt.py
 ```
-
-El log mostrará la inicialización de los managers core y la carga de la ventana principal.

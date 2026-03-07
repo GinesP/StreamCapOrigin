@@ -13,7 +13,8 @@ import os
 import asyncio
 from qasync import QEventLoop
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QLoggingCategory
+from PySide6.QtGui import QFont
 
 # Ensure the project root is in the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,10 +30,12 @@ async def start_app():
     
     # Create and show window
     window = MainWindow(qt_app)
+    qt_app.main_window = window   # Needed for lazy video player creation
     # Ensure it's stored to prevent GC
     global _main_window 
     _main_window = window
     window.show()
+
     
     # Start periodic tasks
     await qt_app.start_periodic_tasks()
@@ -41,11 +44,20 @@ async def start_app():
 
 def main():
     """Main entry point."""
+    # Silence specific Qt warnings that spam the console on some Windows systems
+    # especially related to legacy bitmap fonts that fail with DirectWrite.
+    os.environ["QT_LOGGING_RULES"] = "qt.qpa.fonts.warning=false;qt.qpa.fonts=false"
+    QLoggingCategory.setFilterRules("qt.qpa.fonts.warning=false")
+
     # Create the Qt Application
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("StreamCap")
-    # Recommended for high DPI displays
-    app.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
+
+    # Set a robust default font to avoid legacy bitmap font fallbacks (DirectWrite errors)
+    default_font = QFont("Segoe UI", 10)
+    if not default_font.exactMatch():
+        default_font = QFont("Arial", 10)
+    app.setFont(default_font)
     
     # Create and set the qasync event loop
     loop = QEventLoop(app)
