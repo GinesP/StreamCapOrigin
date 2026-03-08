@@ -262,7 +262,7 @@ class LiveStreamRecorder:
                 proxy=self.proxy
             )
 
-            self.app.page.run_task(
+            self.app.event_bus.run_task(
                 self.start_direct_download,
                 stream_info.anchor_name,
                 self.live_url,
@@ -282,7 +282,7 @@ class LiveStreamRecorder:
                 headers=self.get_headers_params(record_url, self.platform_key)
             )
             ffmpeg_command = ffmpeg_builder.build_command()
-            self.app.page.run_task(
+            self.app.event_bus.run_task(
                 self.start_ffmpeg,
                 stream_info.anchor_name,
                 self.live_url,
@@ -308,7 +308,7 @@ class LiveStreamRecorder:
             if recording_duration > self.min_valid_recording_duration:
                 if self.app.recording_enabled:
                     # Perform extra checks outside the normal cycle to catch transient disconnects
-                    self.app.page.run_task(self.app.record_manager.check_if_live_with_retry, self.recording)
+                    self.app.event_bus.run_task(self.app.record_manager.check_if_live_with_retry, self.recording)
             else:
                 self.recording.status_info = RecordingStatus.RECORDING_ERROR
 
@@ -398,11 +398,13 @@ class LiveStreamRecorder:
 
                     try:
                         self.app.record_manager.stop_recording(self.recording)
-                        await self.app.record_card_manager.update_card(self.recording)
-                        self.app.page.pubsub.send_others_on_topic("update", self.recording)
-                        await self.app.snack_bar.show_snack_bar(
-                            record_name + " " + self._["record_stream_error"], duration=2000
-                        )
+                        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                            await self.app.record_card_manager.update_card(self.recording)
+                        self.app.event_bus.publish("update", self.recording)
+                        if hasattr(self.app, 'snack_bar') and self.app.snack_bar:
+                            await self.app.snack_bar.show_snack_bar(
+                                record_name + " " + self._["record_stream_error"], duration=2000
+                            )
                     except Exception as e:
                         logger.debug(f"Failed to update UI: {e}")
 
@@ -421,18 +423,19 @@ class LiveStreamRecorder:
                         logger.success(f"Live recording has stopped: {record_name}")
                     else:
                         logger.success(tr("console.live_recording_completed", "Live recording completed: {}").format(record_name))
-                        self.app.page.run_task(self.end_message_push)
+                        self.app.event_bus.run_task(self.end_message_push)
                     
                     try:
                         self.recording.update({"display_title": display_title})
-                        self.app.page.run_task(self.app.record_card_manager.update_card, self.recording)
-                        self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                            await self.app.record_card_manager.update_card(self.recording)
+                        self.app.event_bus.publish("update", self.recording)
                     except Exception as e:
                         logger.debug(f"Failed to update UI: {e}")
 
                 if not self.app.recording_enabled:
                     self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
-                    self.app.page.run_task(self.stop_recording_notify)
+                    self.app.event_bus.run_task(self.stop_recording_notify)
 
                 await self.recheck_live_status()
 
@@ -443,7 +446,7 @@ class LiveStreamRecorder:
                         for path in file_paths:
                             if prefix in path:
                                 try:
-                                    self.app.page.run_task(
+                                    self.app.event_bus.run_task(
                                         self.converts_mp4, path, self.user_config["delete_original"]
                                     )
                                 except Exception as e:
@@ -451,7 +454,7 @@ class LiveStreamRecorder:
                                     await self.converts_mp4(path, self.user_config["delete_original"])
                     else:
                         try:
-                            self.app.page.run_task(
+                            self.app.event_bus.run_task(
                                 self.converts_mp4, save_file_path, self.user_config["delete_original"]
                             )
                         except Exception as e:
@@ -461,7 +464,7 @@ class LiveStreamRecorder:
                 if self.user_config.get("execute_custom_script") and script_command:
                     logger.info("Prepare a direct script in the background")
                     try:
-                        self.app.page.run_task(
+                        self.app.event_bus.run_task(
                             self.custom_script_execute,
                             script_command,
                             record_name,
@@ -488,11 +491,13 @@ class LiveStreamRecorder:
 
             try:
                 self.app.record_manager.stop_recording(self.recording)
-                await self.app.record_card_manager.update_card(self.recording)
-                self.app.page.pubsub.send_others_on_topic("update", self.recording)
-                await self.app.snack_bar.show_snack_bar(
-                    record_name + " " + self._["no_ffmpeg_tip"], duration=4000
-                )
+                if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                    await self.app.record_card_manager.update_card(self.recording)
+                self.app.event_bus.publish("update", self.recording)
+                if hasattr(self.app, 'snack_bar') and self.app.snack_bar:
+                    await self.app.snack_bar.show_snack_bar(
+                        record_name + " " + self._["no_ffmpeg_tip"], duration=4000
+                    )
             except Exception as e:
                 logger.debug(f"Failed to update UI: {e}")
             return False
@@ -611,7 +616,7 @@ class LiveStreamRecorder:
             logger.info("Application is closing, adding script execution task to background service")
             BackgroundService.get_instance().add_task(self.run_script_sync, script_command)
         else:
-            self.app.page.run_task(self.run_script_async, script_command)
+            self.app.event_bus.run_task(self.run_script_async, script_command)
 
         logger.success("Script command execution initiated!")
 
@@ -726,25 +731,26 @@ class LiveStreamRecorder:
                     logger.success(f"Direct Downloading Stopped: {record_name}")
                 else:
                     logger.success(f"Direct Downloading Completed: {record_name}")
-                    self.app.page.run_task(self.end_message_push)
+                    self.app.event_bus.run_task(self.end_message_push)
 
                 try:
                     self.recording.update({"display_title": display_title})
-                    await self.app.record_card_manager.update_card(self.recording)
-                    self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                    if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                        await self.app.record_card_manager.update_card(self.recording)
+                    self.app.event_bus.publish("update", self.recording)
                 except Exception as e:
                     logger.debug(f"Failed to update UI: {e}")
 
             if not self.app.recording_enabled:
                 self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
-                self.app.page.run_task(self.stop_recording_notify)
+                self.app.event_bus.run_task(self.stop_recording_notify)
 
             await self.recheck_live_status()
 
             if self.user_config.get("execute_custom_script") and script_command:
                 logger.info("Prepare to execute custom script in the background")
                 try:
-                    self.app.page.run_task(
+                    self.app.event_bus.run_task(
                         self.custom_script_execute,
                         script_command,
                         record_name,
@@ -773,8 +779,9 @@ class LiveStreamRecorder:
 
             try:
                 self.app.record_manager.stop_recording(self.recording)
-                await self.app.record_card_manager.update_card(self.recording)
-                self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                    await self.app.record_card_manager.update_card(self.recording)
+                self.app.event_bus.publish("update", self.recording)
                 await self.app.snack_bar.show_snack_bar(
                     record_name + " " + self._["record_stream_error"], duration=2000
                 )
@@ -811,7 +818,7 @@ class LiveStreamRecorder:
             msg_title = user_config.get("custom_notification_title").strip()
             msg_title = msg_title or self._["status_notify"]
 
-            self.app.page.run_task(msg_manager.push_messages, msg_title, push_content)
+            self.app.event_bus.run_task(msg_manager.push_messages, msg_title, push_content)
 
     def request_stop(self):
         logger.info(f"Stop requested for recorder: {self.recording.url}, rec_id: {self.recording.rec_id}")

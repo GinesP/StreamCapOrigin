@@ -73,7 +73,7 @@ class EventBus:
 
     # ── Publish ──────────────────────────────────────────────────────
 
-    def publish(self, topic: str, data: Any = None):
+    def publish(self, topic: str, *args, **kwargs):
         """Publish an event to all subscribers of a topic.
 
         Replaces: page.pubsub.send_others_on_topic(topic, data)
@@ -83,7 +83,8 @@ class EventBus:
 
         Args:
             topic: The event topic name.
-            data: Arbitrary data payload to pass to subscribers.
+            *args: Positional arguments to pass to subscribers.
+            **kwargs: Keyword arguments to pass to subscribers.
         """
         # Bridge to Flet's pubsub if the page is set (transition period)
         if self._page:
@@ -91,6 +92,8 @@ class EventBus:
                 # Use getattr just in case the bridge is being tested without full Page object
                 pubsub = getattr(self._page, "pubsub", None)
                 if pubsub:
+                    # Bridge only the first data argument if present (Flet pubsub limit)
+                    data = args[0] if args else None
                     pubsub.send_others_on_topic(topic, data)
             except Exception as e:
                 logger.debug(f"EventBus: Failed to bridge to Flet pubsub: {e}")
@@ -102,16 +105,16 @@ class EventBus:
         for callback in subscribers:
             try:
                 if asyncio.iscoroutinefunction(callback):
-                    self._schedule_async(callback, topic, data)
+                    self._schedule_async(callback, topic, *args, **kwargs)
                 else:
-                    callback(topic, data)
+                    callback(topic, *args, **kwargs)
             except Exception as e:
                 logger.error(
                     f"EventBus: error in subscriber {callback.__qualname__} "
                     f"for topic '{topic}': {e}"
                 )
 
-    def _schedule_async(self, callback: Callable, topic: str, data: Any):
+    def _schedule_async(self, callback: Callable, topic: str, *args, **kwargs):
         """Schedule an async callback on the event loop."""
         loop = self._loop
         if loop is None:
@@ -123,7 +126,7 @@ class EventBus:
 
         if loop.is_running():
             loop.call_soon_threadsafe(
-                asyncio.ensure_future, callback(topic, data)
+                asyncio.ensure_future, callback(topic, *args, **kwargs)
             )
         else:
             logger.warning(

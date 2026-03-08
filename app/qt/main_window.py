@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
     def __init__(self, app_context):
         super().__init__()
         self.app = app_context
+        self.app.main_window = self
         self.setWindowTitle(self.WINDOW_TITLE)
         self.setMinimumSize(QSize(self.MIN_WIDTH, self.MIN_HEIGHT))
         self.resize(1200, 750)
@@ -311,17 +312,87 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent):
         """Handle window close: show confirmation and cleanup."""
+        # If we are already shutting down, just accept and let Qt close the window
+        if getattr(self, "_is_shutting_down", False):
+            event.accept()
+            return
+
         from app.qt.components.confirm_dialog import QtConfirmDialog
         if QtConfirmDialog.confirm(
             self,
             "Exit StreamCap",
             "Are you sure you want to close the application?",
-            "Any active recordings will be stopped.",
+            "Any active recordings will be stopped and processed before exit.",
             type="warning"
         ):
-            event.accept()
+            self._is_shutting_down = True
+            event.ignore()
+
+            # Prevent new recordings and tell StreamManager we are closing
+            if hasattr(self.app, 'recording_enabled'):
+                self.app.recording_enabled = False
+
+            # Stop all active recordings
+            if hasattr(self.app, 'record_manager') and self.app.record_manager:
+                active_recs = [rec for rec in self.app.record_manager.recordings if getattr(rec, 'is_recording', False) or getattr(rec, 'monitor_status', False)]
+                for rec in active_recs:
+                    self.app.record_manager.stop_recording(rec, manually_stopped=True)
+
+            # Update UI to show shutdown state
+            self.setEnabled(False)
+            self.show_toast("Shutting down safely, saving recordings...", duration=15000)
+
+            # Launch async sequence to wait for transcoding tasks
+            import asyncio
+            asyncio.ensure_future(self._perform_shutdown())
         else:
             event.ignore()
+
+    async def _perform_shutdown(self):
+        """Wait for recordings and background tasks to finish, then quit."""
+        from app.utils.logger import logger
+        import asyncio
+
+        logger.info("Starting graceful shutdown sequence...")
+
+        # Sleep briefly to ensure "stop" signals propagate and transcoding background tasks spawn
+        await asyncio.sleep(2.0)
+
+        # Wait up to 30 seconds for active ffmpeg processes to clear
+        for _ in range(60):
+            active_processes = 0
+            if hasattr(self.app, 'process_manager') and self.app.process_manager:
+                active_processes = len([p for p in self.app.process_manager.ffmpeg_processes if p.returncode is None])
+                
+            active_recorders = 0
+            if hasattr(self.app, 'record_manager') and self.app.record_manager:
+                active_recorders = len(self.app.record_manager.active_recorders)
+                
+            bg_tasks = 0
+            try:
+                from app.core.runtime.process_manager import BackgroundService
+                bg_tasks = BackgroundService.get_instance().tasks.unfinished_tasks
+            except Exception:
+                pass
+                
+            # Check for active asyncio tasks related to recording or transcoding
+            asyncio_tasks_active = 0
+            for task in asyncio.all_tasks():
+                coro = task.get_coro()
+                if coro and hasattr(coro, '__name__'):
+                    if coro.__name__ in ['start_ffmpeg', 'converts_mp4', '_do_converts_mp4', 'start_recording']:
+                        asyncio_tasks_active += 1
+
+            if active_processes == 0 and active_recorders == 0 and bg_tasks == 0 and asyncio_tasks_active == 0:
+                logger.info("All background tasks and recordings finished. Safe to exit.")
+                break
+                
+            logger.info(f"Waiting for shutdown... Recorders: {active_recorders}, FFMpeg: {active_processes}, BG_Tasks: {bg_tasks}, AsyncTasks: {asyncio_tasks_active}")
+            await asyncio.sleep(1.0)
+
+        logger.info("Shutdown delay completed, quitting application.")
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().quit()
 
 def run_qt_app():
     # Deprecated for main_qt.py approach

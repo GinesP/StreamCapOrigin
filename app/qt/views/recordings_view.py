@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QButtonGroup
 )
+from PySide6.QtGui import QFont
 
 from app.qt.components.recording_card import QtRecordingCard
 from app.qt.utils.filters import RecordingFilters
@@ -43,6 +44,11 @@ class QtRecordingsView(QWidget):
         self._update_platform_list()
         self._subscribe_events()
         
+        # 1-second timer for real-time card updates (timer/status)
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.timeout.connect(self._on_refresh_tick)
+        self._refresh_timer.start(1000)
+
         # Apply filters initially to make cards visible and redraw the grid
         self._apply_filters()
 
@@ -76,25 +82,47 @@ class QtRecordingsView(QWidget):
         
         header.addStretch()
 
-        # View Mode Toggle — label reflects CURRENT mode, click switches
-        self.view_toggle_btn = QPushButton("田 Grid View")
-        self.view_toggle_btn.setProperty("class", "secondary")
-        self.view_toggle_btn.setFixedWidth(110)
+        # View Mode Toggle
+        self.view_toggle_btn = QPushButton("⊞")  # Show grid icon while in list mode
+        self.view_toggle_btn.setStyleSheet("font-size: 20px;")
+        self.view_toggle_btn.setToolTip("Toggle Grid/List View")
+        self.view_toggle_btn.setProperty("class", "icon")
+        self.view_toggle_btn.setFixedSize(36, 36)
         self.view_toggle_btn.clicked.connect(self._toggle_view_mode)
         header.addWidget(self.view_toggle_btn)
         
         # Refresh button
-        self.refresh_btn = QPushButton("↻ Refresh")
-        self.refresh_btn.setProperty("class", "secondary")
-        self.refresh_btn.setFixedWidth(100)
+        self.refresh_btn = QPushButton("↻")
+        self.refresh_btn.setToolTip("Refresh List")
+        self.refresh_btn.setProperty("class", "icon")
+        self.refresh_btn.setFixedSize(36, 36)
         self.refresh_btn.clicked.connect(self.refresh)
         header.addWidget(self.refresh_btn)
 
         # Add button
-        self.add_btn = QPushButton("Add Stream")
-        self.add_btn.setProperty("class", "primary-btn")
+        self.add_btn = QPushButton("+")
+        self.add_btn.setToolTip("Add New Stream")
+        self.add_btn.setProperty("class", "primary-btn") # Keep it prominent but smaller
+        self.add_btn.setFixedSize(36, 36)
+        self.add_btn.setStyleSheet("font-size: 20px; font-weight: bold; padding: 0;")
         self.add_btn.clicked.connect(self._on_add_stream_clicked)
         header.addWidget(self.add_btn)
+
+        # Batch Start Button
+        self.batch_start_btn = QPushButton("▶")
+        self.batch_start_btn.setToolTip("Start Monitor (Visible Streams)")
+        self.batch_start_btn.setProperty("class", "icon")
+        self.batch_start_btn.setFixedSize(36, 36)
+        self.batch_start_btn.clicked.connect(self._on_batch_start_clicked)
+        header.addWidget(self.batch_start_btn)
+
+        # Batch Stop Button
+        self.batch_stop_btn = QPushButton("■")
+        self.batch_stop_btn.setToolTip("Stop Monitor (Visible Streams)")
+        self.batch_stop_btn.setProperty("class", "icon")
+        self.batch_stop_btn.setFixedSize(36, 36)
+        self.batch_stop_btn.clicked.connect(self._on_batch_stop_clicked)
+        header.addWidget(self.batch_stop_btn)
         
         main_layout.addLayout(header)
 
@@ -109,24 +137,40 @@ class QtRecordingsView(QWidget):
         self.search_box.textChanged.connect(self._on_search_changed)
         filter_bar_layout.addWidget(self.search_box)
         
+        # Status Filter Label
+        status_label = QLabel("Estado:")
+        status_label.setProperty("class", "secondary")
+        filter_bar_layout.addWidget(status_label)
+        
         # 2. Status Filters
         self.status_grp = QButtonGroup(self)
         self.status_grp.setExclusive(True)
         
         status_filters = [
-            ("All", "all"),
-            ("Recording", "recording"),
-            ("Live", "living"),
-            ("Offline", "offline"),
-            ("Error", "error"),
-            ("Stopped", "stopped"),
+            ("Todos", "all", "#FF6428"),
+            ("Grabando", "recording", "#F44336"),
+            ("En Vivo", "living", "#4CAF50"),
+            ("Offline", "offline", "#9E9E9E"),
+            ("Error", "error", "#FF9800"),
+            ("Detenido", "stopped", "#607D8B"),
         ]
         
-        for i, (label, key) in enumerate(status_filters):
+        for i, (label, key, color) in enumerate(status_filters):
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setProperty("class", "filter-btn")
-            if key == "all": btn.setChecked(True)
+            if key == "all": 
+                btn.setChecked(True)
+            
+            # Elite Premium Styling: Active state uses the specific status color
+            btn.setStyleSheet(f"""
+                QPushButton[class="filter-btn"]:checked {{
+                    background-color: {color};
+                    border-color: {color};
+                    color: white;
+                }}
+            """)
+            
             btn.setProperty("filter_key", key)
             btn.clicked.connect(self._on_filter_clicked)
             self.status_grp.addButton(btn, i)
@@ -136,10 +180,13 @@ class QtRecordingsView(QWidget):
         
         # 3. Platform Dropdown
         self.platform_combo = QComboBox()
-        self.platform_combo.setFixedWidth(120)
-        self.platform_combo.addItem("All Platforms", "all")
+        self.platform_combo.setFixedWidth(140)
+        self.platform_combo.addItem("Todas", "all")
         self.platform_combo.currentIndexChanged.connect(self._on_platform_changed)
-        filter_bar_layout.addWidget(QLabel("Platform:"))
+        
+        platform_label = QLabel("Plataforma:")
+        platform_label.setProperty("class", "secondary")
+        filter_bar_layout.addWidget(platform_label)
         filter_bar_layout.addWidget(self.platform_combo)
         
         main_layout.addLayout(filter_bar_layout)
@@ -166,10 +213,14 @@ class QtRecordingsView(QWidget):
 
     def _toggle_view_mode(self) -> None:
         self._view_mode = "grid" if self._view_mode == "list" else "list"
-        # Button label shows the OPPOSITE mode (what you'll switch TO)
-        self.view_toggle_btn.setText(
-            "≡ List View" if self._view_mode == "grid" else "田 Grid View"
-        )
+        
+        # Update icon and tooltip only (no text to avoid clipping in 36x36 btn)
+        icon = "⊞" if self._view_mode == "list" else "≣"
+        tip = "Switch to Grid View" if self._view_mode == "list" else "Switch to List View"
+        
+        self.view_toggle_btn.setText(icon)
+        self.view_toggle_btn.setToolTip(tip)
+        
         for card in self._cards.values():
             card.set_view_mode(self._view_mode)
         self._redraw_grid()
@@ -195,9 +246,9 @@ class QtRecordingsView(QWidget):
             match_status = RecordingFilters.matches_status(rec, self._current_status_filter)
             match_platform = RecordingFilters.matches_platform(rec, self._current_platform_filter)
             match_search = RecordingFilters.matches_search(rec, self._search_query)
-            
             card.setVisible(match_status and match_platform and match_search)
             
+        # Optional sorting dynamically if needed, though grid redraw iterates.
         self._redraw_grid()
 
     def _update_platform_list(self):
@@ -241,8 +292,14 @@ class QtRecordingsView(QWidget):
     def _load_data(self):
         """Initial load of recordings from the manager."""
         recordings = self.app.record_manager.recordings
-        logger.info(f"QtRecordingsView: Loading {len(recordings)} recordings.")
-        for i, rec in enumerate(recordings):
+        # Sort recordings: Live first, then by priority score (descending)
+        sorted_recordings = sorted(
+            recordings,
+            key=lambda r: (r.is_live, getattr(r, 'priority_score', 0.0), r.streamer_name),
+            reverse=True
+        )
+        logger.info(f"QtRecordingsView: Loading {len(sorted_recordings)} recordings.")
+        for i, rec in enumerate(sorted_recordings):
             self._add_card(rec, i)
 
     def _add_card(self, recording, index):
@@ -269,6 +326,13 @@ class QtRecordingsView(QWidget):
             card.update_content()
             # Automatically re-apply filters so if a card no longer matches, it hides
             self._apply_filters()
+
+    def _on_refresh_tick(self):
+        """Called every second to update durations/status of visible cards."""
+        # Only update visible cards to save CPU
+        for card in self._cards.values():
+            if card.isVisible():
+                card.update_content()
 
     def _on_recording_added(self, topic, recording):
         """Handle 'add' event from EventBus."""
@@ -319,14 +383,77 @@ class QtRecordingsView(QWidget):
 
         visible = [c for c in self._cards.values() if c.isVisible()]
 
-        for i, card in enumerate(visible):
-            self.grid_layout.removeWidget(card)
-            if self._view_mode == "list":
-                card.setFixedWidth(card_w)
-                card.setFixedHeight(card_h)
-            else:
-                card.setFixedSize(card_w, card_h)
-            row = i // cols
-            col = i % cols
-            self.grid_layout.addWidget(card, row, col)
+        # Sort the visible cards to guarantee the desired order
+        visible.sort(
+            key=lambda c: (c.recording.is_live, getattr(c.recording, 'priority_score', 0.0), c.recording.streamer_name),
+            reverse=True
+        )
 
+        # Check if we need to redraw by comparing state
+        current_state = (cols, card_w, self._view_mode, [id(c) for c in visible])
+        if getattr(self, "_last_grid_state", None) == current_state:
+            return
+        self._last_grid_state = current_state
+
+        self.card_container.setUpdatesEnabled(False)
+        try:
+            for i, card in enumerate(visible):
+                self.grid_layout.removeWidget(card)
+                if self._view_mode == "list":
+                    card.setFixedWidth(card_w)
+                    card.setFixedHeight(card_h)
+                else:
+                    card.setFixedSize(card_w, card_h)
+                row = i // cols
+                col = i % cols
+                self.grid_layout.addWidget(card, row, col)
+        finally:
+            self.card_container.setUpdatesEnabled(True)
+
+    def _on_batch_start_clicked(self):
+        """Start monitoring for all currently visible recordings."""
+        visible_recordings = [card.recording for card in self._cards.values() if card.isVisible()]
+        if not visible_recordings:
+            return
+            
+        import asyncio
+        from PySide6.QtWidgets import QMessageBox
+        from PySide6.QtCore import QTimer
+        
+        # Disable buttons temporarily
+        self.batch_start_btn.setEnabled(False)
+        self.batch_stop_btn.setEnabled(False)
+        QTimer.singleShot(1500, lambda: self.batch_start_btn.setEnabled(True))
+        QTimer.singleShot(1500, lambda: self.batch_stop_btn.setEnabled(True))
+        
+        # Show toast
+        from app.qt.main_window import MainWindow
+        main_window = self.window()
+        if isinstance(main_window, MainWindow):
+            main_window.show_toast(f"Starting monitor for {len(visible_recordings)} visible stream(s)...", duration=3000)
+            
+        asyncio.ensure_future(self.app.record_manager.start_monitor_recordings(visible_recordings))
+
+    def _on_batch_stop_clicked(self):
+        """Stop monitoring for all currently visible recordings."""
+        visible_recordings = [card.recording for card in self._cards.values() if card.isVisible()]
+        if not visible_recordings:
+            return
+            
+        import asyncio
+        from PySide6.QtWidgets import QMessageBox
+        from PySide6.QtCore import QTimer
+        
+        # Disable buttons temporarily
+        self.batch_start_btn.setEnabled(False)
+        self.batch_stop_btn.setEnabled(False)
+        QTimer.singleShot(1500, lambda: self.batch_start_btn.setEnabled(True))
+        QTimer.singleShot(1500, lambda: self.batch_stop_btn.setEnabled(True))
+        
+        # Show toast
+        from app.qt.main_window import MainWindow
+        main_window = self.window()
+        if isinstance(main_window, MainWindow):
+            main_window.show_toast(f"Stopping monitor for {len(visible_recordings)} visible stream(s)...", duration=3000)
+            
+        asyncio.ensure_future(self.app.record_manager.stop_monitor_recordings(visible_recordings))

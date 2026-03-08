@@ -178,16 +178,25 @@ class RecordingManager:
             self.app.event_bus.publish("update", recording)
             await self.persist_recordings()
 
-    async def start_monitor_recordings(self):
+    async def start_monitor_recordings(self, selected_recordings: list[Recording | None] | None = None):
         """
         Start monitoring multiple recordings based on user selection or all recordings if none are selected.
         """
-        selected_recordings = await self.get_selected_recordings()
+        if not selected_recordings:
+            selected_recordings = await self.get_selected_recordings()
         pre_start_monitor_recordings = selected_recordings if selected_recordings else self.recordings
-        cards_obj = self.app.record_card_manager.cards_obj
-        for recording in pre_start_monitor_recordings:
-            if cards_obj[recording.rec_id]["card"].visible:
+        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+            cards_obj = self.app.record_card_manager.cards_obj
+            for recording in pre_start_monitor_recordings:
+                # If card manager exists, check visibility
+                if recording.rec_id in cards_obj and cards_obj[recording.rec_id]["card"].visible:
+                    self.app.event_bus.run_task(self.start_monitor_recording, recording, auto_save=False)
+        else:
+            # In Qt version, we just start all selected/filtered recordings for now
+            # TODO: Improve filtering for Qt version batch actions
+            for recording in pre_start_monitor_recordings:
                 self.app.event_bus.run_task(self.start_monitor_recording, recording, auto_save=False)
+        
         self.app.event_bus.run_task(self.persist_recordings)
         logger.info(f"Batch Start Monitor Recordings: {[i.rec_id for i in pre_start_monitor_recordings]}")
 
@@ -198,10 +207,15 @@ class RecordingManager:
         if not selected_recordings:
             selected_recordings = await self.get_selected_recordings()
         pre_stop_monitor_recordings = selected_recordings or self.recordings
-        cards_obj = self.app.record_card_manager.cards_obj
-        for recording in pre_stop_monitor_recordings:
-            if cards_obj[recording.rec_id]["card"].visible:
+        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+            cards_obj = self.app.record_card_manager.cards_obj
+            for recording in pre_stop_monitor_recordings:
+                if recording.rec_id in cards_obj and cards_obj[recording.rec_id]["card"].visible:
+                    self.app.event_bus.run_task(self.stop_monitor_recording, recording, auto_save=False)
+        else:
+            for recording in pre_stop_monitor_recordings:
                 self.app.event_bus.run_task(self.stop_monitor_recording, recording, auto_save=False)
+        
         self.app.event_bus.run_task(self.persist_recordings)
         logger.info(f"Batch Stop Monitor Recordings: {[i.rec_id for i in pre_stop_monitor_recordings]}")
 
@@ -515,7 +529,8 @@ class RecordingManager:
                     recording.status_info = RecordingStatus.PREPARING_RECORDING
                     recording.loop_time_seconds = self.loop_time_seconds
                     self.start_update(recording)
-                    self.app.event_bus.publish("start_recording", recorder, stream_info)
+                    # Explicitly start recording loop instead of relying on a potentially unsubscribed event
+                    self.app.event_bus.run_task(recorder.start_recording, stream_info)
                 else:
                     if recording.notified_live_start:
                         notify_loop_time = user_config.get("notify_loop_time")
@@ -536,7 +551,7 @@ class RecordingManager:
                 recording.is_recording = False
                 if recording.is_live:
                     recording.is_live = False
-                    self.app.event_bus.publish("end_message_push", recorder)
+                    self.app.event_bus.run_task(recorder.end_message_push)
 
                 recording.status_info = RecordingStatus.MONITORING
                 title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[recording.quality]}"
@@ -637,8 +652,8 @@ class RecordingManager:
             logger.error(
                 f"Disk space remaining is below {disk_space_limit} GB. Recording function disabled"
             )
-            if self.app.page and hasattr(self.app, "snack_bar"):
-                self.app.page.run_task(
+            if hasattr(self.app, 'snack_bar') and self.app.snack_bar:
+                self.app.event_bus.run_task(
                     self.app.snack_bar.show_snack_bar,
                     self._["not_disk_space_tip"],
                     duration=86400,
