@@ -372,13 +372,6 @@ class QtHomeView(QWidget):
         self.btn_go_recordings.clicked.connect(self._on_go_recordings)
         row.addWidget(self.btn_go_recordings)
 
-        self.btn_open_storage = QuickActionButton(
-            "▤", "Browse Storage",
-            accent="#4A4A6A",
-        )
-        self.btn_open_storage.clicked.connect(self._on_open_storage)
-        row.addWidget(self.btn_open_storage)
-
         self.btn_settings = QuickActionButton(
             "✦", "Settings",
             accent="#4A4A6A",
@@ -496,10 +489,6 @@ class QtHomeView(QWidget):
     def _on_go_recordings(self) -> None:
         if mw := getattr(self.app, "main_window", None):
             mw.show_page("recordings")
-
-    def _on_open_storage(self) -> None:
-        if mw := getattr(self.app, "main_window", None):
-            mw.show_page("storage")
 
     def _on_open_settings(self) -> None:
         if mw := getattr(self.app, "main_window", None):
