@@ -10,7 +10,7 @@ Este documento detalla la estrategia para migrar el frontend de StreamCap de **F
 - [x] **Fase 3: Vista de Grabaciones (Grid/List)** - Portando RecordingCard a Qt
 - [x] **Fase 4: Configuración y Diálogos** (SettingsView y AddStream integrados)
 - [x] **Fase 5: Reproductor y Utilidades de UI** (StorageView y VideoPlayer)
-- [ ] **Fase 6: Diálogos Restantes y Pulido Final**
+- [x] **Fase 6: Diálogos Restantes y Pulido Final**
 
 ---
 
@@ -69,9 +69,9 @@ Se ha creado la estructura base de la aplicación Qt siguiendo el diseño modern
 
 - [x] **Sistema de Filtros, Búsqueda y Ordenamiento Dinámico** - Filtrado por texto, estado y plataforma con layout fluido.
 - [x] **Acciones en Lote (Batch Actions)** - Iniciar y detener monitoreo y eliminación masiva de *streams* en la vista actual.
-- [ ] **Diálogo de Edición de Streamers** - Permitir modificar configuración de cada stream.
+- [x] **Diálogo de Edición de Streamers** - Permitir modificar configuración de cada stream.
 - [x] **Diálogos de Confirmación y Cierre Limpio** - Avisos antes de borrar o cerrar la app, implementando paradas asíncronas de guardado.
-- [ ] **Atajos de Teclado Globales** - Navegación rápida por la app.
+- [x] **Atajos de Teclado Globales** - Navegación rápida por la app.
 
 ---
 
