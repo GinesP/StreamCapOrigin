@@ -406,6 +406,24 @@ class QtRecordingCard(QFrame):
         )
         self._l_dur.setText(dur_t)
 
+        # play button
+        play_btn_g = self._g_btns.get("play")
+        play_btn_l = self._l_btns.get("play")
+        
+        if rec.is_recording:
+            text, tip = "Stop", "Stop Recording"
+        elif rec.monitor_status:
+            text, tip = "Stop", "Stop Monitoring"
+        else:
+            text, tip = "Run", "Start Monitoring"
+            
+        if play_btn_g:
+            play_btn_g.setText(text)
+            play_btn_g.setToolTip(tip)
+        if play_btn_l:
+            play_btn_l.setText(text)
+            play_btn_l.setToolTip(tip)
+
         # Badges
         self._fill_badges(rec, self._g_badge_row)
         self._fill_badges(rec, self._l_badge_row)
@@ -497,9 +515,9 @@ class QtRecordingCard(QFrame):
             utils.open_folder(path)
 
         elif name == "play":
-            if rec.is_recording:
+            if rec.is_recording or rec.monitor_status:
                 self.app.event_bus.run_task(
-                    self.app.record_manager.stop_recording, rec, manually_stopped=True
+                    self.app.record_manager.stop_monitor_recording, rec
                 )
             else:
                 self.app.event_bus.run_task(
@@ -524,16 +542,14 @@ class QtRecordingCard(QFrame):
                     )
 
         elif name == "delete":
-            from PySide6.QtWidgets import QMessageBox
-            box = QMessageBox(self)
-            box.setWindowTitle("Confirm Delete")
-            box.setText(f"Are you sure you want to delete '{rec.streamer_name}'?")
-            box.setInformativeText("This will stop any active recordings for this stream.")
-            box.setIcon(QMessageBox.Icon.Warning)
-            box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            box.setDefaultButton(QMessageBox.StandardButton.No)
-            
-            if box.exec() == QMessageBox.StandardButton.Yes:
+            from app.qt.components.confirm_dialog import QtConfirmDialog
+            if QtConfirmDialog.confirm(
+                self, 
+                "Confirm Delete", 
+                f"Are you sure you want to delete '{rec.streamer_name}'?",
+                "This will stop any active recordings for this stream.",
+                type="danger"
+            ):
                 self.app.event_bus.run_task(
                     self.app.record_manager.remove_recording, rec
                 )
@@ -556,18 +572,9 @@ class QtRecordingCard(QFrame):
             logger.warning(f"Edit dialog error: {exc}")
 
     def _open_info_dialog(self) -> None:
-        from PySide6.QtWidgets import QMessageBox
-        rec = self.recording
-        lines = [
-            f"<b>Streamer:</b> {rec.streamer_name}",
-            f"<b>URL:</b> {rec.url}",
-            f"<b>Platform:</b> {getattr(rec, 'platform', 'N/A')}",
-            f"<b>Status:</b> {rec.status_info}",
-            f"<b>Quality:</b> {getattr(rec, 'record_quality', 'N/A')}",
-            f"<b>Directory:</b> {getattr(rec, 'recording_dir', 'N/A')}",
-        ]
-        box = QMessageBox(self)
-        box.setWindowTitle(f"Info — {rec.streamer_name}")
-        box.setText("<br>".join(lines))
-        box.setIcon(QMessageBox.Icon.Information)
-        box.exec()
+        try:
+            from app.qt.components.recording_info_dialog import QtRecordingInfoDialog
+            dialog = QtRecordingInfoDialog(self.app, self.recording, self)
+            dialog.exec()
+        except Exception as exc:
+            logger.warning(f"Info dialog error: {exc}")

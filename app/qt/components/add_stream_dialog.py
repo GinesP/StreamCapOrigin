@@ -1,18 +1,14 @@
 """
-Qt Add Stream Dialog for StreamCap.
+Qt Add Stream Dialog for StreamCap — Expanded Version.
 """
 
-from PySide6.QtCore import Qt, QSize
+import os
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QComboBox,
-    QFrame,
-    QMessageBox
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QComboBox, QFrame, QMessageBox, QCheckBox,
+    QSpinBox, QTimeEdit, QTabWidget, QWidget, QFileDialog,
+    QGroupBox, QFormLayout
 )
 
 from app.utils.logger import logger
@@ -28,48 +24,43 @@ class QtAddStreamDialog(QDialog):
         self.is_edit = self.recording is not None
         
         self.setWindowTitle("Edit Stream" if self.is_edit else "Add New Stream")
-        self.setMinimumWidth(450)
+        self.setMinimumWidth(500)
+        self.setMinimumHeight(450)
         
         self._setup_ui()
         if self.is_edit:
             self._fill_data()
+        else:
+            # Set default path
+            self.dir_input.setText(self.app.settings.get_video_save_path())
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
 
         # Title
-        title = QLabel("Edit Stream" if self.is_edit else "Add New Stream")
-        title.setProperty("class", "heading")
-        layout.addWidget(title)
+        title_lbl = QLabel("Edit Stream Settings" if self.is_edit else "Add New Stream")
+        title_lbl.setProperty("class", "heading")
+        layout.addWidget(title_lbl)
 
-        # URL Input
-        layout.addWidget(QLabel("Stream URL (Twitch, YouTube, etc.)"))
-        self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("https://twitch.tv/example")
-        if self.is_edit:
-            self.url_input.setReadOnly(True)  # Usually URL is the ID
-            self.url_input.setStyleSheet("color: #777; background: #252525;")
-        layout.addWidget(self.url_input)
+        # Tabs
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
 
-        # Quality Selection
-        layout.addWidget(QLabel("Preferred Quality"))
-        self.quality_combo = QComboBox()
-        # Map indices to VideoQuality standard keys if needed
-        self.qualities = {
-            "Best": "OD",
-            "1080p60": "UHD",
-            "720p60": "HD",
-            "480p": "SD",
-            "Audio Only": "AUDIO"
-        }
-        self.quality_combo.addItems(list(self.qualities.keys()))
-        layout.addWidget(self.quality_combo)
+        self.tab_general = QWidget()
+        self.tab_recording = QWidget()
+        self.tab_scheduling = QWidget()
 
-        layout.addStretch()
+        self.tabs.addTab(self.tab_general, "General")
+        self.tabs.addTab(self.tab_recording, "Recording")
+        self.tabs.addTab(self.tab_scheduling, "Scheduling & Extra")
 
-        # Buttons
+        self._setup_general_tab()
+        self._setup_recording_tab()
+        self._setup_scheduling_tab()
+
+        # Action Buttons
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
         
@@ -77,39 +68,198 @@ class QtAddStreamDialog(QDialog):
         self.cancel_btn.setProperty("class", "secondary")
         self.cancel_btn.clicked.connect(self.reject)
         
-        self.add_btn = QPushButton("Save Changes" if self.is_edit else "Add Stream")
-        self.add_btn.setProperty("class", "primary")
-        self.add_btn.clicked.connect(self._on_add_clicked)
+        self.save_btn = QPushButton("Save Changes" if self.is_edit else "Add Stream")
+        self.save_btn.setProperty("class", "primary")
+        self.save_btn.clicked.connect(self._on_save_clicked)
         
         btn_layout.addStretch()
         btn_layout.addWidget(self.cancel_btn)
-        btn_layout.addWidget(self.add_btn)
+        btn_layout.addWidget(self.save_btn)
         
         layout.addLayout(btn_layout)
 
+    def _setup_general_tab(self):
+        lay = QVBoxLayout(self.tab_general)
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        # URL
+        self.url_input = QLineEdit()
+        self.url_input.setPlaceholderText("https://twitch.tv/example")
+        form.addRow("Stream URL:", self.url_input)
+
+        # Streamer Name
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Optional: Custom Name")
+        form.addRow("Streamer Name:", self.name_input)
+
+        # Directory
+        self.dir_input = QLineEdit()
+        self.dir_browse_btn = QPushButton("Browse...")
+        self.dir_browse_btn.setFixedWidth(80)
+        self.dir_browse_btn.clicked.connect(self._on_browse_dir)
+        
+        dir_lay = QHBoxLayout()
+        dir_lay.addWidget(self.dir_input)
+        dir_lay.addWidget(self.dir_browse_btn)
+        form.addRow("Save Folder:", dir_lay)
+
+        lay.addLayout(form)
+        lay.addStretch()
+
+    def _setup_recording_tab(self):
+        lay = QVBoxLayout(self.tab_recording)
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        # Quality
+        self.quality_combo = QComboBox()
+        from PySide6.QtWidgets import QListView
+        self.quality_combo.setView(QListView())
+        self.qualities = {
+            "Best (Original)": "OD",
+            "1080p60 / 1080p": "UHD",
+            "720p60  / 720p":  "HD",
+            "480p / 360p":     "SD",
+            "Audio Only":      "AUDIO"
+        }
+        self.quality_combo.addItems(list(self.qualities.keys()))
+        form.addRow("Preferred Quality:", self.quality_combo)
+
+        # Format
+        self.format_combo = QComboBox()
+        self.format_combo.setView(QListView())
+        self.format_combo.addItems(["ts", "mp4", "mkv", "flv"])
+        form.addRow("Video Format:", self.format_combo)
+
+        # Segmenting
+        self.segment_check = QCheckBox("Enable Segmented Recording")
+        form.addRow("", self.segment_check)
+
+        self.segment_time = QSpinBox()
+        self.segment_time.setRange(60, 86400)
+        self.segment_time.setSuffix(" seconds")
+        self.segment_time.setValue(3600)
+        self.segment_time.setEnabled(False)
+        self.segment_check.toggled.connect(self.segment_time.setEnabled)
+        form.addRow("Segment Duration:", self.segment_time)
+
+        lay.addLayout(form)
+        lay.addStretch()
+
+    def _setup_scheduling_tab(self):
+        lay = QVBoxLayout(self.tab_scheduling)
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        # Monitor Status
+        self.monitor_check = QCheckBox("Automatically Monitor this stream")
+        self.monitor_check.setChecked(True)
+        form.addRow("", self.monitor_check)
+
+        # Scheduled Recording
+        self.schedule_group = QGroupBox("Scheduled Recording")
+        self.schedule_group.setCheckable(True)
+        self.schedule_group.setChecked(False)
+        
+        s_lay = QFormLayout(self.schedule_group)
+        self.start_time = QTimeEdit()
+        self.start_time.setDisplayFormat("HH:mm:ss")
+        s_lay.addRow("Start Time:", self.start_time)
+
+        self.monitor_hours = QSpinBox()
+        self.monitor_hours.setRange(1, 24)
+        self.monitor_hours.setSuffix(" hours")
+        self.monitor_hours.setValue(2)
+        s_lay.addRow("Duration:", self.monitor_hours)
+        
+        lay.addWidget(self.schedule_group)
+
+        # Extra
+        self.push_check = QCheckBox("Enable Notifications (Push)")
+        form.addRow("", self.push_check)
+
+        lay.addLayout(form)
+        lay.addStretch()
+
     def _fill_data(self):
-        """Pre-fill fields with existing recording data."""
-        self.url_input.setText(self.recording.url)
-        # Find quality
-        q_val = getattr(self.recording, "record_quality", "OD")
+        rec = self.recording
+        self.url_input.setText(rec.url)
+        self.name_input.setText(rec.streamer_name)
+        self.dir_input.setText(getattr(rec, "recording_dir", "") or "")
+        
+        # Quality
+        q_val = getattr(rec, "quality", "OD")
         for label, key in self.qualities.items():
             if key == q_val:
                 self.quality_combo.setCurrentText(label)
                 break
-
-    def _on_add_clicked(self):
-        url = self.url_input.text().strip()
-        quality_label = self.quality_combo.currentText()
-        quality_key = self.qualities.get(quality_label, "OD")
         
+        # Format
+        fmt = getattr(rec, "record_format", "ts")
+        self.format_combo.setCurrentText(fmt)
+
+        # Segments
+        self.segment_check.setChecked(bool(getattr(rec, "segment_record", False)))
+        self.segment_time.setValue(int(getattr(rec, "segment_time", 3600)))
+
+        # Monitoring
+        self.monitor_check.setChecked(bool(getattr(rec, "monitor_status", True)))
+        self.push_check.setChecked(bool(getattr(rec, "enabled_message_push", False)))
+
+        # Schedule
+        self.schedule_group.setChecked(bool(getattr(rec, "scheduled_recording", False)))
+        from PySide6.QtCore import QTime
+        time_str = getattr(rec, "scheduled_start_time", "00:00:00") or "00:00:00"
+        self.start_time.setTime(QTime.fromString(time_str))
+        self.monitor_hours.setValue(int(getattr(rec, "monitor_hours", 2)))
+
+    def _on_browse_dir(self):
+        path = QFileDialog.getExistingDirectory(self, "Select Save Directory", self.dir_input.text())
+        if path:
+            self.dir_input.setText(path)
+
+    def _on_save_clicked(self):
+        url = self.url_input.text().strip()
         if not url:
             return
 
+        quality_label = self.quality_combo.currentText()
+        data = {
+            "url": url,
+            "streamer_name": self.name_input.text().strip() or url.split("/")[-1],
+            "recording_dir": self.dir_input.text().strip(),
+            "quality": self.qualities.get(quality_label, "OD"),
+            "record_format": self.format_combo.currentText(),
+            "segment_record": self.segment_check.isChecked(),
+            "segment_time": self.segment_time.value(),
+            "monitor_status": self.monitor_check.isChecked(),
+            "enabled_message_push": self.push_check.isChecked(),
+            "scheduled_recording": self.schedule_group.isChecked(),
+            "scheduled_start_time": self.start_time.time().toString("HH:mm:ss"),
+            "monitor_hours": self.monitor_hours.value(),
+        }
+
         if self.is_edit:
-            logger.info(f"Updating stream: {url} with quality {quality_key}")
-            # Update local object
-            self.recording.record_quality = quality_key
-            # Save to manager
+            if self.recording.url != url:
+                # Re-validate platform if URL changed
+                platform, platform_key = get_platform_info(url)
+                if not platform:
+                    QMessageBox.warning(self, "Unsupported Platform", f"The platform for this URL is not supported yet: {url}")
+                    return
+                # Duplicate check (excluding current rec_id)
+                if any(r.url == url and r.rec_id != self.recording.rec_id for r in self.app.record_manager.recordings):
+                    QMessageBox.information(self, "Duplicate Stream", "This stream URL is already in use by another entry.")
+                    return
+                data["platform"] = platform
+                data["platform_key"] = platform_key
+
+            logger.info(f"Updating stream: {url}")
+            self.recording.update(data)
+            # Ensure title is updated too
+            from app.utils.i18n import tr
+            self.recording.update_title(tr(f"video_quality.{data['quality']}"))
+            
             self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
             
             if hasattr(self.app.main_window, "show_toast"):
@@ -117,6 +267,7 @@ class QtAddStreamDialog(QDialog):
             self.accept()
             return
 
+        # NEW STREAM LOGIC
         # Validate platform
         platform, platform_key = get_platform_info(url)
         if not platform:
@@ -128,27 +279,30 @@ class QtAddStreamDialog(QDialog):
             QMessageBox.information(self, "Duplicate Stream", "This stream is already in your list.")
             return
 
-        logger.info(f"Adding stream: {url} with quality {quality_key}")
-        
-        # Create Recording object
-        # We use streamer_name as URL tail if not specified, similar to Flet version
-        streamer_name = url.split("/")[-1] or "New Stream"
+        logger.info(f"Adding stream: {url}")
         
         new_rec = Recording(
+            rec_id=None, # Will be set by manager
             url=url,
-            streamer_name=streamer_name,
-            quality=quality_key,
-            monitor_status=True
+            streamer_name=data["streamer_name"],
+            record_format=data["record_format"],
+            quality=data["quality"],
+            segment_record=data["segment_record"],
+            segment_time=data["segment_time"],
+            monitor_status=data["monitor_status"],
+            scheduled_recording=data["scheduled_recording"],
+            scheduled_start_time=data["scheduled_start_time"],
+            monitor_hours=data["monitor_hours"],
+            recording_dir=data["recording_dir"],
+            enabled_message_push=data["enabled_message_push"],
+            only_notify_no_record=False,
+            flv_use_direct_download=False
         )
         
-        # Add to manager (async)
         self.app.event_bus.run_task(self.app.record_manager.add_recording, new_rec)
-        
-        # Publish event
         self.app.event_bus.publish("add", new_rec)
         
-        # Show toast
         if hasattr(self.app.main_window, "show_toast"):
-            self.app.main_window.show_toast(f"Stream added: {streamer_name}", "success")
+            self.app.main_window.show_toast(f"Stream added: {data['streamer_name']}", "success")
             
         self.accept()

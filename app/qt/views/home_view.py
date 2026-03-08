@@ -476,6 +476,9 @@ class QtHomeView(QWidget):
             self._stat_cards["recording"].set_value(str(rec_count))
             self._stat_cards["live"].set_value(str(live_count))
             self._stat_cards["offline"].set_value(str(max(0, offline_count)))
+        except (KeyboardInterrupt, SystemError):
+            # Ignore interrupts during refresh, main loop will handle exit
+            pass
         except Exception as e:
             logger.error(f"HomeView: Error refreshing stats: {e}")
 

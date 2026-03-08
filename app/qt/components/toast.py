@@ -27,11 +27,26 @@ class ToastWidget(QFrame):
         self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         
         self._setup_ui()
         
     def _setup_ui(self):
-        self.setObjectName("toastWidget")
+        """
+        Setup nested UI to support both drop shadow and opacity fading.
+        The shadow is on the inner 'content' frame, the opacity is on 'self'.
+        """
+        # Outer wrapper needs to be transparent for the shadow margins
+        self.setObjectName("toastWrapper")
+        # Ensure we don't inherit global background
+        self.setStyleSheet("background: transparent; border: none;")
+        
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)  # Room for the shadow
+        
+        self.content = QFrame(self)
+        self.content.setObjectName("toastContent")
+        main_layout.addWidget(self.content)
         
         # Style based on type
         colors = {
@@ -42,27 +57,49 @@ class ToastWidget(QFrame):
         }
         accent = colors.get(self.toast_type, colors["info"])
         
-        self.setStyleSheet(f"""
-            QFrame#toastWidget {{
+        # Inner frame styling
+        self.content.setStyleSheet(f"""
+            QFrame#toastContent {{
                 background-color: {accent};
-                border: 1px solid #444;
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 8px;
             }}
             QLabel {{
                 color: #FFFFFF;
+                background: transparent;
                 font-size: 13px;
-                font-weight: 500;
+                font-weight: 600;
             }}
         """)
         
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(15, 10, 15, 10)
+        content_layout = QHBoxLayout(self.content)
+        content_layout.setContentsMargins(15, 12, 15, 12)
+        content_layout.setSpacing(12)
         
+        # Icon
+        icons = {
+            "info": "ℹ️",
+            "success": "✅",
+            "error": "❌",
+            "warning": "⚠️"
+        }
+        icon_label = QLabel(icons.get(self.toast_type, "ℹ️"))
+        content_layout.addWidget(icon_label)
+        
+        # Message
         self.label = QLabel(self.message)
         self.label.setWordWrap(True)
-        layout.addWidget(self.label)
+        content_layout.addWidget(self.label)
         
-        # Opacity effect for fading
+        # Apply drop shadow to the INNER frame
+        from PySide6.QtWidgets import QGraphicsDropShadowEffect
+        shadow = QGraphicsDropShadowEffect(self.content)
+        shadow.setBlurRadius(12)
+        shadow.setColor(QColor(0, 0, 0, 120))
+        shadow.setOffset(0, 3)
+        self.content.setGraphicsEffect(shadow)
+        
+        # Apply opacity effect to the OUTER widget for fading
         self.opacity_effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self.opacity_effect)
         

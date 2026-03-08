@@ -75,12 +75,12 @@ class Sidebar(QFrame):
 
     page_changed = Signal(str)
 
-    # Navigation items definition: (icon, default_label, page_name)
     NAV_ITEMS = [
         ("🏠", "Home", "home"),
         ("📺", "Recordings", "recordings"),
         ("⚙️", "Settings", "settings"),
         ("📁", "Storage", "storage"),
+        ("📜", "Logs", "logs"),
         ("ℹ️", "About", "about"),
     ]
 
@@ -110,6 +110,7 @@ class Sidebar(QFrame):
                 "recordings": "recordings",
                 "settings": "settings",
                 "storage": "storage",
+                "logs": "logs",
                 "about": "about"
             }
             
