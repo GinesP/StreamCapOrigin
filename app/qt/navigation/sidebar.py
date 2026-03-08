@@ -79,7 +79,6 @@ class Sidebar(QFrame):
         ("🏠", "Home", "home"),
         ("📺", "Recordings", "recordings"),
         ("⚙️", "Settings", "settings"),
-        ("📁", "Storage", "storage"),
         ("📜", "Logs", "logs"),
         ("ℹ️", "About", "about"),
     ]
@@ -109,7 +108,6 @@ class Sidebar(QFrame):
                 "home": "home",
                 "recordings": "recordings",
                 "settings": "settings",
-                "storage": "storage",
                 "logs": "logs",
                 "about": "about"
             }

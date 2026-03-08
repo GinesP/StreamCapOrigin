@@ -30,7 +30,7 @@ from app.qt.views.settings_view import QtSettingsView
 from app.qt.views.home_view import QtHomeView
 from app.qt.views.log_view import QtLogView
 from app.qt.components.toast import QtToastManager
-# NOTE: QtStorageView, QtAboutView, QtVideoPlayer are imported lazily
+# NOTE: QtAboutView, QtVideoPlayer are imported lazily
 # to avoid loading PySide6.QtMultimedia at module level, which activates
 # the DirectShow backend on Windows and causes a brief spurious window.
 
@@ -80,9 +80,8 @@ class MainWindow(QMainWindow):
             "Ctrl+1": "home",
             "Ctrl+2": "recordings",
             "Ctrl+3": "settings",
-            "Ctrl+4": "storage",
-            "Ctrl+5": "about",
-            "Ctrl+6": "logs",
+            "Ctrl+4": "about",
+            "Ctrl+5": "logs",
         }
         for key, page in shortcuts.items():
             s = QShortcut(QKeySequence(key), self)
@@ -166,14 +165,12 @@ class MainWindow(QMainWindow):
 
     def _register_pages(self):
         """Register all pages in the content stack."""
-        from app.qt.views.storage_view import QtStorageView  # lazy: avoids QtMultimedia at startup
         from app.qt.views.about_view import QtAboutView       # lazy
 
         # Migrated views
         self.register_page("home",       QtHomeView(self.app))
         self.register_page("recordings", QtRecordingsView(self.app))
         self.register_page("settings",   QtSettingsView(self.app))
-        self.register_page("storage",    QtStorageView(self.app))
         self.register_page("logs",       QtLogView(self.app))
         self.register_page("about",      QtAboutView(self.app))
 
@@ -240,7 +237,6 @@ class MainWindow(QMainWindow):
             "home": "home",
             "recordings": "recordings",
             "settings": "settings",
-            "storage": "storage",
             "logs": "logs",
             "about": "about"
         }
