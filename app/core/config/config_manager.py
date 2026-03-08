@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import sqlite3
+import uuid
 from typing import TypeVar
 
 import aiofiles
@@ -240,7 +241,7 @@ class ConfigManager:
     @staticmethod
     async def _save_config(config_path, config, success_message, error_message):
         """Save configuration to a JSON file atomically using a temporary file."""
-        tmp_path = config_path + f".{os.getpid()}.tmp"
+        tmp_path = config_path + f".{uuid.uuid4().hex}.tmp"
         try:
             # Write to temporary file first
             async with aiofiles.open(tmp_path, "w", encoding="utf-8") as file:
