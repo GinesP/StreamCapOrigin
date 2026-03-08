@@ -67,9 +67,10 @@ Se ha creado la estructura base de la aplicación Qt siguiendo el diseño modern
 
 **Objetivo**: Añadir funcionalidades avanzadas de gestión y controles de seguridad.
 
-- [x] **Sistema de Filtros y Búsqueda** - Filtrado por texto, estado y plataforma.
+- [x] **Sistema de Filtros, Búsqueda y Ordenamiento Dinámico** - Filtrado por texto, estado y plataforma con layout fluido.
+- [x] **Acciones en Lote (Batch Actions)** - Iniciar y detener monitoreo y eliminación masiva de *streams* en la vista actual.
 - [ ] **Diálogo de Edición de Streamers** - Permitir modificar configuración de cada stream.
-- [ ] **Diálogos de Confirmación** - Avisos antes de borrar o cerrar la app.
+- [x] **Diálogos de Confirmación y Cierre Limpio** - Avisos antes de borrar o cerrar la app, implementando paradas asíncronas de guardado.
 - [ ] **Atajos de Teclado Globales** - Navegación rápida por la app.
 
 ---

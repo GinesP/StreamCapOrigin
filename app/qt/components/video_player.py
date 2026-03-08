@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QSlider,
     QWidget
 )
+from PySide6.QtGui import QFont
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
@@ -114,6 +115,21 @@ class QtVideoPlayer(QDialog):
         # Double click on video to toggle fullscreen
         self.video_widget.mouseDoubleClickEvent = self._on_video_double_click
 
+    def _setup_player(self):
+        self.player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.player.setAudioOutput(self.audio_output)
+        self.player.setVideoOutput(self.video_widget)
+        
+        self.player.playbackStateChanged.connect(self._on_state_changed)
+        self.player.positionChanged.connect(self._on_position_changed)
+        self.player.durationChanged.connect(self._on_duration_changed)
+        self.player.errorOccurred.connect(self._on_error)
+
+    def _on_video_double_click(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._toggle_fullscreen()
+
     def keyPressEvent(self, event):
         """Keyboard shortcuts for the player (Space, F, Esc, M)."""
         key = event.key()
@@ -134,6 +150,13 @@ class QtVideoPlayer(QDialog):
             self.player.setPosition(min(self._duration, self.player.position() + 10000)) # +10s
         else:
             super().keyPressEvent(event)
+
+    def _toggle_fullscreen(self):
+        """Toggle between windowed and fullscreen mode."""
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
 
     def _toggle_mute(self):
         is_muted = self.audio_output.isMuted()

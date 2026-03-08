@@ -43,20 +43,19 @@ from app.models.recording.recording_status_model import RecordingStatus, CardSta
 from app.utils.logger import logger
 
 
+from app.qt.themes.theme import theme_manager
+
 # ── Palette ───────────────────────────────────────────────────────────────────
 
+# These are state-specific accents
 _STATUS_COLOR: dict[CardStateType, str] = {
-    CardStateType.RECORDING: "#4CAF50",
-    CardStateType.ERROR:     "#FF9800",
-    CardStateType.LIVE:      "#F44336",
-    CardStateType.OFFLINE:   "#757575",
-    CardStateType.STOPPED:   "#546E7A",
-    CardStateType.CHECKING:  "#AB47BC",
+    CardStateType.RECORDING: "#F44336", # Red for recording
+    CardStateType.ERROR:     "#FF9800", # Orange for error
+    CardStateType.LIVE:      "#4CAF50", # Green for live
+    CardStateType.OFFLINE:   "#9E9E9E", # Grey for offline
+    CardStateType.STOPPED:   "#607D8B", # Blue-grey for stopped
+    CardStateType.CHECKING:  "#2196F3", # Blue for checking
 }
-
-_CARD_BG        = "#2D2D2D"
-_CARD_BG_HOVER  = "#363636"
-_CARD_BORDER    = "#383838"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,31 +108,34 @@ class _Badge(QFrame):
 
 
 def _mk_btn(icon: str, tip: str, parent: QWidget) -> QPushButton:
-    """Create a small icon action button."""
+    """Create a small icon action button with premium styling."""
     b = QPushButton(icon, parent)
     b.setToolTip(tip)
-    b.setFixedSize(38, 24)
+    b.setFixedSize(38, 26)
     b.setCursor(Qt.CursorShape.PointingHandCursor)
-    b.setStyleSheet("""
-        QPushButton {
-            background: #3A3A3A;
-            color: #BBBBBB;
-            border: 1px solid #555555;
+    
+    accent = theme_manager.get_color("accent")
+    text_sec = theme_manager.get_color("text_sec")
+    border = theme_manager.get_color("border")
+    surface = theme_manager.get_color("surface2")
+    
+    b.setStyleSheet(f"""
+        QPushButton {{
+            background: transparent;
+            color: {text_sec};
+            border: none;
             border-radius: 4px;
-            font-size: 10px;
-            font-weight: 700;
-            font-family: "Consolas", "Courier New", monospace;
-            padding: 0;
+            font-size: 15px; /* Larger for emojis */
+            padding: 4px;
             margin: 0;
-        }
-        QPushButton:hover {
-            background: #FF6428;
-            color: #FFFFFF;
-            border-color: #FF8050;
-        }
-        QPushButton:pressed {
-            background: #CC4F20;
-        }
+        }}
+        QPushButton:hover {{
+            background: {accent}33; /* 20% opacity accent */
+            color: {accent};
+        }}
+        QPushButton:pressed {{
+            background: {accent}66; /* 40% opacity accent */
+        }}
     """)
     return b
 
@@ -141,12 +143,12 @@ def _mk_btn(icon: str, tip: str, parent: QWidget) -> QPushButton:
 # ── Card ──────────────────────────────────────────────────────────────────────
 
 _ACTIONS = [
-    ("folder",  "Dir",  "Open Folder"),
-    ("play",    "Run",  "Start / Stop"),
-    ("preview", "Play", "Preview"),
-    ("edit",    "Edit", "Edit"),
-    ("info",    "Info", "Info"),
-    ("delete",  "Del",  "Delete"),
+    ("folder",  "📁",   "Open Folder"),
+    ("play",    "▶️",   "Start / Stop"),
+    ("preview", "👁️",   "Preview"),
+    ("edit",    "✏️",   "Edit"),
+    ("info",    "ℹ️",   "Info"),
+    ("delete",  "🗑️",   "Delete"),
 ]
 
 
@@ -169,7 +171,10 @@ class QtRecordingCard(QFrame):
         self.app         = app_context
         self._hovered    = False
         self._mode       = "list"
-        self._status_color = _CARD_BG
+        self._status_color = theme_manager.get_color("card")
+        
+        # Subscribe to theme changes
+        theme_manager.themeChanged.connect(self.update)
 
         self._build()
         self.update_content()
@@ -182,29 +187,15 @@ class QtRecordingCard(QFrame):
         self.setObjectName(f"rec_card_{self.recording.rec_id}")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
-        root = QHBoxLayout(self)
+        root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-
-        # Colored stripe
-        self._stripe = QFrame()
-        self._stripe.setFixedWidth(4)
-        root.addWidget(self._stripe)
-
-        # Body container
-        self._body = QWidget()
-        self._body.setStyleSheet("background: transparent;")
-        root.addWidget(self._body, 1)
-
-        body_root = QVBoxLayout(self._body)
-        body_root.setContentsMargins(0, 0, 0, 0)
-        body_root.setSpacing(0)
 
         self._grid_w = self._build_grid()
         self._list_w = self._build_list()
 
-        body_root.addWidget(self._grid_w)
-        body_root.addWidget(self._list_w)
+        root.addWidget(self._grid_w)
+        root.addWidget(self._list_w)
 
         # Initial: list mode
         self._grid_w.hide()
@@ -216,7 +207,7 @@ class QtRecordingCard(QFrame):
         w = QWidget()
         w.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         lay = QVBoxLayout(w)
-        lay.setContentsMargins(14, 12, 12, 10)
+        lay.setContentsMargins(18, 12, 12, 10) # 18px left margin to make room for indicator
         lay.setSpacing(5)
 
         # Top row
@@ -287,7 +278,7 @@ class QtRecordingCard(QFrame):
         w = QWidget()
         w.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         lay = QHBoxLayout(w)
-        lay.setContentsMargins(12, 0, 10, 0)
+        lay.setContentsMargins(16, 0, 10, 0) # 16px left margin
         lay.setSpacing(10)
         lay.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
@@ -354,13 +345,11 @@ class QtRecordingCard(QFrame):
             self.setFixedHeight(72)
             self.setMinimumWidth(0)
             self.setMaximumWidth(16_777_215)
-            self._update_stripe_style()
         else:
             self._list_w.hide()
             self._grid_w.show()
             self._g_actions.hide()
             self.setFixedSize(320, 165)
-            self._update_stripe_style()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Content
@@ -379,6 +368,10 @@ class QtRecordingCard(QFrame):
         if rec.status_info == RecordingStatus.RECORDING and getattr(rec, "live_title", None):
             name = f"{rec.streamer_name} — {rec.live_title}"
 
+        if self._g_name.text() != name:
+            self._g_name.setText(name)
+            self._l_name.setText(name)
+
         # Duration
         dur = self.app.record_manager.get_duration(rec)
         dur_t = f"  {dur}" if (rec.is_recording or rec.is_live) and dur != "00:00:00" else ""
@@ -386,36 +379,41 @@ class QtRecordingCard(QFrame):
         # Avatar letter
         letter = rec.streamer_name[0].upper() if rec.streamer_name else "?"
 
-        # Grid
-        self._g_av.set_letter(letter, color)
-        self._g_name.setText(name)
-        self._g_status.setText(rec.status_info or "Idle")
-        self._g_status.setStyleSheet(
-            f"color:{color}; font-size:11px; font-weight:600; background:transparent;"
-        )
-        self._g_dur.setText(dur_t)
-        added = getattr(rec, "added_at", "")
-        self._g_dates.setText(f"Added: {added}" if added else "")
+        if getattr(self, "_last_av_state", None) != (letter, color):
+            self._g_av.set_letter(letter, color)
+            self._l_av.set_letter(letter, color)
+            self._last_av_state = (letter, color)
 
-        # List
-        self._l_av.set_letter(letter, color)
-        self._l_name.setText(name)
-        self._l_status.setText(rec.status_info or "Idle")
-        self._l_status.setStyleSheet(
-            f"color:{color}; font-size:11px; font-weight:600; background:transparent;"
-        )
-        self._l_dur.setText(dur_t)
+        status_text = rec.status_info or "Idle"
+        if self._g_status.text() != status_text:
+            self._g_status.setText(status_text)
+            self._l_status.setText(status_text)
+            
+        status_style = f"color:{color}; font-size:11px; font-weight:600; background:transparent;"
+        if getattr(self, "_last_status_style", None) != status_style:
+            self._g_status.setStyleSheet(status_style)
+            self._l_status.setStyleSheet(status_style)
+            self._last_status_style = status_style
+
+        if self._g_dur.text() != dur_t:
+            self._g_dur.setText(dur_t)
+            self._l_dur.setText(dur_t)
+
+        added = getattr(rec, "added_at", "")
+        added_text = f"Added: {added}" if added else ""
+        if self._g_dates.text() != added_text:
+            self._g_dates.setText(added_text)
 
         # play button
         play_btn_g = self._g_btns.get("play")
         play_btn_l = self._l_btns.get("play")
         
         if rec.is_recording:
-            text, tip = "Stop", "Stop Recording"
+            text, tip = "⏹️", "Stop Recording"
         elif rec.monitor_status:
-            text, tip = "Stop", "Stop Monitoring"
+            text, tip = "⏹️", "Stop Monitoring"
         else:
-            text, tip = "Run", "Start Monitoring"
+            text, tip = "▶️", "Start Monitoring"
             
         if play_btn_g:
             play_btn_g.setText(text)
@@ -425,44 +423,44 @@ class QtRecordingCard(QFrame):
             play_btn_l.setToolTip(tip)
 
         # Badges
-        self._fill_badges(rec, self._g_badge_row)
-        self._fill_badges(rec, self._l_badge_row)
+        self._fill_badges(rec, self._g_badge_row, self, "grid")
+        self._fill_badges(rec, self._l_badge_row, self, "list")
 
-        # Stripe
-        self._update_stripe_style()
-
-    def _update_stripe_style(self) -> None:
-        radius = "6px" if self._mode == "grid" else "2px"
-        self._stripe.setStyleSheet(
-            f"background:{self._status_color}; border:none;"
-            f" border-top-left-radius:{radius}; border-bottom-left-radius:{radius};"
-        )
 
     @staticmethod
-    def _fill_badges(rec, layout: QHBoxLayout) -> None:
-        while layout.count():
-            item = layout.takeAt(0)
-            if w := item.widget():
-                w.setParent(None)  # safe deletion in layout context
-                w.deleteLater()
-
+    def _fill_badges(rec, layout: QHBoxLayout, card_instance: QtRecordingCard, prefix: str) -> None:
         interval = getattr(rec, "loop_time_seconds", 60)
         q_t, q_c = (
             ("F", "#4CAF50") if interval <= 60 else
             ("M", "#FF9800") if interval <= 180 else
             ("S", "#F44336")
         )
-        layout.addWidget(_Badge(q_t, q_c, "Queue speed"))
 
+        score = 0
         try:
             from app.core.recording.history_manager import HistoryManager
             score = HistoryManager.get_likelihood_score(rec)
-            if score > 0:
-                l_t = "High" if score >= 0.8 else "Normal"
-                l_c = "#4CAF50" if score >= 0.8 else "#42A5F5"
-                layout.addWidget(_Badge(l_t, l_c, f"Likelihood {score:.0%}"))
         except Exception:
             pass
+
+        cache_attr = f"_badge_state_{prefix}"
+        current_state = (q_t, q_c, score)
+        if getattr(card_instance, cache_attr, None) == current_state:
+            return
+        setattr(card_instance, cache_attr, current_state)
+
+        while layout.count():
+            item = layout.takeAt(0)
+            if w := item.widget():
+                w.setParent(None)  # safe deletion in layout context
+                w.deleteLater()
+
+        layout.addWidget(_Badge(q_t, q_c, "Queue speed"))
+
+        if score > 0:
+            l_t = "High" if score >= 0.8 else "Normal"
+            l_c = "#4CAF50" if score >= 0.8 else "#42A5F5"
+            layout.addWidget(_Badge(l_t, l_c, f"Likelihood {score:.0%}"))
 
     # ─────────────────────────────────────────────────────────────────────────
     # Painting  (card background + shadow drawn here to avoid effect conflicts)
@@ -472,16 +470,59 @@ class QtRecordingCard(QFrame):
         p = QPainter(self)
         p.setRenderHints(
             QPainter.RenderHint.Antialiasing |
-            QPainter.RenderHint.TextAntialiasing
+            QPainter.RenderHint.TextAntialiasing |
+            QPainter.RenderHint.SmoothPixmapTransform
         )
-        r = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        
+        c = theme_manager.colors
+        r = QRectF(self.rect()).adjusted(2, 2, -2, -2) # Leave space for focus/hover glow
         radius = 10.0
 
-        # Card fill
-        bg = _CARD_BG_HOVER if self._hovered else _CARD_BG
-        p.setPen(QPen(QColor(_CARD_BORDER), 1))
-        p.setBrush(QBrush(QColor(bg)))
+        # Hover logic
+        bg_color = c["card_hover"] if self._hovered else c["card"]
+        border_color = c["accent"] if self._hovered else c["border"]
+        border_width = 1.5 if self._hovered else 1.0
+        
+        # 1. Shadow (Subtle lift on hover)
+        if self._hovered:
+            shadow_color = QColor(0, 0, 0, 80)
+            for i in range(1, 4):
+                p.setPen(QPen(QColor(0, 0, 0, 20 // i), 1))
+                p.drawRoundedRect(r.adjusted(i, i, -i, -i), radius, radius)
+
+        # 2. Main background
+        p.setPen(QPen(QColor(border_color), border_width))
+        p.setBrush(QBrush(QColor(bg_color)))
         p.drawRoundedRect(r, radius, radius)
+        
+        # 3. Glow effect on hover (Brand color glow)
+        if self._hovered:
+            glow = QColor(c["accent"])
+            glow.setAlpha(30)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(glow))
+            p.drawRoundedRect(r, radius, radius)
+
+        # 4. Status indicator pill (The modern way)
+        # Instead of a chunky bar, we draw a subtle floating vertical pill
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(QColor(self._status_color)))
+
+        # Determine pill geometry based on mode
+        if self._mode == "list":
+            # Narrow vertical pill centered on the left
+            pill_w = 4
+            pill_h = r.height() * 0.4
+            pill_x = r.x() + 6
+            pill_y = r.y() + (r.height() - pill_h) / 2
+        else:
+            # Slightly longer pill for grid cards
+            pill_w = 4
+            pill_h = r.height() * 0.3
+            pill_x = r.x() + 6
+            pill_y = r.y() + 20
+        
+        p.drawRoundedRect(pill_x, pill_y, pill_w, pill_h, 2, 2)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Hover
