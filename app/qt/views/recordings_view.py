@@ -83,6 +83,13 @@ class QtRecordingsView(QWidget):
         self.view_toggle_btn.clicked.connect(self._toggle_view_mode)
         header.addWidget(self.view_toggle_btn)
         
+        # Refresh button
+        self.refresh_btn = QPushButton("↻ Refresh")
+        self.refresh_btn.setProperty("class", "secondary")
+        self.refresh_btn.setFixedWidth(100)
+        self.refresh_btn.clicked.connect(self.refresh)
+        header.addWidget(self.refresh_btn)
+
         # Add button
         self.add_btn = QPushButton("Add Stream")
         self.add_btn.setProperty("class", "primary-btn")
@@ -215,6 +222,22 @@ class QtRecordingsView(QWidget):
             
         self.platform_combo.blockSignals(False)
 
+    def refresh(self):
+        """Force reload data from disk and rebuild cards."""
+        # Cleanup existing
+        for card in list(self._cards.values()):
+            self.grid_layout.removeWidget(card)
+            card.deleteLater()
+        self._cards.clear()
+        
+        # Load again (manager reload)
+        self.app.record_manager.load_recordings()
+        
+        # Re-build UI
+        self._load_data()
+        self._update_platform_list()
+        self._apply_filters()
+
     def _load_data(self):
         """Initial load of recordings from the manager."""
         recordings = self.app.record_manager.recordings
@@ -244,6 +267,8 @@ class QtRecordingsView(QWidget):
         if recording.rec_id in self._cards:
             card = self._cards[recording.rec_id]
             card.update_content()
+            # Automatically re-apply filters so if a card no longer matches, it hides
+            self._apply_filters()
 
     def _on_recording_added(self, topic, recording):
         """Handle 'add' event from EventBus."""

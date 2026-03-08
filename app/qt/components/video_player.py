@@ -26,8 +26,11 @@ class QtVideoPlayer(QDialog):
         super().__init__(parent)
         self.app = app_context
         self.setWindowTitle("Video Player")
-        self.resize(900, 600)
-        self.setMinimumSize(640, 480)
+        self.resize(1000, 650)
+        self.setMinimumSize(800, 500)
+        
+        # Set default font to avoid setPointSize <= 0 warning
+        self.setFont(QFont("Segoe UI", 10))
         
         self._setup_ui()
         self._setup_player()
@@ -37,82 +40,107 @@ class QtVideoPlayer(QDialog):
 
     def _setup_ui(self):
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(10, 10, 10, 10)
-        
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+        self.setObjectName("videoPlayer")
+
         # 1. Video Render Widget
+        self.video_container = QWidget()
+        self.video_container.setStyleSheet("background-color: black;")
+        container_layout = QVBoxLayout(self.video_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        
         self.video_widget = QVideoWidget()
-        self.video_widget.setStyleSheet("background-color: black;")
-        self.layout.addWidget(self.video_widget)
+        container_layout.addWidget(self.video_widget)
+        self.layout.addWidget(self.video_container)
         
         # 2. Controls Area
-        controls_layout = QVBoxLayout()
+        self.controls_widget = QWidget()
+        self.controls_widget.setFixedHeight(100)
+        self.controls_widget.setObjectName("playerControls")
+        self.controls_widget.setStyleSheet("""
+            #playerControls { 
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #252525, stop:1 #1a1a1a);
+                border-top: 1px solid #333;
+            }
+            QPushButton { border-radius: 4px; padding: 6px 12px; }
+            QLabel { color: #eee; font-family: 'Consolas', monospace; }
+        """)
+        
+        controls_layout = QVBoxLayout(self.controls_widget)
+        controls_layout.setContentsMargins(20, 10, 20, 15)
         
         # Seek bar
         self.seek_slider = QSlider(Qt.Orientation.Horizontal)
         self.seek_slider.setRange(0, 0)
+        self.seek_slider.setFixedHeight(20)
+        self.seek_slider.setCursor(Qt.CursorShape.PointingHandCursor)
         self.seek_slider.sliderMoved.connect(self._on_seek_moved)
         controls_layout.addWidget(self.seek_slider)
         
         # Buttons row
         btns_row = QHBoxLayout()
+        btns_row.setSpacing(15)
         
         self.play_btn = QPushButton("▶ Play")
         self.play_btn.setFixedWidth(100)
+        self.play_btn.setProperty("class", "primary-btn")
         self.play_btn.clicked.connect(self._toggle_playback)
         btns_row.addWidget(self.play_btn)
         
         self.time_label = QLabel("00:00 / 00:00")
         btns_row.addWidget(self.time_label)
         
-        self.fullscreen_btn = QPushButton("📺 Fullscreen")
-        self.fullscreen_btn.setFixedWidth(110)
-        self.fullscreen_btn.clicked.connect(self._toggle_fullscreen)
-        btns_row.addWidget(self.fullscreen_btn)
-        
         btns_row.addStretch()
         
         # Action buttons (Copy, Open Room)
         self.actions_layout = QHBoxLayout()
+        self.actions_layout.setSpacing(8)
         btns_row.addLayout(self.actions_layout)
         
-        self.close_btn = QPushButton("Close")
+        self.fullscreen_btn = QPushButton("📺 Fullscreen")
+        self.fullscreen_btn.setProperty("class", "secondary")
+        self.fullscreen_btn.clicked.connect(self._toggle_fullscreen)
+        btns_row.addWidget(self.fullscreen_btn)
+        
+        self.close_btn = QPushButton("✕ Close")
+        self.close_btn.setProperty("class", "danger")
         self.close_btn.clicked.connect(self.close)
         btns_row.addWidget(self.close_btn)
         
         controls_layout.addLayout(btns_row)
-        self.layout.addLayout(controls_layout)
+        self.layout.addWidget(self.controls_widget)
         
         # Double click on video to toggle fullscreen
         self.video_widget.mouseDoubleClickEvent = self._on_video_double_click
 
-    def _setup_player(self):
-        self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.player.setAudioOutput(self.audio_output)
-        self.player.setVideoOutput(self.video_widget)
-        
-        # Signals
-        self.player.positionChanged.connect(self._on_position_changed)
-        self.player.durationChanged.connect(self._on_duration_changed)
-        self.player.playbackStateChanged.connect(self._on_state_changed)
-        self.player.errorOccurred.connect(self._on_error)
-
-    def _toggle_fullscreen(self):
-        if self.isFullScreen():
-            self.showNormal()
-            self.fullscreen_btn.setText("📺 Fullscreen")
-        else:
-            self.showFullScreen()
-            self.fullscreen_btn.setText("🗗 Windowed")
-
-    def _on_video_double_click(self, event):
-        self._toggle_fullscreen()
-
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape and self.isFullScreen():
+        """Keyboard shortcuts for the player (Space, F, Esc, M)."""
+        key = event.key()
+        if key == Qt.Key.Key_Space:
+            self._toggle_playback()
+        elif key == Qt.Key.Key_F:
             self._toggle_fullscreen()
+        elif key == Qt.Key.Key_M:
+            self._toggle_mute()
+        elif key == Qt.Key.Key_Escape:
+            if self.isFullScreen():
+                self._toggle_fullscreen()
+            else:
+                self.close()
+        elif key == Qt.Key.Key_Left:
+            self.player.setPosition(max(0, self.player.position() - 10000)) # -10s
+        elif key == Qt.Key.Key_Right:
+            self.player.setPosition(min(self._duration, self.player.position() + 10000)) # +10s
         else:
             super().keyPressEvent(event)
+
+    def _toggle_mute(self):
+        is_muted = self.audio_output.isMuted()
+        self.audio_output.setMuted(not is_muted)
+        if hasattr(self.app.main_window, "show_toast"):
+            msg = "Muted" if not is_muted else "Unmuted"
+            self.app.main_window.show_toast(msg, "info", 1000)
 
     async def preview_video(self, source, is_file_path=True, room_url=None):
         """Prepare and show the video."""

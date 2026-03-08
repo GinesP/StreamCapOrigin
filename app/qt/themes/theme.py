@@ -300,14 +300,40 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
         min-height: 28px;
     }}
     QComboBox:focus {{ border-color: {c["input_focus"]}; }}
-    QComboBox::drop-down {{ border: none; width: 24px; }}
+    QComboBox::drop-down {{
+        border: none;
+        width: 24px;
+    }}
+    QComboBox::down-arrow {{
+        image: none;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 5px solid {c["text_sec"]};
+        width: 0; height: 0;
+        margin-right: 10px;
+    }}
+    
+    /* MANDATORY: This prevents the transparent/glitched popup on Windows */
     QComboBox QAbstractItemView {{
         background-color: {c["surface"]};
+        color: {c["text"]};
         border: 1px solid {c["border"]};
-        border-radius: 6px;
-        padding: 4px;
+        border-radius: 0px; 
         selection-background-color: {c["accent"]};
         selection-color: #ffffff;
+        outline: none;
+    }}
+
+    QComboBox QAbstractItemView::item {{
+        min-height: 30px;
+        padding-left: 10px;
+        background-color: {c["surface"]}; /* Force opaque */
+    }}
+
+    /* Target the container of the list to ensure no transparency */
+    QComboBox QFrame {{
+        background-color: {c["surface"]};
+        border: 1px solid {c["border"]};
     }}
 
     /* ── TabWidget ─────────────────────────────────────────────── */

@@ -163,15 +163,18 @@ class RecordingManager:
         Stop monitoring a single recording if it is currently being monitored.
         """
         if recording.monitor_status:
+            # If it's recording, stop it first
+            self.stop_recording(recording, manually_stopped=True)
+
+            # Now update to stopped monitoring state
+            monitor_stopped_label = self._.get('monitor_stopped', 'Stopped monitoring')
             await self._update_recording(
                 recording=recording,
                 monitor_status=False,
-                display_title=f"[{self._['monitor_stopped']}] {recording.title}",
+                display_title=f"[{monitor_stopped_label}] {recording.title}",
                 status_info=RecordingStatus.STOPPED_MONITORING,
                 selected=False,
             )
-            self.stop_recording(recording, manually_stopped=True)
-            self.app.event_bus.publish("update", recording)
             self.app.event_bus.publish("update", recording)
             await self.persist_recordings()
 

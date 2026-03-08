@@ -111,26 +111,19 @@ class QtSettingsView(QWidget):
         main_layout.addWidget(self.tabs)
 
     def _on_restore_clicked(self):
-        from PySide6.QtWidgets import QMessageBox
-        box = QMessageBox(self)
-        box.setWindowTitle("Confirm Restore")
-        box.setText("Are you sure you want to restore all settings to their default values?")
-        box.setInformativeText("This will not affect your cookies or accounts.")
-        box.setIcon(QMessageBox.Icon.Question)
-        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        box.setDefaultButton(QMessageBox.StandardButton.No)
-        
-        if box.exec() == QMessageBox.StandardButton.Yes:
-            # We don't have a direct 'restore_defaults' in SettingsLogic that is exposed nicely
-            # So we use the same logic as Flet: update the whole dict if needed, or better,
-            # use update_setting for each key. But for now, let's just trigger a logic call.
+        from app.qt.components.confirm_dialog import QtConfirmDialog
+        if QtConfirmDialog.confirm(
+            self,
+            "Confirm Restore",
+            "Are you sure you want to restore all settings to their default values?",
+            "This will not affect your cookies or accounts.",
+            type="warning"
+        ):
             self.app.event_bus.run_task(self.settings.restore_default_config)
             
-            # Show toast feedback
             if hasattr(self.app.main_window, "show_toast"):
                 self.app.main_window.show_toast("Settings restored to defaults", "success")
                 
-            # Re-load UI after a short delay to allow settings to persist
             QTimer.singleShot(200, self._load_settings)
 
 
@@ -152,7 +145,9 @@ class QtSettingsView(QWidget):
         # Basic
         rec_group = SettingsGroup("Basic Settings", "General recording behavior.")
         
+        from PySide6.QtWidgets import QListView
         self.lang_combo = QComboBox()
+        self.lang_combo.setView(QListView())
         for lang_name in self.settings.language_option.keys():
             self.lang_combo.addItem(lang_name)
         self.lang_combo.currentTextChanged.connect(lambda v: self._save_setting("language", v))
@@ -192,6 +187,7 @@ class QtSettingsView(QWidget):
         layout.addWidget(naming_group)
 
         self.quality_combo = QComboBox()
+        self.quality_combo.setView(QListView())
         self.quality_combo.addItems(["OD", "UHD", "HD", "SD", "LD"])
         self.quality_combo.currentTextChanged.connect(lambda v: self._save_setting("record_quality", v))
         rec_group.add_setting("Default Quality:", self.quality_combo)

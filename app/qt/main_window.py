@@ -28,6 +28,7 @@ from app.qt.themes.theme import theme_manager, apply_theme, DARK_COLORS, LIGHT_C
 from app.qt.views.recordings_view import QtRecordingsView
 from app.qt.views.settings_view import QtSettingsView
 from app.qt.views.home_view import QtHomeView
+from app.qt.views.log_view import QtLogView
 from app.qt.components.toast import QtToastManager
 # NOTE: QtStorageView, QtAboutView, QtVideoPlayer are imported lazily
 # to avoid loading PySide6.QtMultimedia at module level, which activates
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
         self._pages: dict[str, QWidget] = {}
 
         self._setup_ui()
+        self._setup_shortcuts()
         self._apply_theme()
         self._enable_dwm_shadow()
         self.toast_manager = QtToastManager(self)
@@ -66,9 +68,65 @@ class MainWindow(QMainWindow):
         # Subscribe to external theme changes (hot-reload via theme.json)
         theme_manager.themeChanged.connect(self._on_theme_manager_changed)
 
-        # NOTE: video_player is created lazily on first use to avoid
-        # it appearing as a spurious window during startup (QDialog bug).
-        # Do NOT instantiate QtVideoPlayer here.
+    # ── Shortcuts ────────────────────────────────────────────────────
+
+    def _setup_shortcuts(self):
+        """Register global keyboard shortcuts (Design Guide §7.2)."""
+        from PySide6.QtGui import QKeySequence, QShortcut
+        
+        # Navigation
+        shortcuts = {
+            "Ctrl+1": "home",
+            "Ctrl+2": "recordings",
+            "Ctrl+3": "settings",
+            "Ctrl+4": "storage",
+            "Ctrl+5": "about",
+            "Ctrl+6": "logs",
+        }
+        for key, page in shortcuts.items():
+            s = QShortcut(QKeySequence(key), self)
+            s.activated.connect(lambda p=page: self.show_page(p))
+
+        # Actions
+        QShortcut(QKeySequence("Ctrl+T"), self).activated.connect(self._toggle_theme)
+        
+        # Context-aware: Focus search
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self.search_shortcut.activated.connect(self._on_search_shortcut)
+
+        # Context-aware: Add stream
+        self.add_shortcut = QShortcut(QKeySequence("Alt+N"), self)
+        self.add_shortcut.activated.connect(self._on_add_shortcut)
+
+        # Context-aware: Refresh
+        self.refresh_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
+        self.refresh_shortcut.activated.connect(self._on_refresh_shortcut)
+
+    def _on_search_shortcut(self):
+        """Global Search shortcut — focus search box if in Recordings View."""
+        self.show_page("recordings")
+        view = self._pages.get("recordings")
+        if view and hasattr(view, "search_box"):
+            view.search_box.setFocus()
+            view.search_box.selectAll()
+
+    def _on_add_shortcut(self):
+        """Global Add shortcut — open dialog if relevant."""
+        if self.sidebar.current_page == "recordings":
+            view = self._pages.get("recordings")
+            if view and hasattr(view, "_on_add_stream_clicked"):
+                view._on_add_stream_clicked()
+        elif self.sidebar.current_page == "home":
+            self.show_page("recordings") # Shift to recordings
+            QTimer.singleShot(100, self._on_add_shortcut)
+
+    def _on_refresh_shortcut(self):
+        """Global Refresh shortcut — refresh current view if applicable."""
+        view = self.content_stack.currentWidget()
+        if view and hasattr(view, "refresh") and callable(view.refresh):
+            view.refresh()
+        elif view and hasattr(view, "_load_data"): # Common pattern in our views
+            view._load_data()
 
     # ── UI Setup ─────────────────────────────────────────────────────
 
@@ -115,6 +173,7 @@ class MainWindow(QMainWindow):
         self.register_page("recordings", QtRecordingsView(self.app))
         self.register_page("settings",   QtSettingsView(self.app))
         self.register_page("storage",    QtStorageView(self.app))
+        self.register_page("logs",       QtLogView(self.app))
         self.register_page("about",      QtAboutView(self.app))
 
         # Default landing page
@@ -181,6 +240,7 @@ class MainWindow(QMainWindow):
             "recordings": "recordings",
             "settings": "settings",
             "storage": "storage",
+            "logs": "logs",
             "about": "about"
         }
         translated = {page_name: sidebar_labels[key] for key, page_name in keys_map.items() if key in sidebar_labels}
@@ -250,8 +310,18 @@ class MainWindow(QMainWindow):
     # ── Window Events ────────────────────────────────────────────────
 
     def closeEvent(self, event: QCloseEvent):
-        """Handle window close: cleanup before exit."""
-        event.accept()
+        """Handle window close: show confirmation and cleanup."""
+        from app.qt.components.confirm_dialog import QtConfirmDialog
+        if QtConfirmDialog.confirm(
+            self,
+            "Exit StreamCap",
+            "Are you sure you want to close the application?",
+            "Any active recordings will be stopped.",
+            type="warning"
+        ):
+            event.accept()
+        else:
+            event.ignore()
 
 def run_qt_app():
     # Deprecated for main_qt.py approach
