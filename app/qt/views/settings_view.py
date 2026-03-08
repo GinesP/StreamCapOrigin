@@ -301,17 +301,56 @@ class QtSettingsView(QWidget):
         cookie_group = SettingsGroup("Platform Cookies", "JSON-format cookies for authenticated stream extraction.")
         
         self.cookie_fields = {}
-        platforms = ["douyin", "tiktok", "twitch", "youtube", "bilibili", "tiktok_cookie_file"]
+        platforms = ["douyin", "tiktok", "twitch", "youtube", "bilibili"]
         
         for p in platforms:
             field = QLineEdit()
             field.setPlaceholderText(f"Enter {p} cookies...")
             field.textChanged.connect(lambda v, plat=p: self._save_cookie(plat, v))
-            cookie_group.add_setting(f"{p.capitalize()}:", field)
             self.cookie_fields[p] = field
+            
+            if p == "tiktok":
+                row = QHBoxLayout()
+                row.addWidget(field)
+                btn = QPushButton("Import JSON")
+                btn.setFixedWidth(100)
+                btn.clicked.connect(lambda _, f=field, plat=p: self._on_browse_cookie_clicked(f, plat))
+                row.addWidget(btn)
+                wrapper = QWidget()
+                wrapper.setLayout(row)
+                cookie_group.add_setting(f"{p.capitalize()}:", wrapper)
+            else:
+                cookie_group.add_setting(f"{p.capitalize()}:", field)
             
         layout.addWidget(cookie_group)
         return self._create_scroll_wrapper(content)
+
+    def _on_browse_cookie_clicked(self, target_line_edit, plat):
+        from PySide6.QtWidgets import QFileDialog
+        from app.utils.cookie_importer import load_json_cookies, convert_json_to_cookie_string
+        
+        path, _ = QFileDialog.getOpenFileName(self, "Select JSON Cookie File", "", "JSON Files (*.json);;Text Files (*.txt);;All Files (*)")
+        if path:
+            try:
+                cookies_json = load_json_cookies(path)
+                if cookies_json:
+                    cookie_string = convert_json_to_cookie_string(cookies_json)
+                    if cookie_string:
+                        target_line_edit.setText(cookie_string)
+                        self._save_cookie(plat, cookie_string) # Automatically save
+                        
+                        if hasattr(self.app.main_window, "show_toast"):
+                            self.app.main_window.show_toast(f"Cookies imported successfully from {path.split('/')[-1]}", "success")
+                    else:
+                        if hasattr(self.app.main_window, "show_toast"):
+                            self.app.main_window.show_toast("Failed to convert cookies from JSON.", "error")
+                else:
+                    if hasattr(self.app.main_window, "show_toast"):
+                        self.app.main_window.show_toast("No cookies found in file.", "error")
+            except Exception as e:
+                logger.error(f"Error importing cookies: {e}")
+                if hasattr(self.app.main_window, "show_toast"):
+                    self.app.main_window.show_toast(f"Error importing cookies: {e}", "error")
 
     def _create_accounts_tab(self):
         content = QWidget()
