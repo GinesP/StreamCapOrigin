@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QPushButton, QFrame
 )
 
+from app.qt.themes.theme import theme_manager
+
 class QtConfirmDialog(QDialog):
     def __init__(self, title, message, sub_message="", type="warning", parent=None):
         super().__init__(parent)
@@ -27,7 +29,7 @@ class QtConfirmDialog(QDialog):
         layout.setSpacing(15)
 
         # Style colors
-        accent = "#FF6428" if type == "warning" else "#F44336" if type == "danger" else "#2196F3"
+        accent = theme_manager.get_color("accent") if type == "warning" else "#F44336" if type == "danger" else "#2196F3"
         
         # Icon / Title row
         title_lbl = QLabel(title)

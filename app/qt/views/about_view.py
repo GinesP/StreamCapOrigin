@@ -17,8 +17,8 @@ from PySide6.QtWidgets import (
     QFrame,
     QSizePolicy
 )
-
 from app.utils.logger import logger
+from app.qt.themes.theme import theme_manager
 
 
 class InfoCard(QFrame):
@@ -26,29 +26,34 @@ class InfoCard(QFrame):
     def __init__(self, title, content_layout=None, parent=None):
         super().__init__(parent)
         self.setObjectName("infoCard")
-        self.setStyleSheet("""
-            QFrame#infoCard {
-                background-color: #2b2b3b;
-                border-radius: 12px;
-                border: 1px solid #3d3d5d;
-            }
-            QLabel#cardTitle {
-                color: #a0a0c0;
-                font-weight: bold;
-                font-size: 16px;
-                margin-bottom: 10px;
-            }
-        """)
+        self._refresh_style()
+        theme_manager.themeChanged.connect(self._refresh_style)
         
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(20, 20, 20, 20)
-        
+
         self.title_label = QLabel(title)
         self.title_label.setObjectName("cardTitle")
         self.layout.addWidget(self.title_label)
         
         if content_layout:
             self.layout.addLayout(content_layout)
+
+    def _refresh_style(self):
+        c = theme_manager.colors
+        self.setStyleSheet(f"""
+            QFrame#infoCard {{
+                background-color: {c["surface"]};
+                border-radius: 12px;
+                border: 1px solid {c["border"]};
+            }}
+            QLabel#cardTitle {{
+                color: {c["text_sec"]};
+                font-weight: bold;
+                font-size: 16px;
+                margin-bottom: 10px;
+            }}
+        """)
 
 class QtAboutView(QWidget):
     def __init__(self, app_context):
@@ -59,6 +64,7 @@ class QtAboutView(QWidget):
         
         self.load_language()
         self._setup_ui()
+        theme_manager.themeChanged.connect(self._on_theme_changed)
 
     def load_language(self):
         language = self.app.language_manager.language
@@ -74,9 +80,10 @@ class QtAboutView(QWidget):
         header_layout = QVBoxLayout()
         header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        title_label = QLabel(self._.get("about_project", "About Project"))
-        title_label.setStyleSheet("font-size: 32px; font-weight: 800; color: #7c4dff;")
-        header_layout.addWidget(title_label)
+        
+        self.title_label = QLabel(self._.get("about_project", "About Project"))
+        self.title_label.setStyleSheet(f"font-size: 32px; font-weight: 800; color: {theme_manager.get_color('accent')};")
+        header_layout.addWidget(self.title_label)
         
         v_updates = self.about_config.get("version_updates", [{}])[0]
         ver_info = (
@@ -84,9 +91,9 @@ class QtAboutView(QWidget):
             f"{self._.get('kernel_version', 'Kernel Version')}: {v_updates.get('kernel_version', 'N/A')} | "
             f"{self._.get('license', 'License')}: {self.about_config.get('open_source_license', 'GPL')}"
         )
-        ver_label = QLabel(ver_info)
-        ver_label.setStyleSheet("color: #8888aa; font-size: 13px;")
-        header_layout.addWidget(ver_label)
+        self.ver_label = QLabel(ver_info)
+        self.ver_label.setStyleSheet(f"color: {theme_manager.get_color('text_sec')}; font-size: 13px;")
+        header_layout.addWidget(self.ver_label)
         
         main_layout.addLayout(header_layout)
 
@@ -104,12 +111,12 @@ class QtAboutView(QWidget):
 
         # 2. Introduction Card
         intro_text = self.about_config.get("introduction", {}).get(self.app.language_code, "")
-        intro_label = QLabel(intro_text)
-        intro_label.setWordWrap(True)
-        intro_label.setStyleSheet("color: #bbbbcc; font-size: 14px; line-height: 1.5;")
+        self.intro_label = QLabel(intro_text)
+        self.intro_label.setWordWrap(True)
+        self.intro_label.setStyleSheet(f"color: {theme_manager.get_color('text')}; font-size: 14px; line-height: 1.5;")
         
         card_intro = InfoCard(self._.get("introduction", "Introduction"))
-        card_intro.layout.addWidget(intro_label)
+        card_intro.layout.addWidget(self.intro_label)
         self.content_layout.addWidget(card_intro)
 
         # 3. Features Card
@@ -124,6 +131,7 @@ class QtAboutView(QWidget):
             (self._.get("status_push", "Notifications"), "🔔"),
         ]
         
+        self.feature_labels = []
         for name, icon in feature_defs:
             f_box = QVBoxLayout()
             f_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -134,9 +142,10 @@ class QtAboutView(QWidget):
             
             n_label = QLabel(name)
             n_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            n_label.setStyleSheet("font-size: 11px; color: #a0a0c0;")
+            n_label.setStyleSheet(f"font-size: 11px; color: {theme_manager.get_color('text_sec')};")
             n_label.setWordWrap(True)
             f_box.addWidget(n_label)
+            self.feature_labels.append(n_label)
             
             features_layout.addLayout(f_box)
             
@@ -148,13 +157,13 @@ class QtAboutView(QWidget):
         
         # Dev Info
         dev_col = QVBoxLayout()
-        dev_title = QLabel("Hmily")
-        dev_title.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
-        dev_col.addWidget(dev_title)
+        self.dev_title = QLabel("Hmily")
+        self.dev_title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {theme_manager.get_color('text')};")
+        dev_col.addWidget(self.dev_title)
         
-        dev_sub = QLabel(self._.get("author", "Author / Developer"))
-        dev_sub.setStyleSheet("color: #8888aa; font-size: 12px;")
-        dev_col.addWidget(dev_sub)
+        self.dev_sub = QLabel(self._.get("author", "Author / Developer"))
+        self.dev_sub.setStyleSheet(f"color: {theme_manager.get_color('text_sec')}; font-size: 12px;")
+        dev_col.addWidget(self.dev_sub)
         
         dev_card = InfoCard(self._.get("developer", "Developer"), dev_col)
         dev_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -180,11 +189,13 @@ class QtAboutView(QWidget):
 
         # 5. Changelog Card
         card_updates = InfoCard(self._.get("update", "Updates"))
+        self.update_labels = []
         for update in v_updates.get("updates", {}).get(self.app.language_code, []):
             u_label = QLabel(f"• {update}")
             u_label.setWordWrap(True)
-            u_label.setStyleSheet("color: #8888aa; font-size: 12px; margin-bottom: 4px;")
+            u_label.setStyleSheet(f"color: {theme_manager.get_color('text_sec')}; font-size: 12px; margin-bottom: 4px;")
             card_updates.layout.addWidget(u_label)
+            self.update_labels.append(u_label)
             
         self.content_layout.addWidget(card_updates)
         
@@ -192,6 +203,18 @@ class QtAboutView(QWidget):
         
         scroll.setWidget(scroll_content)
         main_layout.addWidget(scroll)
+
+    def _on_theme_changed(self):
+        self.title_label.setStyleSheet(f"font-size: 32px; font-weight: 800; color: {theme_manager.get_color('accent')};")
+        self.ver_label.setStyleSheet(f"color: {theme_manager.get_color('text_sec')}; font-size: 13px;")
+        self.intro_label.setStyleSheet(f"color: {theme_manager.get_color('text')}; font-size: 14px; line-height: 1.5;")
+        self.dev_title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {theme_manager.get_color('text')};")
+        self.dev_sub.setStyleSheet(f"color: {theme_manager.get_color('text_sec')}; font-size: 12px;")
+        
+        for n_label in self.feature_labels:
+            n_label.setStyleSheet(f"font-size: 11px; color: {theme_manager.get_color('text_sec')};")
+        for u_label in self.update_labels:
+            u_label.setStyleSheet(f"color: {theme_manager.get_color('text_sec')}; font-size: 12px; margin-bottom: 4px;")
 
     async def _check_updates(self):
         logger.info("Checking for updates from About view...")

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import random
 import time
 
-from ...messages import desktop_notify, message_pusher
+
 from ...models.recording.recording_model import Recording
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
@@ -498,33 +498,6 @@ class RecordingManager:
                     recording.notified_live_start = False
                     recording.notified_live_end = False
 
-                    if desktop_notify.should_push_notification(self.app):
-                        desktop_notify.send_notification(
-                            title=self._["notify"],
-                            message=recording.streamer_name + ' | ' + self._["live_recording_started_message"],
-                            app_icon=self.app.tray_manager.icon_path
-                        )
-
-                msg_manager = message_pusher.MessagePusher(self.settings)
-                user_config = self.settings.user_config
-                if (msg_manager.should_push_message(self.settings, recording, message_type='start')
-                        and not recording.notified_live_start):
-                    push_content = self._["push_content"]
-                    begin_push_message_text = user_config.get("custom_stream_start_content")
-                    if begin_push_message_text:
-                        push_content = begin_push_message_text
-
-                    push_at = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
-                    push_content = push_content.replace("[room_name]", recording.streamer_name).replace(
-                        "[time]", push_at).replace("[title]", recording.live_title or "None")
-                    msg_title = user_config.get("custom_notification_title").strip()
-                    msg_title = msg_title or self._["status_notify"]
-
-                    BackgroundService.get_instance().add_task(
-                        msg_manager.push_messages_sync, msg_title, push_content
-                    )
-                    recording.notified_live_start = True
-
                 if not recording.only_notify_no_record:
                     recording.status_info = RecordingStatus.PREPARING_RECORDING
                     recording.loop_time_seconds = self.loop_time_seconds
@@ -551,7 +524,7 @@ class RecordingManager:
                 recording.is_recording = False
                 if recording.is_live:
                     recording.is_live = False
-                    self.app.event_bus.run_task(recorder.end_message_push)
+                    pass # removed message push
 
                 recording.status_info = RecordingStatus.MONITORING
                 title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[recording.quality]}"
