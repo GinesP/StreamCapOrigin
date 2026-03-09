@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from typing import TypeVar
 
-from ...messages import desktop_notify, message_pusher
+
 from ...models.media.video_quality_model import VideoQuality
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
@@ -423,7 +423,7 @@ class LiveStreamRecorder:
                         logger.success(f"Live recording has stopped: {record_name}")
                     else:
                         logger.success(tr("console.live_recording_completed", "Live recording completed: {}").format(record_name))
-                        self.app.event_bus.run_task(self.end_message_push)
+                        pass # removed message push
                     
                     try:
                         self.recording.update({"display_title": display_title})
@@ -731,7 +731,7 @@ class LiveStreamRecorder:
                     logger.success(f"Direct Downloading Stopped: {record_name}")
                 else:
                     logger.success(f"Direct Downloading Completed: {record_name}")
-                    self.app.event_bus.run_task(self.end_message_push)
+                    pass # removed message push
 
                 try:
                     self.recording.update({"display_title": display_title})
@@ -792,33 +792,7 @@ class LiveStreamRecorder:
             self.recording.record_url = None
 
     async def stop_recording_notify(self):
-        if desktop_notify.should_push_notification(self.app):
-            desktop_notify.send_notification(
-                title=self._["notify"],
-                message=self.recording.streamer_name + ' | ' + self._["live_recording_stopped_message"],
-                app_icon=self.app.tray_manager.icon_path
-            )
-
-    async def end_message_push(self):
-        msg_manager = message_pusher.MessagePusher(self.settings)
-        user_config = self.settings.user_config
-
-        if (self.app.recording_enabled and msg_manager.should_push_message(
-                self.settings, self.recording, check_manually_stopped=True, message_type='end') and
-                not self.recording.notified_live_end):
-            self.recording.notified_live_end = True
-            push_content = self._["push_content_end"]
-            end_push_message_text = user_config.get("custom_stream_end_content")
-            if end_push_message_text:
-                push_content = end_push_message_text
-
-            push_at = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
-            push_content = push_content.replace("[room_name]", self.recording.streamer_name).replace(
-                "[time]", push_at).replace("[title]", self.recording.live_title or "None")
-            msg_title = user_config.get("custom_notification_title").strip()
-            msg_title = msg_title or self._["status_notify"]
-
-            self.app.event_bus.run_task(msg_manager.push_messages, msg_title, push_content)
+        pass
 
     def request_stop(self):
         logger.info(f"Stop requested for recorder: {self.recording.url}, rec_id: {self.recording.rec_id}")

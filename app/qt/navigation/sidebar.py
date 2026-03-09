@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.qt.themes.theme import theme_manager
+
 
 class SidebarItem(QPushButton):
     """A single navigation item in the sidebar."""
@@ -132,11 +134,13 @@ class Sidebar(QFrame):
         logo_layout = QHBoxLayout(logo_container)
         logo_layout.setContentsMargins(12, 8, 12, 16)
 
-        title = QLabel("StreamCap")
-        title.setProperty("class", "heading")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; background: transparent;")
-        logo_layout.addWidget(title)
+        self.title_lbl = QLabel("StreamCap")
+        self.title_lbl.setProperty("class", "heading")
+        self.title_lbl.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {theme_manager.get_color('accent')}; background: transparent;")
+        logo_layout.addWidget(self.title_lbl)
         layout.addWidget(logo_container)
+        
+        theme_manager.themeChanged.connect(self._on_theme_changed)
 
         # ── Navigation Items ────────────────────────
         for icon_char, label, name in self.NAV_ITEMS:
@@ -189,3 +193,6 @@ class Sidebar(QFrame):
     def set_theme_text(self, text: str):
         """Update the theme toggle button label."""
         self.theme_btn.setText(text)
+
+    def _on_theme_changed(self):
+        self.title_lbl.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {theme_manager.get_color('accent')}; background: transparent;")

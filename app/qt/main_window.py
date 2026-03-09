@@ -162,6 +162,7 @@ class MainWindow(QMainWindow):
 
         # Register pages
         self._register_pages()
+        self.show_page("home")
 
     def _register_pages(self):
         """Register all pages in the content stack."""
@@ -173,9 +174,6 @@ class MainWindow(QMainWindow):
         self.register_page("settings",   QtSettingsView(self.app))
         self.register_page("logs",       QtLogView(self.app))
         self.register_page("about",      QtAboutView(self.app))
-
-        # Default landing page
-        self.show_page("home")
 
     def _create_placeholder(self, name: str) -> QWidget:
         """Create a simple placeholder widget for a page not yet migrated."""
@@ -243,6 +241,21 @@ class MainWindow(QMainWindow):
         translated = {page_name: sidebar_labels[key] for key, page_name in keys_map.items() if key in sidebar_labels}
         self.sidebar.update_labels(translated)
 
+        # Hot-reload all views with new language
+        current_page = None
+        current_widget = self.content_stack.currentWidget()
+        for name, widget in self._pages.items():
+            if widget == current_widget:
+                current_page = name
+                break
+                
+        self._register_pages()
+        
+        if current_page:
+            self.show_page(current_page)
+        else:
+            self.show_page("home")
+
     # ── Theme ────────────────────────────────────────────────────────
 
     def _toggle_theme(self):
@@ -253,15 +266,29 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self):
         """Apply the current theme at startup."""
+        from app.qt.themes.theme import ACCENT_COLORS, theme_manager
+        
+        self._dark_mode = self.app.settings.user_config.get("theme_mode", "dark") == "dark"
         theme_manager._dark = self._dark_mode
+        
+        theme_color = self.app.settings.user_config.get("theme_color", "orange")
+        theme_manager._accent = ACCENT_COLORS.get(theme_color, "#FF6428")
+        
         theme_manager._rebuild_colors()
         theme_manager._apply_to_app()
+        theme_manager.themeChanged.emit()
         self._update_theme_btn()
 
     def _update_theme_btn(self):
         emoji = "☀️" if self._dark_mode else "🌙"
         label = "Light" if self._dark_mode else "Dark"
         self.sidebar.set_theme_text(f"{emoji}  {label}")
+
+        # ensure we save the preference
+        mode_str = "dark" if self._dark_mode else "light"
+        if self.app and self.app.settings and self.app.settings.user_config.get("theme_mode") != mode_str:
+            self.app.settings.user_config["theme_mode"] = mode_str
+            self.app.event_bus.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
 
     def _on_theme_manager_changed(self):
         """Called by ThemeManager when theme.json changes (hot-reload)."""

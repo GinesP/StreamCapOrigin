@@ -22,6 +22,7 @@ from PySide6.QtGui import QFont
 
 from app.qt.components.recording_card import QtRecordingCard
 from app.qt.utils.filters import RecordingFilters
+from app.qt.themes.theme import theme_manager
 from app.utils.logger import logger
 
 
@@ -33,6 +34,8 @@ class QtRecordingsView(QWidget):
     def __init__(self, app_context):
         super().__init__()
         self.app = app_context
+        self.language = self.app.language_manager.language
+        self._l = self.language.get("recordings_page", {})
         self._cards: dict = {}
         self._view_mode = "list"   # list is default; user can switch to grid
         self._current_status_filter = "all"
@@ -48,6 +51,8 @@ class QtRecordingsView(QWidget):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.timeout.connect(self._on_refresh_tick)
         self._refresh_timer.start(1000)
+
+        theme_manager.themeChanged.connect(self._on_theme_changed)
 
         # Apply filters initially to make cards visible and redraw the grid
         self._apply_filters()
@@ -76,7 +81,7 @@ class QtRecordingsView(QWidget):
 
         # Header: Title + Actions
         header = QHBoxLayout()
-        title = QLabel("Recordings")
+        title = QLabel(self._l.get("recording_list", "Recordings"))
         title.setProperty("class", "heading")
         header.addWidget(title)
         
@@ -85,7 +90,7 @@ class QtRecordingsView(QWidget):
         # View Mode Toggle
         self.view_toggle_btn = QPushButton("⊞")  # Show grid icon while in list mode
         self.view_toggle_btn.setStyleSheet("font-size: 20px;")
-        self.view_toggle_btn.setToolTip("Toggle Grid/List View")
+        self.view_toggle_btn.setToolTip(self._l.get("toggle_view", "Toggle Grid/List View"))
         self.view_toggle_btn.setProperty("class", "icon")
         self.view_toggle_btn.setFixedSize(36, 36)
         self.view_toggle_btn.clicked.connect(self._toggle_view_mode)
@@ -93,7 +98,7 @@ class QtRecordingsView(QWidget):
         
         # Refresh button
         self.refresh_btn = QPushButton("↻")
-        self.refresh_btn.setToolTip("Refresh List")
+        self.refresh_btn.setToolTip(self._l.get("refresh", "Refresh List"))
         self.refresh_btn.setProperty("class", "icon")
         self.refresh_btn.setFixedSize(36, 36)
         self.refresh_btn.clicked.connect(self.refresh)
@@ -101,7 +106,7 @@ class QtRecordingsView(QWidget):
 
         # Add button
         self.add_btn = QPushButton("+")
-        self.add_btn.setToolTip("Add New Stream")
+        self.add_btn.setToolTip(self._l.get("add_record", "Add New Stream"))
         self.add_btn.setProperty("class", "primary-btn") # Keep it prominent but smaller
         self.add_btn.setFixedSize(36, 36)
         self.add_btn.setStyleSheet("font-size: 20px; font-weight: bold; padding: 0;")
@@ -110,7 +115,7 @@ class QtRecordingsView(QWidget):
 
         # Batch Start Button
         self.batch_start_btn = QPushButton("▶")
-        self.batch_start_btn.setToolTip("Start Monitor (Visible Streams)")
+        self.batch_start_btn.setToolTip(self._l.get("batch_start", "Start Monitor (Visible Streams)"))
         self.batch_start_btn.setProperty("class", "icon")
         self.batch_start_btn.setFixedSize(36, 36)
         self.batch_start_btn.clicked.connect(self._on_batch_start_clicked)
@@ -118,7 +123,7 @@ class QtRecordingsView(QWidget):
 
         # Batch Stop Button
         self.batch_stop_btn = QPushButton("■")
-        self.batch_stop_btn.setToolTip("Stop Monitor (Visible Streams)")
+        self.batch_stop_btn.setToolTip(self._l.get("batch_stop", "Stop Monitor (Visible Streams)"))
         self.batch_stop_btn.setProperty("class", "icon")
         self.batch_stop_btn.setFixedSize(36, 36)
         self.batch_stop_btn.clicked.connect(self._on_batch_stop_clicked)
@@ -132,13 +137,13 @@ class QtRecordingsView(QWidget):
         
         # 1. Search Box
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search streamers...")
+        self.search_box.setPlaceholderText(self.language.get("search_dialog", {}).get("search_keyword", "Search streamers..."))
         self.search_box.setFixedWidth(200)
         self.search_box.textChanged.connect(self._on_search_changed)
         filter_bar_layout.addWidget(self.search_box)
         
         # Status Filter Label
-        status_label = QLabel("Estado:")
+        status_label = QLabel(self._l.get("status_filter", "Status:").split(':')[0] + ":")
         status_label.setProperty("class", "secondary")
         filter_bar_layout.addWidget(status_label)
         
@@ -147,14 +152,15 @@ class QtRecordingsView(QWidget):
         self.status_grp.setExclusive(True)
         
         status_filters = [
-            ("Todos", "all", "#FF6428"),
-            ("Grabando", "recording", "#F44336"),
-            ("En Vivo", "living", "#4CAF50"),
-            ("Offline", "offline", "#9E9E9E"),
-            ("Error", "error", "#FF9800"),
-            ("Detenido", "stopped", "#607D8B"),
+            (self._l.get("filter_all", "Todos"), "all", theme_manager.get_color("accent")),
+            (self._l.get("filter_recording", "Grabando"), "recording", "#F44336"),
+            (self._l.get("filter_living", "En Vivo"), "living", "#4CAF50"),
+            (self._l.get("filter_offline", "Offline"), "offline", "#9E9E9E"),
+            (self._l.get("filter_error", "Error"), "error", "#FF9800"),
+            (self._l.get("filter_stopped", "Detenido"), "stopped", "#607D8B"),
         ]
         
+        self.filter_btns = []
         for i, (label, key, color) in enumerate(status_filters):
             btn = QPushButton(label)
             btn.setCheckable(True)
@@ -172,19 +178,21 @@ class QtRecordingsView(QWidget):
             """)
             
             btn.setProperty("filter_key", key)
+            btn.setProperty("base_color", color)
             btn.clicked.connect(self._on_filter_clicked)
             self.status_grp.addButton(btn, i)
             filter_bar_layout.addWidget(btn)
+            self.filter_btns.append(btn)
             
         filter_bar_layout.addStretch()
         
         # 3. Platform Dropdown
         self.platform_combo = QComboBox()
         self.platform_combo.setFixedWidth(140)
-        self.platform_combo.addItem("Todas", "all")
+        self.platform_combo.addItem(self.language.get("recording_card", {}).get("all", "Todas"), "all")
         self.platform_combo.currentIndexChanged.connect(self._on_platform_changed)
         
-        platform_label = QLabel("Plataforma:")
+        platform_label = QLabel(self._l.get("platform_filter", "Plataforma:").split(':')[0] + ":")
         platform_label.setProperty("class", "secondary")
         filter_bar_layout.addWidget(platform_label)
         filter_bar_layout.addWidget(self.platform_combo)
@@ -216,7 +224,7 @@ class QtRecordingsView(QWidget):
         
         # Update icon and tooltip only (no text to avoid clipping in 36x36 btn)
         icon = "⊞" if self._view_mode == "list" else "≣"
-        tip = "Switch to Grid View" if self._view_mode == "list" else "Switch to List View"
+        tip = self._l.get("toggle_view", "Switch View")
         
         self.view_toggle_btn.setText(icon)
         self.view_toggle_btn.setToolTip(tip)
@@ -251,12 +259,24 @@ class QtRecordingsView(QWidget):
         # Optional sorting dynamically if needed, though grid redraw iterates.
         self._redraw_grid()
 
+    def _on_theme_changed(self):
+        for btn in self.filter_btns:
+            if btn.property("filter_key") == "all":
+                color = theme_manager.get_color("accent")
+                btn.setStyleSheet(f"""
+                    QPushButton[class="filter-btn"]:checked {{
+                        background-color: {color};
+                        border-color: {color};
+                        color: white;
+                    }}
+                """)
+
     def _update_platform_list(self):
         """Populate platform combo with existing platforms."""
         prev_data = self.platform_combo.currentData()
         self.platform_combo.blockSignals(True)
         self.platform_combo.clear()
-        self.platform_combo.addItem("All Platforms", "all")
+        self.platform_combo.addItem(self.language.get("recording_card", {}).get("all", "All Platforms"), "all")
         
         platforms = {}
         for rec in self.app.record_manager.recordings:

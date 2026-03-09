@@ -118,6 +118,16 @@ QUEUE_COLORS: dict[str, str] = {
     "slow":   "#F44336",
 }
 
+ACCENT_COLORS: dict[str, str] = {
+    "orange": "#FF6428",
+    "blue": "#2196F3",
+    "green": "#4CAF50",
+    "purple": "#9C27B0",
+    "red": "#F44336",
+    "pink": "#E91E63",
+    "teal": "#009688"
+}
+
 
 # ── Helper ───────────────────────────────────────────────────────────────────
 

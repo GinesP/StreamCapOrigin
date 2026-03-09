@@ -45,7 +45,8 @@ class StatCard(QFrame):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._accent = accent or theme_manager.get_color("accent")
+        self._initial_accent_setting = accent
+        self._accent = theme_manager.get_color("accent") if accent == "use_theme_accent" else (accent or theme_manager.get_color("accent"))
         self.setMinimumWidth(140)
         self.setFixedHeight(110)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -106,6 +107,9 @@ class StatCard(QFrame):
         p.drawRoundedRect(QRectF(2, 1, r.width() - 4, 4), 2, 2)
 
     def _refresh_colors(self) -> None:
+        if self._initial_accent_setting == "use_theme_accent":
+            self._accent = theme_manager.get_color("accent")
+            
         self.title_lbl.setStyleSheet(
             f"font-size: 11px; color: {theme_manager.get_color('text_sec')}; background: transparent;"
         )
@@ -136,19 +140,27 @@ class FeatureCard(QFrame):
         self._effect = QGraphicsOpacityEffect(self)
         self._effect.setOpacity(1.0)
         self.setGraphicsEffect(self._effect)
+        
+        theme_manager.themeChanged.connect(self._refresh_colors)
+
+    def _refresh_colors(self) -> None:
+        self.icon_lbl.setStyleSheet(
+            f"font-size: 24px; font-weight: 900; "
+            f"color: {theme_manager.get_color('accent')}; background: transparent;"
+        )
 
     def _setup(self, icon: str, title: str, description: str) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(8)
 
-        icon_lbl = QLabel(icon)
+        self.icon_lbl = QLabel(icon)
         # Use accent color for the icon — gives it identity without emoji engine
-        icon_lbl.setStyleSheet(
+        self.icon_lbl.setStyleSheet(
             f"font-size: 24px; font-weight: 900; "
             f"color: {theme_manager.get_color('accent')}; background: transparent;"
         )
-        layout.addWidget(icon_lbl)
+        layout.addWidget(self.icon_lbl)
 
         title_lbl = QLabel(title)
         title_lbl.setStyleSheet("font-weight: 700; font-size: 13px; background: transparent;")
@@ -187,11 +199,19 @@ class QuickActionButton(QPushButton):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._accent = accent or theme_manager.get_color("accent")
+        self._initial_accent_setting = accent
+        self._accent = theme_manager.get_color("accent") if accent == "use_theme_accent" else (accent or theme_manager.get_color("accent"))
         self.setFixedHeight(42)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setText(f"{icon}  {label}")
+        self._refresh_style()
+        theme_manager.themeChanged.connect(self._refresh_style)
+
+    def _refresh_style(self):
+        if self._initial_accent_setting == "use_theme_accent":
+            self._accent = theme_manager.get_color("accent")
+            
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self._accent};
@@ -231,6 +251,8 @@ class QtHomeView(QWidget):
     def __init__(self, app_context) -> None:
         super().__init__()
         self.app = app_context
+        self.language = self.app.language_manager.language
+        self._l = self.language.get("home_page", {})
         self._stat_cards: dict[str, StatCard] = {}
 
         self._setup_ui()
@@ -300,13 +322,14 @@ class QtHomeView(QWidget):
         h_layout.setSpacing(6)
 
         title = QLabel("StreamCap")
+        self._header_title_lbl = title
         title.setStyleSheet(
             f"font-size: 34px; font-weight: 800; color: {c['accent']}; background: transparent;"
         )
         h_layout.addWidget(title)
 
         subtitle = QLabel(
-            "Multi-platform live-stream recording dashboard"
+            self._l.get("tagline", "Multi-platform live-stream recording dashboard")
         )
         subtitle.setStyleSheet(
             f"font-size: 14px; color: {c['text_sec']}; background: transparent;"
@@ -319,7 +342,7 @@ class QtHomeView(QWidget):
     def _build_stat_cards(self) -> None:
         c = theme_manager.colors
 
-        section_lbl = QLabel("Overview")
+        section_lbl = QLabel(self._l.get("stats", "Overview"))
         section_lbl.setStyleSheet(
             f"font-size: 12px; font-weight: 700; letter-spacing: 1px; "
             f"color: {c['text_muted']}; text-transform: uppercase;"
@@ -331,10 +354,10 @@ class QtHomeView(QWidget):
         row.setSpacing(12)
 
         defs = [
-            ("total",     "▣",  "Total Streams",  theme_manager.get_color("accent")),
-            ("recording", "◉",  "Recording",      STATUS_COLORS["recording"]),
-            ("live",      "◎",  "Live",           STATUS_COLORS["living"]),
-            ("offline",   "○",  "Offline",        STATUS_COLORS["offline"]),
+            ("total",     "▣",  self._l.get("total_rooms", "Total Streams"),  "use_theme_accent"),
+            ("recording", "◉",  self._l.get("active_recordings", "Recording"),      STATUS_COLORS["recording"]),
+            ("live",      "◎",  self.language.get("recording_manager", {}).get("is_live", "Live"),           STATUS_COLORS["living"]),
+            ("offline",   "○",  self.language.get("recording_card", {}).get("offline", "Offline"),        STATUS_COLORS["offline"]),
         ]
 
         for key, icon, label, accent in defs:
@@ -347,7 +370,7 @@ class QtHomeView(QWidget):
     def _build_quick_actions(self) -> None:
         c = theme_manager.colors
 
-        section_lbl = QLabel("Quick Actions")
+        section_lbl = QLabel(self.language.get("recordings_page", {}).get("operations", "Quick Actions"))
         section_lbl.setStyleSheet(
             f"font-size: 12px; font-weight: 700; letter-spacing: 1px; "
             f"color: {c['text_muted']}; text-transform: uppercase;"
@@ -359,21 +382,21 @@ class QtHomeView(QWidget):
         row.setSpacing(10)
 
         self.btn_add_stream = QuickActionButton(
-            "+", "Add Stream",
-            accent=theme_manager.get_color("accent"),
+            "+", self.language.get("recordings_page", {}).get("add_record", "Add Stream"),
+            accent="use_theme_accent",
         )
         self.btn_add_stream.clicked.connect(self._on_add_stream)
         row.addWidget(self.btn_add_stream)
 
         self.btn_go_recordings = QuickActionButton(
-            "▶", "View Recordings",
+            "▶", self.language.get("sidebar", {}).get("recordings", "View Recordings"),
             accent="#4A4A6A",
         )
         self.btn_go_recordings.clicked.connect(self._on_go_recordings)
         row.addWidget(self.btn_go_recordings)
 
         self.btn_settings = QuickActionButton(
-            "✦", "Settings",
+            "✦", self.language.get("sidebar", {}).get("settings", "Settings"),
             accent="#4A4A6A",
         )
         self.btn_settings.clicked.connect(self._on_open_settings)
@@ -384,7 +407,7 @@ class QtHomeView(QWidget):
     def _build_feature_cards(self) -> None:
         c = theme_manager.colors
 
-        section_lbl = QLabel("Features")
+        section_lbl = QLabel(self._l.get("main_features", "Features"))
         section_lbl.setStyleSheet(
             f"font-size: 12px; font-weight: 700; letter-spacing: 1px; "
             f"color: {c['text_muted']}; text-transform: uppercase;"
@@ -395,18 +418,21 @@ class QtHomeView(QWidget):
         grid = QGridLayout()
         grid.setSpacing(12)
 
+        about_l = self.language.get("about_page", {})
+        param_l = self.language.get("settings_page", {})
+        
         features = [
-            ("◈",  "30+ Platforms",
-             "Record streams from Twitch, YouTube, TikTok, Bilibili, and more."),
-            ("◉",  "Auto-Recording",
+            ("◈",  about_l.get("support_platforms", "30+ Platforms"),
+             self._l.get("feature_desc_1", "Record streams from Twitch, YouTube, TikTok, Bilibili, and more.")),
+            ("◉",  self._l.get("feature_title_1", "Auto-Recording"),
              "Start recording automatically when your favourite streamer goes live."),
-            ("✦",  "Custom Quality",
-             "Choose OD, UHD, HD, SD or LD per stream — independently."),
-            ("◆",  "Push Notifications",
-             "Receive instant alerts on stream start and end."),
-            ("↺",  "Auto-Transcode",
-             "Convert recordings to MP4 automatically after capture."),
-            ("◑",  "Light / Dark Mode",
+            ("✦",  param_l.get("recording_quality", "Custom Quality"),
+             about_l.get("customize_recording", "Choose OD, UHD, HD, SD or LD per stream.")),
+            ("◆",  self._l.get("feature_title_2", "Push Notifications"),
+             self._l.get("feature_desc_2", "Receive instant alerts on stream start and end.")),
+            ("↺",  about_l.get("automatic_transcoding", "Auto-Transcode"),
+             param_l.get("convert_mp4", "Convert recordings to MP4 automatically after capture.")),
+            ("◑",  self.language.get("sidebar", {}).get("light_theme", "Light") + " / " + self.language.get("sidebar", {}).get("dark_theme", "Dark Mode"),
              "Switch themes instantly without restarting the app."),
         ]
 
@@ -444,13 +470,17 @@ class QtHomeView(QWidget):
         tip_layout.addWidget(bulb)
 
         tip_text = QLabel(
-            "<b>Pro tip:</b> Use the Recordings view filter bar to quickly find streams "
-            "by status (Live, Recording, Offline) or search by name."
+            f"<b>{self.language.get('recordings_page', {}).get('refresh_success_tip', 'Pro tip').split(':')[0]}:</b> "
+            "Use the Recordings view filter bar to quickly find streams "
+            f"by status ({self.language.get('recording_manager', {}).get('is_live', 'Live')}, "
+            f"{self.language.get('recording_card', {}).get('recording', 'Recording')}, "
+            f"{self.language.get('recording_card', {}).get('offline', 'Offline')})."
         )
         tip_text.setWordWrap(True)
         tip_text.setStyleSheet(f"color: {c['text_sec']}; font-size: 13px; background: transparent;")
         tip_layout.addWidget(tip_text, 1)
 
+        self._tip_bulb_lbl = bulb
         self._tip_text_lbl = tip_text
         self._main_layout.addWidget(tip)
 
@@ -523,6 +553,10 @@ class QtHomeView(QWidget):
             self._section_features_lbl,
         ):
             lbl.setStyleSheet(section_style)
+            
+        self._header_title_lbl.setStyleSheet(
+            f"font-size: 34px; font-weight: 800; color: {c['accent']}; background: transparent;"
+        )
 
         # Tip frame
         self._tip_frame.setStyleSheet(f"""
@@ -535,4 +569,8 @@ class QtHomeView(QWidget):
         """)
         self._tip_text_lbl.setStyleSheet(
             f"color: {c['text_sec']}; font-size: 13px; background: transparent;"
+        )
+        self._tip_bulb_lbl.setStyleSheet(
+            f"font-size: 16px; font-weight: 900; "
+            f"color: {c['accent']}; background: transparent;"
         )
