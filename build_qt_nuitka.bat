@@ -24,8 +24,15 @@ echo [3/3] Compiling to native machine code with Nuitka...
 "venv\Scripts\python" -m nuitka ^
     --standalone ^
     --enable-plugin=pyside6 ^
+    --include-qt-plugins=multimedia,qml ^
     --windows-console-mode=disable ^
     --nofollow-import-to=flet ^
+    --follow-imports ^
+    --include-package=app.qt.views ^
+    --include-package=app.qt.components ^
+    --include-package=app.qt.navigation ^
+    --include-package=app.qt.themes ^
+    --include-package=app.qt.utils ^
     --windows-icon-from-ico="assets/icon.ico" ^
     --include-data-dir="app=app" ^
     --include-data-dir="assets=assets" ^
@@ -38,7 +45,7 @@ echo [3/3] Compiling to native machine code with Nuitka...
     --product-name="StreamCap" ^
     --file-version="1.0.0" ^
     --product-version="1.0.0" ^
-    --company-name="GinesP" ^
+    --company-name="StreamCap" ^
     main_qt.py
 
 if %ERRORLEVEL% equ 0 (
