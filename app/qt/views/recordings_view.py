@@ -307,6 +307,10 @@ class QtRecordingsView(QWidget):
 
     def refresh(self):
         """Force reload data from disk and rebuild cards."""
+        # Stop any ongoing incremental loading
+        if hasattr(self, "_load_timer") and self._load_timer.isActive():
+            self._load_timer.stop()
+            
         # Cleanup existing
         for card in list(self._cards.values()):
             self.grid_layout.removeWidget(card)
@@ -322,17 +326,48 @@ class QtRecordingsView(QWidget):
         self._apply_filters()
 
     def _load_data(self):
-        """Initial load of recordings from the manager."""
+        """Initial load of recordings from the manager using incremental loading."""
         recordings = self.app.record_manager.recordings
         # Sort recordings: Live first, then by priority score (descending)
-        sorted_recordings = sorted(
+        self._pending_recordings = sorted(
             recordings,
             key=lambda r: (r.is_live, getattr(r, 'priority_score', 0.0), r.streamer_name),
             reverse=True
         )
-        logger.info(f"QtRecordingsView: Loading {len(sorted_recordings)} recordings.")
-        for i, rec in enumerate(sorted_recordings):
-            self._add_card(rec, i)
+        
+        logger.info(f"QtRecordingsView: Starting incremental load of {len(self._pending_recordings)} recordings.")
+        
+        # Process first batch immediately (e.g., first 12 cards)
+        self._process_load_batch(batch_size=12)
+        
+        # Schedule the rest in batches
+        if self._pending_recordings:
+            if not hasattr(self, "_load_timer"):
+                self._load_timer = QTimer(self)
+                self._load_timer.timeout.connect(lambda: self._process_load_batch(batch_size=8))
+            
+            self._load_timer.start(50) # Small delay between batches
+
+    def _process_load_batch(self, batch_size=10):
+        """Create and add a batch of cards to the view."""
+        if not hasattr(self, "_pending_recordings") or not self._pending_recordings:
+            if hasattr(self, "_load_timer"):
+                self._load_timer.stop()
+            return
+
+        batch = self._pending_recordings[:batch_size]
+        self._pending_recordings = self._pending_recordings[batch_size:]
+        
+        start_index = len(self._cards)
+        for i, rec in enumerate(batch):
+            self._add_card(rec, start_index + i)
+            
+        # Update layout and filters for the new cards
+        self._apply_filters()
+        
+        if not self._pending_recordings and hasattr(self, "_load_timer"):
+            self._load_timer.stop()
+            logger.debug("QtRecordingsView: Incremental loading finished.")
 
     def _add_card(self, recording, index):
         """Create and add a card for a recording."""
