@@ -37,24 +37,25 @@ class QtApp:
         self.run_path = execute_dir
         self.assets_dir = os.path.join(bundle_dir, "assets")
         
-        # Managers
-        self.process_manager = AsyncProcessManager()
-        self.config_manager = ConfigManager(self.run_path, bundle_path=bundle_dir)
-        
-        # UI related managers (Qt versions will be needed)
-        self.settings = None # Settings manager (will need a Qt-agnostic version or Qt version)
-        self.language_manager = None
-        self.record_manager = None
-        self.install_manager = None
-        self.update_checker = None
-        self.video_player = None
-        
-        # Flet compatibility attributes (placeholders)
+        # Flet compatibility attributes (placeholders) - Must be set BEFORE managers
         self.is_web_mode = False
         self.is_mobile = False
         self.recording_enabled = True
         self.page = None  # None for Qt
         self.subprocess_start_up_info = utils.get_startup_info()
+        self.video_player = None
+
+        # Core Services
+        self.process_manager = AsyncProcessManager()
+        self.config_manager = ConfigManager(self.run_path, bundle_path=bundle_dir)
+        
+        # Instantiate managers immediately so they are available for the UI
+        from app.core.config.settings_logic import SettingsLogic
+        self.settings = SettingsLogic(self)
+        self.language_manager = LanguageManager(self)
+        self.record_manager = RecordingManager(self)
+        self.install_manager = InstallationManager(self)
+        self.update_checker = UpdateChecker(self)
 
     @property
     def language_code(self):
@@ -64,27 +65,15 @@ class QtApp:
         return "en"
 
     async def initialize(self):
-        """Asynchronously initialize all core managers."""
-        logger.info("Initializing QtApp core managers...")
-        
-        # In this phase, we reuse existing managers that we've decoupled
-        # Note: some managers currently expect 'self.app.settings' in their __init__
-        
-        # We need to provide a mock/replacement for SettingsPage as a logic class
-        from app.core.config.settings_logic import SettingsLogic
-        self.settings = SettingsLogic(self)
-        
-        self.language_manager = LanguageManager(self)
-        self.record_manager = RecordingManager(self)
-        self.install_manager = InstallationManager(self)
-        self.update_checker = UpdateChecker(self)
+        """Asynchronously start background tasks and periodic checks."""
+        logger.info("Starting QtApp background tasks...")
         
         # Start background tasks
         self.event_bus.run_task(self.install_manager.check_env)
         self.event_bus.run_task(self.record_manager.check_free_space)
         self.event_bus.run_task(self._check_for_updates_periodic)
         
-        logger.info("QtApp core managers initialized.")
+        logger.info("QtApp background tasks started.")
 
     async def _check_for_updates_periodic(self):
         """Periodic update check logic."""

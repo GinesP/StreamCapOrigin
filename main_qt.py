@@ -29,19 +29,18 @@ _qt_app = None
 async def start_app():
     """Asynchronously initialize core and launch the main window."""
     global _qt_app
-    # Initialize Core Application Logic
+    # Initialize Core Application Logic (Sync part happens in __init__)
     _qt_app = QtApp()
-    await _qt_app.initialize()
     
-    # Create and show window
+    # Create and show window immediately for better perceived performance
     window = MainWindow(_qt_app)
-    _qt_app.main_window = window   # Needed for lazy video player creation
-    # Ensure it's stored to prevent GC
+    _qt_app.main_window = window
     global _main_window 
     _main_window = window
     window.show()
 
-    # Start periodic tasks
+    # Perform background initialization (update checks, env checks) after window is shown
+    await _qt_app.initialize()
     await _qt_app.start_periodic_tasks()
 
 def main():
@@ -64,7 +63,7 @@ def main():
     app.setApplicationDisplayName("StreamCap")
 
     # Set the application icon globally
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.ico")
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icons", "icon.iconset", "icon_512x512.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

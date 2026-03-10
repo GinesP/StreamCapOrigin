@@ -25,6 +25,7 @@ echo [3/3] Compiling to native machine code with Nuitka...
     --standalone ^
     --enable-plugin=pyside6 ^
     --windows-console-mode=disable ^
+    --nofollow-import-to=flet ^
     --windows-icon-from-ico="assets/icon.ico" ^
     --include-data-dir="app=app" ^
     --include-data-dir="assets=assets" ^
@@ -33,13 +34,17 @@ echo [3/3] Compiling to native machine code with Nuitka...
     --include-data-file="config/language.json=config/" ^
     --include-data-file="config/version.json=config/" ^
     --output-dir="dist" ^
+    --output-filename="StreamCap.exe" ^
+    --product-name="StreamCap" ^
+    --file-version="1.0.0" ^
+    --product-version="1.0.0" ^
+    --company-name="GinesP" ^
     main_qt.py
 
 if %ERRORLEVEL% equ 0 (
-    echo.
     echo ====================================================
     echo Build Successful! 
-    echo Native executable located at: dist\main_qt.dist\main_qt.exe
+    echo Native executable located at: dist\main_qt.dist\StreamCap.exe
     echo ====================================================
 ) else (
     echo.

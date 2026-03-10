@@ -132,20 +132,30 @@ class QtRecordingsView(QWidget):
         main_layout.addLayout(header)
 
         # ── Filter Bar ────────────────────────────────────────────────
-        filter_bar_layout = QHBoxLayout()
-        filter_bar_layout.setSpacing(10)
+        # Use two rows to handle long translated strings gracefully
+        filter_bar_layout = QVBoxLayout()
+        filter_bar_layout.setSpacing(12)
+        
+        top_filter_row = QHBoxLayout()
+        top_filter_row.setSpacing(10)
         
         # 1. Search Box
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText(self.language.get("search_dialog", {}).get("search_keyword", "Search streamers..."))
-        self.search_box.setFixedWidth(200)
+        # Use simple "Search..." instead of long "Enter search keyword"
+        placeholder = self._l.get("search", "Search")
+        self.search_box.setPlaceholderText(f"{placeholder}...")
+        self.search_box.setMinimumWidth(250)
         self.search_box.textChanged.connect(self._on_search_changed)
-        filter_bar_layout.addWidget(self.search_box)
+        top_filter_row.addWidget(self.search_box)
+        top_filter_row.addStretch()
         
+        bottom_filter_row = QHBoxLayout()
+        bottom_filter_row.setSpacing(10)
+
         # Status Filter Label
         status_label = QLabel(self._l.get("status_filter", "Status:").split(':')[0] + ":")
         status_label.setProperty("class", "secondary")
-        filter_bar_layout.addWidget(status_label)
+        bottom_filter_row.addWidget(status_label)
         
         # 2. Status Filters
         self.status_grp = QButtonGroup(self)
@@ -181,22 +191,24 @@ class QtRecordingsView(QWidget):
             btn.setProperty("base_color", color)
             btn.clicked.connect(self._on_filter_clicked)
             self.status_grp.addButton(btn, i)
-            filter_bar_layout.addWidget(btn)
+            bottom_filter_row.addWidget(btn)
             self.filter_btns.append(btn)
             
-        filter_bar_layout.addStretch()
+        bottom_filter_row.addStretch()
+        filter_bar_layout.addLayout(bottom_filter_row)
         
         # 3. Platform Dropdown
         self.platform_combo = QComboBox()
-        self.platform_combo.setFixedWidth(140)
+        self.platform_combo.setMinimumWidth(140)
         self.platform_combo.addItem(self.language.get("recording_card", {}).get("all", "Todas"), "all")
         self.platform_combo.currentIndexChanged.connect(self._on_platform_changed)
         
         platform_label = QLabel(self._l.get("platform_filter", "Plataforma:").split(':')[0] + ":")
         platform_label.setProperty("class", "secondary")
-        filter_bar_layout.addWidget(platform_label)
-        filter_bar_layout.addWidget(self.platform_combo)
+        top_filter_row.addWidget(platform_label)
+        top_filter_row.addWidget(self.platform_combo)
         
+        filter_bar_layout.insertLayout(0, top_filter_row)
         main_layout.addLayout(filter_bar_layout)
 
         # Scrollable Area for cards
