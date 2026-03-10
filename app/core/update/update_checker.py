@@ -258,28 +258,11 @@ class UpdateChecker:
         return 0
     
     async def show_update_dialog(self, update_info: dict[str, Any]) -> None:
-        import flet as ft  # Lazy import: only used in Flet context
-        _ = self.app.language_manager.language.get("update", {})
-
-        dialog = ft.AlertDialog(
-            title=ft.Text(_["new_version"].format(version=update_info.get("latest_version"))),
-            content=ft.Column([
-                ft.Text(_["current_version"].format(version=update_info.get("current_version"))),
-                ft.Text(_["latest_version"].format(version=update_info.get("latest_version"))),
-                ft.Text(_["update_source"].format(source=update_info.get("source", _["unknown"]))),
-            ], spacing=10, width=400, height=300),
-            actions=[
-                ft.TextButton(_["later"], on_click=lambda _: self.close_dialog()),
-                ft.TextButton(_["download"], on_click=lambda _: self.open_download_page(update_info))
-            ],
-        )
-
-        self.app.page.open(dialog)
+        """Deprecated: UI handles update dialogs natively via the event bus 'update_found'."""
+        pass
     
     def close_dialog(self) -> None:
         """Close the current dialog."""
-        # Programmatic close is now handled by buttons in 0.27+
-        # If needed, we could keep a reference to 'self.current_dialog'
         pass
 
     def open_download_page(self, update_info: dict[str, Any]) -> None:
@@ -298,9 +281,4 @@ class UpdateChecker:
             elif system == "linux" and "linux" in download_urls:
                 url = download_urls["linux"]
         
-        # If Flet page available, use it; otherwise open in system browser
-        if self.app.page:
-            self.app.page.launch_url(url)
-        else:
-            webbrowser.open(url)
-        self.close_dialog()
+        webbrowser.open(url)

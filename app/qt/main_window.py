@@ -160,20 +160,31 @@ class MainWindow(QMainWindow):
         self.content_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         main_layout.addWidget(self.content_stack)
 
-        # Register pages
-        self._register_pages()
+        # Show initial page
         self.show_page("home")
 
     def _register_pages(self):
-        """Register all pages in the content stack."""
-        from app.qt.views.about_view import QtAboutView       # lazy
+        """No longer used for eager loading. Pages are created lazily in show_page."""
+        pass
 
-        # Migrated views
-        self.register_page("home",       QtHomeView(self.app))
-        self.register_page("recordings", QtRecordingsView(self.app))
-        self.register_page("settings",   QtSettingsView(self.app))
-        self.register_page("logs",       QtLogView(self.app))
-        self.register_page("about",      QtAboutView(self.app))
+    def _create_page(self, name: str) -> QWidget:
+        """Factory method to create page widgets lazily."""
+        if name == "home":
+            from app.qt.views.home_view import QtHomeView
+            return QtHomeView(self.app)
+        elif name == "recordings":
+            from app.qt.views.recordings_view import QtRecordingsView
+            return QtRecordingsView(self.app)
+        elif name == "settings":
+            from app.qt.views.settings_view import QtSettingsView
+            return QtSettingsView(self.app)
+        elif name == "logs":
+            from app.qt.views.log_view import QtLogView
+            return QtLogView(self.app)
+        elif name == "about":
+            from app.qt.views.about_view import QtAboutView
+            return QtAboutView(self.app)
+        return self._create_placeholder(name)
 
     def _create_placeholder(self, name: str) -> QWidget:
         """Create a simple placeholder widget for a page not yet migrated."""
@@ -207,10 +218,13 @@ class MainWindow(QMainWindow):
         self._pages[name] = widget
 
     def show_page(self, name: str):
-        """Switch the visible page in the content stack."""
-        if name in self._pages:
-            self.content_stack.setCurrentWidget(self._pages[name])
-            self.sidebar.select_page(name)
+        """Switch the visible page in the content stack, creating it if needed."""
+        if name not in self._pages:
+            widget = self._create_page(name)
+            self.register_page(name, widget)
+            
+        self.content_stack.setCurrentWidget(self._pages[name])
+        self.sidebar.select_page(name)
 
     def _on_page_changed(self, name: str):
         """Handle sidebar navigation click."""
