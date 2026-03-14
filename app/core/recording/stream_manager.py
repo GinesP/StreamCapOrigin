@@ -533,34 +533,63 @@ class LiveStreamRecorder:
         save_path = None
         try:
             converts_file_path = converts_file_path.replace("\\", "/")
-            if os.path.exists(converts_file_path) and os.path.getsize(converts_file_path) > 0:
-                save_path = converts_file_path.rsplit(".", maxsplit=1)[0] + ".mp4"
-                ffmpeg_command = [
-                    "ffmpeg",
-                    "-i", converts_file_path,
-                    "-c:v", "copy",
-                    "-c:a", "copy",
-                    "-f", "mp4",
-                    "-movflags", "+faststart",
-                    save_path
-                ]
-                process = await asyncio.create_subprocess_exec(
-                    *ffmpeg_command,
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    startupinfo=self.subprocess_start_info
-                )
 
-                self.app.add_ffmpeg_process(process)
-                task = asyncio.create_task(process.communicate())
-                _, stderr = await task
-                if process.returncode == 0:
-                    converts_success = True
-                    logger.info(f"Video transcoding completed: {save_path}")
+            # On Windows the recording ffmpeg process may hold the file handle briefly
+            # after it reports completion. Retry opening the file until it is unlocked.
+            max_wait_attempts = 10
+            wait_interval = 2  # seconds between attempts
+            file_ready = False
+            for attempt in range(max_wait_attempts):
+                if os.path.exists(converts_file_path) and os.path.getsize(converts_file_path) > 0:
+                    try:
+                        # Try to open the file exclusively to verify it is not locked
+                        with open(converts_file_path, "rb") as _f:
+                            pass
+                        file_ready = True
+                        break
+                    except (PermissionError, OSError) as lock_err:
+                        logger.warning(
+                            f"TS file is still locked by another process (attempt {attempt + 1}/{max_wait_attempts}): "
+                            f"{converts_file_path} - {lock_err}"
+                        )
+                        await asyncio.sleep(wait_interval)
                 else:
-                    logger.error(
-                        f"Video transcoding failed! Error message: {stderr.decode() if stderr else 'Unknown error'}")
+                    await asyncio.sleep(wait_interval)
+
+            if not file_ready:
+                logger.error(
+                    f"Cannot convert TS file after {max_wait_attempts} attempts, file is still locked or missing: "
+                    f"{converts_file_path}"
+                )
+                return
+
+            save_path = converts_file_path.rsplit(".", maxsplit=1)[0] + ".mp4"
+            ffmpeg_command = [
+                "ffmpeg",
+                "-i", converts_file_path,
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-f", "mp4",
+                "-movflags", "+faststart",
+                save_path
+            ]
+            process = await asyncio.create_subprocess_exec(
+                *ffmpeg_command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                startupinfo=self.subprocess_start_info
+            )
+
+            self.app.add_ffmpeg_process(process)
+            task = asyncio.create_task(process.communicate())
+            _, stderr = await task
+            if process.returncode == 0:
+                converts_success = True
+                logger.info(f"Video transcoding completed: {save_path}")
+            else:
+                logger.error(
+                    f"Video transcoding failed! Error message: {stderr.decode() if stderr else 'Unknown error'}")
 
         except subprocess.CalledProcessError as e:
             logger.error(f"Video transcoding failed! Error message: {e.output.decode()}")
@@ -568,10 +597,27 @@ class LiveStreamRecorder:
         try:
             if converts_success:
                 if is_original_delete:
+                    # Give the OS a moment to release file handles before deleting
                     await asyncio.sleep(1)
-                    if os.path.exists(converts_file_path):
-                        os.remove(converts_file_path)
-                    logger.info(f"Delete Original File: {converts_file_path}")
+                    delete_attempts = 5
+                    for attempt in range(delete_attempts):
+                        try:
+                            if os.path.exists(converts_file_path):
+                                os.remove(converts_file_path)
+                            logger.info(f"Delete Original File: {converts_file_path}")
+                            break
+                        except (PermissionError, OSError) as del_err:
+                            if attempt < delete_attempts - 1:
+                                logger.warning(
+                                    f"Cannot delete TS file yet (attempt {attempt + 1}/{delete_attempts}): "
+                                    f"{converts_file_path} - {del_err}"
+                                )
+                                await asyncio.sleep(2)
+                            else:
+                                logger.error(
+                                    f"Failed to delete original TS file after {delete_attempts} attempts: "
+                                    f"{converts_file_path} - {del_err}"
+                                )
                 else:
                     converts_dir = f"{os.path.dirname(save_path)}/original"
                     os.makedirs(converts_dir, exist_ok=True)
