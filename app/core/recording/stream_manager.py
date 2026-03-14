@@ -597,27 +597,14 @@ class LiveStreamRecorder:
         try:
             if converts_success:
                 if is_original_delete:
-                    # Give the OS a moment to release file handles before deleting
-                    await asyncio.sleep(1)
-                    delete_attempts = 5
-                    for attempt in range(delete_attempts):
-                        try:
-                            if os.path.exists(converts_file_path):
-                                os.remove(converts_file_path)
-                            logger.info(f"Delete Original File: {converts_file_path}")
-                            break
-                        except (PermissionError, OSError) as del_err:
-                            if attempt < delete_attempts - 1:
-                                logger.warning(
-                                    f"Cannot delete TS file yet (attempt {attempt + 1}/{delete_attempts}): "
-                                    f"{converts_file_path} - {del_err}"
-                                )
-                                await asyncio.sleep(2)
-                            else:
-                                logger.error(
-                                    f"Failed to delete original TS file after {delete_attempts} attempts: "
-                                    f"{converts_file_path} - {del_err}"
-                                )
+                    deleted = await self._delete_with_retry(converts_file_path)
+                    if not deleted:
+                        # Schedule one final attempt after a much longer wait (60 s).
+                        # By then any AV scanner or OS indexer should have finished.
+                        logger.warning(
+                            f"Scheduling deferred deletion in 60 s for: {converts_file_path}"
+                        )
+                        asyncio.create_task(self._deferred_delete(converts_file_path, delay=60))
                 else:
                     converts_dir = f"{os.path.dirname(save_path)}/original"
                     os.makedirs(converts_dir, exist_ok=True)
@@ -628,6 +615,46 @@ class LiveStreamRecorder:
             logger.error(f"Error occurred during conversion: {e}")
         except Exception as e:
             logger.error(f"An unknown error occurred: {e}")
+
+    async def _delete_with_retry(self, file_path: str, attempts: int = 10, interval: int = 3) -> bool:
+        """Try to delete *file_path* up to *attempts* times, waiting *interval* seconds between each.
+
+        Returns True if the file was deleted (or no longer exists), False if all attempts failed.
+        """
+        # Give the OS / conversion process a moment before the first try
+        await asyncio.sleep(2)
+        for attempt in range(attempts):
+            try:
+                if not os.path.exists(file_path):
+                    logger.info(f"Delete Original File (already gone): {file_path}")
+                    return True
+                os.remove(file_path)
+                logger.info(f"Delete Original File: {file_path}")
+                return True
+            except (PermissionError, OSError) as err:
+                remaining = attempts - attempt - 1
+                if remaining > 0:
+                    logger.warning(
+                        f"Cannot delete TS file yet (attempt {attempt + 1}/{attempts}): "
+                        f"{file_path} - {err}"
+                    )
+                    await asyncio.sleep(interval)
+                else:
+                    logger.error(
+                        f"Exhausted {attempts} deletion attempts for: {file_path} - {err}"
+                    )
+        return False
+
+    async def _deferred_delete(self, file_path: str, delay: int = 60) -> None:
+        """Wait *delay* seconds, then make one final deletion attempt."""
+        await asyncio.sleep(delay)
+        try:
+            if not os.path.exists(file_path):
+                return
+            os.remove(file_path)
+            logger.info(f"Deferred deletion succeeded: {file_path}")
+        except Exception as err:
+            logger.error(f"Deferred deletion failed (giving up): {file_path} - {err}")
 
     async def custom_script_execute(
             self,
