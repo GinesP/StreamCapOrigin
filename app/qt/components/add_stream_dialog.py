@@ -201,7 +201,7 @@ class QtAddStreamDialog(QDialog):
 
         # Segments
         self.segment_check.setChecked(bool(getattr(rec, "segment_record", False)))
-        self.segment_time.setValue(int(getattr(rec, "segment_time", 3600)))
+        self.segment_time.setValue(self._coerce_int(getattr(rec, "segment_time", 3600), 3600))
 
         # Monitoring
         self.monitor_check.setChecked(bool(getattr(rec, "monitor_status", True)))
@@ -212,7 +212,23 @@ class QtAddStreamDialog(QDialog):
         from PySide6.QtCore import QTime
         time_str = getattr(rec, "scheduled_start_time", "00:00:00") or "00:00:00"
         self.start_time.setTime(QTime.fromString(time_str))
-        self.monitor_hours.setValue(int(getattr(rec, "monitor_hours", 2)))
+        self.monitor_hours.setValue(self._coerce_int(getattr(rec, "monitor_hours", 2), 2))
+
+    @staticmethod
+    def _coerce_int(value, default: int) -> int:
+        """Safely convert *value* to int, stripping locale noise (commas, spaces, suffixes)."""
+        import re
+        if value is None:
+            return default
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        cleaned = re.sub(r"[^\d-]", "", str(value))
+        try:
+            return int(cleaned) if cleaned and cleaned != "-" else default
+        except (ValueError, OverflowError):
+            return default
 
     def _on_browse_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Select Save Directory", self.dir_input.text())
