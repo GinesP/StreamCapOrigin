@@ -24,3 +24,11 @@
 - **Error:** `AttributeError: 'QtApp' object has no attribute 'page'`.
 - **Lesson:** Define basic compatibility attributes (`self.page`, `self.is_web_mode`, etc.) at the VERY TOP of the `QtApp.__init__` constructor.
 - **Why:** Some managers (`InstallationManager`, etc.) access these attributes immediately upon instantiation.
+
+## 5. Windows File Lock After Subprocess Termination
+- **Error:** `WinError 32: El proceso no puede tener acceso al archivo porque está siendo utilizado por otro proceso` al intentar convertir/borrar el archivo `.ts` justo después de que ffmpeg termina.
+- **Symptom:** Quedan duplicados (`.ts` + `.mp4`) porque la conversión falla con el fichero bloqueado y el original no se puede borrar.
+- **Root cause:** En Windows, el kernel puede tardar unos instantes en liberar el handle de fichero de un proceso hijo incluso después de que `process.communicate()` o `process.wait()` retornan en el proceso padre. La versión Flet no lo sufría porque su event loop añadía latencia suficiente de forma accidental.
+- **Rule:** Nunca acceder a un fichero producido por un subproceso (ffmpeg, etc.) inmediatamente después de su terminación. Implementar un **bucle de espera activa** que pruebe abrir el fichero (`open(..., "rb")`) y reintente con `asyncio.sleep` hasta confirmar que está desbloqueado.
+- **Pattern:** Retry-with-backoff en `_do_converts_mp4` → hasta 10 intentos (2 s entre cada uno) antes de la conversión; hasta 5 intentos (2 s entre cada uno) antes de borrar el original.
+- **Applied to:** `app/core/recording/stream_manager.py` → `_do_converts_mp4`.
