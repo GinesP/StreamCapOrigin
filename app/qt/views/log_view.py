@@ -60,19 +60,14 @@ _LEVEL_COLORS: dict[str, dict] = {
     "STREAM":    {"fg": "#38bdf8", "bold": False},   # sky-blue
 }
 
-# Tokens that trigger the "Intelligence" / queue highlight
+# Tokens that trigger the "Intelligence" / queue highlight.
+# Only match the SUMMARY / WORKER lines, not individual dispatch debug lines.
 _INTELLIGENCE_KEYWORDS = (
-    "Intelligence",
-    "Cycle Summary",
-    "queue",
-    "Queue",
-    "Disp(",
-    "Busy(",
-    "waiting",
-    "Worker-",
+    "Intelligence Cycle Summary",
+    "Intelligence Worker",
 )
-_INTELLIGENCE_BG  = "#1c2a1c"   # subtle green tint
-_INTELLIGENCE_FG  = "#7ee787"   # bright green
+_INTELLIGENCE_BG   = "#0f3318"   # vivid dark-green background — clearly visible on #0d1117
+_INTELLIGENCE_FG   = "#a8ff78"   # bright lime-green text
 _INTELLIGENCE_BOLD = True
 
 # Timestamp colour
