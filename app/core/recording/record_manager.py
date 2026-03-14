@@ -319,7 +319,20 @@ class RecordingManager:
                 f"Busy({busy_fast}F+{busy_medium}M+{busy_slow}S) | "
                 f"{skipping_count} waiting</yellow>"
             )
-        
+
+        # Publish structured data so the dashboard can update in real-time
+        self.app.event_bus.publish("intelligence_cycle", {
+            "disp_fast":   dispatched_fast,
+            "disp_medium": dispatched_medium,
+            "disp_slow":   dispatched_slow,
+            "busy_fast":   busy_fast,
+            "busy_medium": busy_medium,
+            "busy_slow":   busy_slow,
+            "waiting":     skipping_count,
+            "total_disp":  dispatched_fast + dispatched_medium + dispatched_slow,
+            "total_busy":  busy_fast + busy_medium + busy_slow,
+        })
+
         # Persist all recording updates once after all checks are queued
         await self.persist_recordings()
 

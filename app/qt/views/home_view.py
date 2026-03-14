@@ -2,14 +2,19 @@
 Qt Home View for StreamCap.
 
 Dashboard principal con estadísticas en vivo, acciones rápidas,
-y cards de características. Sustituye la vista Home de Flet.
+cards de características e Intelligence Monitor con gráficas dinámicas.
+Sustituye la vista Home de Flet.
 """
 
 from __future__ import annotations
 
+import collections
+from typing import Sequence
+
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer, QRectF, QSize
 from PySide6.QtGui import (
-    QColor, QPainter, QBrush, QLinearGradient, QPen, QFont, QDesktopServices
+    QColor, QPainter, QBrush, QLinearGradient, QPen, QFont, QDesktopServices,
+    QFontMetrics,
 )
 from PySide6.QtWidgets import (
     QWidget,
@@ -232,6 +237,403 @@ class QuickActionButton(QPushButton):
         """)
 
 
+# ── Intelligence Monitor widgets ──────────────────────────────────────────────
+
+# Colour constants for queue lanes (consistent with QUEUE_COLORS in theme)
+_FAST_COLOR   = "#4CAF50"   # green
+_MEDIUM_COLOR = "#FF9800"   # orange
+_SLOW_COLOR   = "#F44336"   # red
+_BUSY_ALPHA   = 0.45        # dimmed version for "busy" bars
+
+
+class QueueBarChart(QWidget):
+    """Grouped bar chart showing Dispatched + Busy counts for F / M / S queues.
+
+    Each cycle updates three groups (Fast, Medium, Slow) with two bars each:
+    - Solid bar  → dispatched
+    - Dimmer bar → busy (already checking)
+    """
+
+    _BAR_WIDTH  = 18
+    _GROUP_GAP  = 14
+    _BAR_GAP    = 4
+    _BOTTOM_PAD = 28   # room for x-axis labels
+    _TOP_PAD    = 12
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setMinimumHeight(130)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        # Current values (animated targets)
+        self._disp = [0, 0, 0]   # F M S dispatched
+        self._busy = [0, 0, 0]   # F M S busy
+        self._waiting = 0
+
+        # Rendered values (smoothly interpolated)
+        self._rdisp = [0.0, 0.0, 0.0]
+        self._rbusy = [0.0, 0.0, 0.0]
+
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(30)   # ~33 fps
+        self._anim_timer.timeout.connect(self._step_animation)
+
+        theme_manager.themeChanged.connect(self.update)
+
+    def set_data(self, disp: Sequence[int], busy: Sequence[int], waiting: int) -> None:
+        self._disp    = list(disp)
+        self._busy    = list(busy)
+        self._waiting = waiting
+        if not self._anim_timer.isActive():
+            self._anim_timer.start()
+
+    def _step_animation(self) -> None:
+        speed   = 0.22   # lerp factor per frame
+        settled = True
+        for i in range(3):
+            for src, rendered in [("_disp", "_rdisp"), ("_busy", "_rbusy")]:
+                target  = float(getattr(self, src)[i])
+                current = getattr(self, rendered)[i]
+                diff    = target - current
+                if abs(diff) < 0.01:
+                    getattr(self, rendered)[i] = target
+                else:
+                    getattr(self, rendered)[i] = current + diff * speed
+                    settled = False
+        if settled:
+            self._anim_timer.stop()
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        c      = theme_manager.colors
+        w      = self.width()
+        h      = self.height()
+        bottom = h - self._BOTTOM_PAD
+        chart_h = bottom - self._TOP_PAD
+
+        # Background
+        p.fillRect(self.rect(), QColor(c["surface"]))
+
+        # Determine scale: max rendered value → full chart height
+        max_val = max(
+            max(self._rdisp + self._rbusy, default=0),
+            1   # avoid /0
+        )
+
+        colors = [_FAST_COLOR, _MEDIUM_COLOR, _SLOW_COLOR]
+        labels = ["Fast", "Med", "Slow"]
+        group_w = self._BAR_WIDTH * 2 + self._BAR_GAP
+
+        total_w = len(labels) * group_w + (len(labels) - 1) * self._GROUP_GAP
+        x_start = (w - total_w) // 2
+
+        font = QFont("Segoe UI", 9)
+        p.setFont(font)
+        fm = QFontMetrics(font)
+
+        for i, (col, lbl) in enumerate(zip(colors, labels)):
+            gx = x_start + i * (group_w + self._GROUP_GAP)
+
+            # ── Dispatched bar (solid)
+            dh = int(self._rdisp[i] / max_val * chart_h)
+            dy = bottom - dh
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(QColor(col)))
+            p.drawRoundedRect(gx, dy, self._BAR_WIDTH, dh, 3, 3)
+
+            # Dispatched value label above bar
+            if self._rdisp[i] >= 0.5:
+                p.setPen(QPen(QColor(col)))
+                disp_val = str(int(round(self._rdisp[i])))
+                tw = fm.horizontalAdvance(disp_val)
+                p.drawText(gx + (self._BAR_WIDTH - tw) // 2, dy - 3, disp_val)
+
+            # ── Busy bar (dimmed)
+            bx  = gx + self._BAR_WIDTH + self._BAR_GAP
+            bh  = int(self._rbusy[i] / max_val * chart_h)
+            bdy = bottom - bh
+            busy_col = QColor(col)
+            busy_col.setAlphaF(_BUSY_ALPHA)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(busy_col))
+            p.drawRoundedRect(bx, bdy, self._BAR_WIDTH, bh, 3, 3)
+
+            # Busy value label above bar
+            if self._rbusy[i] >= 0.5:
+                p.setPen(QPen(busy_col))
+                busy_val = str(int(round(self._rbusy[i])))
+                tw = fm.horizontalAdvance(busy_val)
+                p.drawText(bx + (self._BAR_WIDTH - tw) // 2, bdy - 3, busy_val)
+
+            # ── X-axis label
+            p.setPen(QPen(QColor(c["text_muted"])))
+            lw = fm.horizontalAdvance(lbl)
+            p.drawText(gx + (group_w - lw) // 2, bottom + 16, lbl)
+
+        # Baseline
+        p.setPen(QPen(QColor(c["border"]), 1))
+        p.drawLine(x_start - 4, bottom, x_start + total_w + 4, bottom)
+
+        # "Waiting" label (bottom-right)
+        if self._waiting > 0:
+            p.setPen(QPen(QColor(c["text_sec"])))
+            wait_txt = f"{self._waiting} waiting"
+            p.setFont(QFont("Segoe UI", 8))
+            p.drawText(w - fm.horizontalAdvance(wait_txt) - 8, h - 4, wait_txt)
+
+
+class SparklineChart(QWidget):
+    """Rolling area sparkline showing total dispatched per cycle over last N cycles."""
+
+    HISTORY = 40
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setMinimumHeight(60)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._data: collections.deque[int] = collections.deque(maxlen=self.HISTORY)
+        theme_manager.themeChanged.connect(self.update)
+
+    def add_point(self, value: int) -> None:
+        self._data.append(value)
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        if len(self._data) < 2:
+            return
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        c   = theme_manager.colors
+        w   = self.width()
+        h   = self.height()
+        pad = 6
+
+        p.fillRect(self.rect(), QColor(c["surface"]))
+
+        data   = list(self._data)
+        n      = len(data)
+        max_v  = max(data) or 1
+        step   = (w - pad * 2) / max(n - 1, 1)
+        accent = theme_manager.get_color("accent")
+
+        # Build polygon for the filled area
+        from PySide6.QtGui import QPolygonF
+        from PySide6.QtCore import QPointF
+
+        pts = []
+        for i, v in enumerate(data):
+            x = pad + i * step
+            y = (h - pad) - (v / max_v) * (h - pad * 2)
+            pts.append(QPointF(x, y))
+
+        # Filled gradient area
+        grad = QLinearGradient(0, 0, 0, h)
+        col_top = QColor(accent)
+        col_top.setAlphaF(0.35)
+        col_bot = QColor(accent)
+        col_bot.setAlphaF(0.0)
+        grad.setColorAt(0, col_top)
+        grad.setColorAt(1, col_bot)
+
+        fill_pts = [QPointF(pts[0].x(), h - pad)] + pts + [QPointF(pts[-1].x(), h - pad)]
+        poly = QPolygonF(fill_pts)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(grad))
+        p.drawPolygon(poly)
+
+        # Line
+        pen = QPen(QColor(accent), 2)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        line_poly = QPolygonF(pts)
+        p.drawPolyline(line_poly)
+
+        # Last-value dot
+        last_pt = pts[-1]
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(QColor(accent)))
+        p.drawEllipse(last_pt, 4, 4)
+
+        # Baseline
+        p.setPen(QPen(QColor(c["border"]), 1))
+        p.drawLine(pad, h - pad, w - pad, h - pad)
+
+
+class IntelligenceMonitor(QFrame):
+    """Dashboard panel for the Intelligence queue-management system.
+
+    Displays:
+    - Grouped bar chart: Dispatched vs Busy per queue tier (F/M/S)
+    - Sparkline: rolling dispatched total over the last 40 cycles
+    - Numeric summary row
+    """
+
+    def __init__(self, app_context, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.app = app_context
+        self.setProperty("class", "card")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        self._setup_ui()
+        theme_manager.themeChanged.connect(self._on_theme_changed)
+
+        # Subscribe to intelligence events from the record manager
+        self.app.event_bus.subscribe("intelligence_cycle", self._on_intelligence_cycle)
+
+    def _setup_ui(self) -> None:
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 14, 16, 14)
+        root.setSpacing(10)
+
+        # ── Header row ─────────────────────────────────────────────
+        hdr = QHBoxLayout()
+        self._title_lbl = QLabel("🧠  Intelligence Monitor")
+        self._title_lbl.setStyleSheet(
+            f"font-size: 13px; font-weight: 700; "
+            f"color: {theme_manager.get_color('text')}; background: transparent;"
+        )
+        hdr.addWidget(self._title_lbl)
+        hdr.addStretch()
+
+        # Legend
+        for color, label in [(_FAST_COLOR, "Fast"), (_MEDIUM_COLOR, "Med"), (_SLOW_COLOR, "Slow")]:
+            dot = QLabel("●")
+            dot.setStyleSheet(f"color: {color}; font-size: 10px; background: transparent;")
+            lbl = QLabel(label)
+            lbl.setStyleSheet(
+                f"color: {theme_manager.get_color('text_muted')}; font-size: 10px; background: transparent;"
+            )
+            hdr.addWidget(dot)
+            hdr.addWidget(lbl)
+
+        # Legend: dimmed = busy
+        dim_dot = QLabel("●")
+        dim_dot.setStyleSheet(f"color: rgba(200,200,200,0.4); font-size: 10px; background: transparent;")
+        dim_lbl = QLabel("Busy")
+        dim_lbl.setStyleSheet(
+            f"color: {theme_manager.get_color('text_muted')}; font-size: 10px; background: transparent;"
+        )
+        hdr.addWidget(dim_dot)
+        hdr.addWidget(dim_lbl)
+
+        root.addLayout(hdr)
+
+        # ── Charts row ─────────────────────────────────────────────
+        charts_row = QHBoxLayout()
+        charts_row.setSpacing(12)
+
+        # Bar chart
+        bar_col = QVBoxLayout()
+        bar_lbl = QLabel("Queue Activity")
+        bar_lbl.setStyleSheet(
+            f"font-size: 10px; color: {theme_manager.get_color('text_muted')}; background: transparent;"
+        )
+        self._bar_lbl = bar_lbl
+        bar_col.addWidget(bar_lbl)
+        self._bar_chart = QueueBarChart()
+        bar_col.addWidget(self._bar_chart)
+        charts_row.addLayout(bar_col, 1)
+
+        # Vertical separator
+        sep = QFrame()
+        sep.setProperty("class", "divider-v")
+        sep.setFixedWidth(1)
+        charts_row.addWidget(sep)
+
+        # Sparkline
+        spark_col = QVBoxLayout()
+        spark_lbl = QLabel("Dispatched / Cycle")
+        spark_lbl.setStyleSheet(
+            f"font-size: 10px; color: {theme_manager.get_color('text_muted')}; background: transparent;"
+        )
+        self._spark_lbl = spark_lbl
+        spark_col.addWidget(spark_lbl)
+        self._sparkline = SparklineChart()
+        spark_col.addWidget(self._sparkline)
+        charts_row.addLayout(spark_col, 2)
+
+        root.addLayout(charts_row)
+
+        # ── Numeric counters row ────────────────────────────────────
+        num_row = QHBoxLayout()
+        num_row.setSpacing(0)
+
+        self._counters: dict[str, QLabel] = {}
+        counter_defs = [
+            ("disp_fast",   "↑F",   _FAST_COLOR),
+            ("disp_medium", "↑M",   _MEDIUM_COLOR),
+            ("disp_slow",   "↑S",   _SLOW_COLOR),
+            ("busy_fast",   "~F",   _FAST_COLOR    + "88"),
+            ("busy_medium", "~M",   _MEDIUM_COLOR  + "88"),
+            ("busy_slow",   "~S",   _SLOW_COLOR    + "88"),
+            ("waiting",     "⏸ wait", theme_manager.get_color("text_sec")),
+        ]
+        for key, label, color in counter_defs:
+            cell = QWidget()
+            cell_lay = QVBoxLayout(cell)
+            cell_lay.setContentsMargins(8, 4, 8, 4)
+            cell_lay.setSpacing(2)
+
+            val_lbl = QLabel("0")
+            val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            val_lbl.setStyleSheet(
+                f"font-size: 16px; font-weight: 700; color: {color}; background: transparent;"
+            )
+
+            key_lbl = QLabel(label)
+            key_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            key_lbl.setStyleSheet(
+                f"font-size: 9px; color: {theme_manager.get_color('text_muted')}; background: transparent;"
+            )
+
+            cell_lay.addWidget(val_lbl)
+            cell_lay.addWidget(key_lbl)
+            num_row.addWidget(cell, 1)
+
+            self._counters[key] = val_lbl
+
+            if key != counter_defs[-1][0]:
+                vsep = QFrame()
+                vsep.setProperty("class", "divider-v")
+                vsep.setFixedWidth(1)
+                num_row.addWidget(vsep)
+
+        root.addLayout(num_row)
+
+    def _on_intelligence_cycle(self, topic, data: dict) -> None:
+        """Receive intelligence cycle data and update all charts."""
+        disp = [data["disp_fast"], data["disp_medium"], data["disp_slow"]]
+        busy = [data["busy_fast"], data["busy_medium"], data["busy_slow"]]
+
+        self._bar_chart.set_data(disp, busy, data["waiting"])
+        self._sparkline.add_point(data["total_disp"])
+
+        # Update counters
+        for key in ("disp_fast", "disp_medium", "disp_slow",
+                    "busy_fast", "busy_medium", "busy_slow", "waiting"):
+            if key in self._counters:
+                self._counters[key].setText(str(data.get(key, 0)))
+
+    def _on_theme_changed(self) -> None:
+        self._title_lbl.setStyleSheet(
+            f"font-size: 13px; font-weight: 700; "
+            f"color: {theme_manager.get_color('text')}; background: transparent;"
+        )
+        for lbl in (self._bar_lbl, self._spark_lbl):
+            lbl.setStyleSheet(
+                f"font-size: 10px; color: {theme_manager.get_color('text_muted')}; background: transparent;"
+            )
+        self._bar_chart.update()
+        self._sparkline.update()
+
+
 # ── Main View ─────────────────────────────────────────────────────────────────
 
 class QtHomeView(QWidget):
@@ -242,6 +644,7 @@ class QtHomeView(QWidget):
         ┌─────────────────────────────────┐
         │  Header (Welcome + subtitle)    │
         │  Stat Cards row (4 cards)       │
+        │  Intelligence Monitor           │
         │  Quick Actions row              │
         │  Feature Cards grid (2×3)       │
         │  Recent Activity / tip section  │
@@ -297,6 +700,7 @@ class QtHomeView(QWidget):
 
         self._build_header()
         self._build_stat_cards()
+        self._build_intelligence_monitor()
         self._build_quick_actions()
         self._build_feature_cards()
         self._build_tip_section()
@@ -366,6 +770,20 @@ class QtHomeView(QWidget):
             self._stat_cards[key] = card
 
         self._main_layout.addLayout(row)
+
+    def _build_intelligence_monitor(self) -> None:
+        c = theme_manager.colors
+
+        section_lbl = QLabel("INTELLIGENCE")
+        section_lbl.setStyleSheet(
+            f"font-size: 12px; font-weight: 700; letter-spacing: 1px; "
+            f"color: {c['text_muted']}; text-transform: uppercase;"
+        )
+        self._main_layout.addWidget(section_lbl)
+        self._section_intelligence_lbl = section_lbl
+
+        self._intel_monitor = IntelligenceMonitor(self.app)
+        self._main_layout.addWidget(self._intel_monitor)
 
     def _build_quick_actions(self) -> None:
         c = theme_manager.colors
@@ -500,7 +918,6 @@ class QtHomeView(QWidget):
             self._stat_cards["live"].set_value(str(live_count))
             self._stat_cards["offline"].set_value(str(max(0, offline_count)))
         except (KeyboardInterrupt, SystemError):
-            # Ignore interrupts during refresh, main loop will handle exit
             pass
         except Exception as e:
             logger.error(f"HomeView: Error refreshing stats: {e}")
@@ -551,6 +968,7 @@ class QtHomeView(QWidget):
             self._section_overview_lbl,
             self._section_actions_lbl,
             self._section_features_lbl,
+            self._section_intelligence_lbl,
         ):
             lbl.setStyleSheet(section_style)
             
