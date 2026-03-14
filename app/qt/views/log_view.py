@@ -16,6 +16,7 @@ Features:
 from __future__ import annotations
 
 import html
+import re
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QObject, Signal, QTimer
@@ -79,6 +80,13 @@ _TS_COLOR = "#484f58"
 
 # Maximum log lines kept in the text widget (older lines are removed)
 _MAX_LINES = 2000
+
+# Regex to strip loguru colour markup tags: <yellow>, </yellow>, <bold>, etc.
+_LOGURU_TAG_RE = re.compile(r"</?[a-zA-Z_]+(?:\s[^>]*)?>")
+
+def _strip_loguru_tags(text: str) -> str:
+    """Remove loguru opt(colors=True) markup tags from a message string."""
+    return _LOGURU_TAG_RE.sub("", text)
 
 
 # ── Signal bridge (loguru sink → Qt main thread) ─────────────────────────────
@@ -295,7 +303,9 @@ class QtLogView(QWidget):
         def _sink(message):
             record = message.record
             level  = record["level"].name
-            msg    = record["message"]
+            # Strip loguru color markup tags (e.g. <yellow>…</yellow>) that are
+            # embedded when callers use logger.opt(colors=True).
+            msg    = _strip_loguru_tags(record["message"])
             ts     = record["time"].strftime("%H:%M:%S.%f")[:-3]  # HH:MM:SS.mmm
             signal.received.emit(ts, level, msg)
 
