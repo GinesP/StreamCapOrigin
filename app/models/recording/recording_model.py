@@ -1,4 +1,18 @@
+import re
 from datetime import timedelta
+
+
+def _safe_int(value, default: int = 0) -> int:
+    """Convert *value* to int robustly, stripping locale noise like '3,600' or '5,'."""
+    if value is None:
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    # Strip everything except digits and a leading minus
+    cleaned = re.sub(r"[^\d-]", "", str(value))
+    return int(cleaned) if cleaned and cleaned != "-" else default
 
 
 class Recording:
@@ -149,11 +163,11 @@ class Recording:
             record_format=data.get("record_format"),
             quality=data.get("quality"),
             segment_record=data.get("segment_record"),
-            segment_time=data.get("segment_time"),
+            segment_time=_safe_int(data.get("segment_time"), 3600),
             monitor_status=data.get("monitor_status"),
             scheduled_recording=data.get("scheduled_recording"),
             scheduled_start_time=data.get("scheduled_start_time"),
-            monitor_hours=data.get("monitor_hours"),
+            monitor_hours=_safe_int(data.get("monitor_hours"), 2),
             recording_dir=data.get("recording_dir"),
             enabled_message_push=data.get("enabled_message_push"),
             only_notify_no_record=data.get("only_notify_no_record"),
