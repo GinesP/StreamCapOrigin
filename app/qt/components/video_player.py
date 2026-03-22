@@ -242,6 +242,7 @@ class QtVideoPlayer(QDialog):
 
     def stop(self):
         self.player.stop()
+        self.player.setSource(QUrl())
 
     def closeEvent(self, event):
         self.stop()

@@ -3,6 +3,7 @@ Qt Add Stream Dialog for StreamCap — Expanded Version.
 """
 
 import os
+import uuid
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -243,7 +244,7 @@ class QtAddStreamDialog(QDialog):
         quality_label = self.quality_combo.currentText()
         data = {
             "url": url,
-            "streamer_name": self.name_input.text().strip() or url.split("/")[-1],
+            "streamer_name": self.name_input.text().strip() or "Sala en Vivo",
             "recording_dir": self.dir_input.text().strip(),
             "quality": self.qualities.get(quality_label, "OD"),
             "record_format": self.format_combo.currentText(),
@@ -298,7 +299,7 @@ class QtAddStreamDialog(QDialog):
         logger.info(f"Adding stream: {url}")
         
         new_rec = Recording(
-            rec_id=None, # Will be set by manager
+            rec_id=str(uuid.uuid4()),
             url=url,
             streamer_name=data["streamer_name"],
             record_format=data["record_format"],
@@ -317,6 +318,9 @@ class QtAddStreamDialog(QDialog):
         
         self.app.event_bus.run_task(self.app.record_manager.add_recording, new_rec)
         self.app.event_bus.publish("add", new_rec)
+
+        if data["monitor_status"]:
+            self.app.event_bus.run_task(self.app.record_manager.check_if_live, new_rec)
         
         if hasattr(self.app.main_window, "show_toast"):
             self.app.main_window.show_toast(f"Stream added: {data['streamer_name']}", "success")
