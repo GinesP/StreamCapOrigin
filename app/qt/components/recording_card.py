@@ -429,7 +429,7 @@ class QtRecordingCard(QFrame):
 
     @staticmethod
     def _fill_badges(rec, layout: QHBoxLayout, card_instance: QtRecordingCard, prefix: str) -> None:
-        interval = getattr(rec, "loop_time_seconds", 60)
+        interval = getattr(rec, "loop_time_seconds", 60) or 60
         q_t, q_c = (
             ("F", "#4CAF50") if interval <= 60 else
             ("M", "#FF9800") if interval <= 180 else

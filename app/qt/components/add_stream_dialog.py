@@ -4,6 +4,7 @@ Qt Add Stream Dialog for StreamCap — Expanded Version.
 
 import os
 import uuid
+from datetime import datetime
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -298,6 +299,9 @@ class QtAddStreamDialog(QDialog):
 
         logger.info(f"Adding stream: {url}")
         
+        # Get default loop time from settings
+        loop_time_seconds = int(self.app.settings.user_config.get("loop_time_seconds", 300))
+        
         new_rec = Recording(
             rec_id=str(uuid.uuid4()),
             url=url,
@@ -313,8 +317,10 @@ class QtAddStreamDialog(QDialog):
             recording_dir=data["recording_dir"],
             enabled_message_push=data["enabled_message_push"],
             only_notify_no_record=False,
-            flv_use_direct_download=False
+            flv_use_direct_download=False,
+            added_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
+        new_rec.loop_time_seconds = loop_time_seconds
         
         self.app.event_bus.run_task(self.app.record_manager.add_recording, new_rec)
         self.app.event_bus.publish("add", new_rec)
