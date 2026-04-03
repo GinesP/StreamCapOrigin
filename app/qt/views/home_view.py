@@ -493,50 +493,13 @@ class IntelligenceMonitor(QFrame):
         self._retranslate_ui()
 
     def _retranslate_ui(self) -> None:
-        c = theme_manager.colors
-        self._header_title_lbl.setText("StreamCap")
-        self._header_subtitle_lbl.setText(self._l.get("tagline", "Multi-platform live-stream recording dashboard"))
-        self._section_overview_lbl.setText(self._l.get("stats", "Overview"))
-        self._section_intelligence_lbl.setText(self._l.get("intelligence_monitor", "INTELLIGENCE"))
-        
-        # Stat cards
-        defs = [
-            ("total",     self._l.get("total_rooms", "Total Streams")),
-            ("recording", self._l.get("active_recordings", "Recording")),
-            ("live",      self.language.get("recording_manager", {}).get("is_live", "Live")),
-            ("offline",   self.language.get("recording_card", {}).get("offline", "Offline")),
-        ]
-        for key, label in defs:
-            if key in self._stat_cards:
-                self._stat_cards[key].title_lbl.setText(label)
-
-        self._section_actions_lbl.setText(self.language.get("recordings_page", {}).get("operations", "Quick Actions"))
-        
-        # Quick Actions
-        self.btn_add_stream.setText(f"+  {self.language.get('recordings_page', {}).get('add_record', 'Add Stream')}")
-        self.btn_live_forecast.setText(f"🔮  {'Previsión'}")
-        self.btn_go_recordings.setText(f"▶  {self.language.get('sidebar', {}).get('recordings', 'View Recordings')}")
-        self.btn_settings.setText(f"✦  {self.language.get('sidebar', {}).get('settings', 'Settings')}")
-
-        self._section_features_lbl.setText(self._l.get("main_features", "Features"))
-        
-        # Tip
-        self._tip_text_lbl.setText(
-            f"<b>{self.language.get('recordings_page', {}).get('refresh_success_tip', 'Pro tip').split(':')[0]}:</b> "
-            "Use the Recordings view filter bar to quickly find streams "
-            f"by status ({self.language.get('recording_manager', {}).get('is_live', 'Live')}, "
-            f"{self.language.get('recording_card', {}).get('recording', 'Recording')}, "
-            f"{self.language.get('recording_card', {}).get('offline', 'Offline')})."
-        )
-        
-        # Monitor retranslation
         l_intel = self.app.language_manager.language.get("home_view", {})
-        self._intel_monitor._title_lbl.setText(l_intel.get("intelligence_monitor", "🧠 Intelligence Monitor"))
-        for lbl, key in self._intel_monitor._legend_items:
+        self._title_lbl.setText(l_intel.get("intelligence_monitor", "🧠 Intelligence Monitor"))
+        for lbl, key in self._legend_items:
             lbl.setText(l_intel.get(key, key.capitalize()))
-        self._intel_monitor._busy_lbl.setText(l_intel.get("busy", "Busy"))
-        self._intel_monitor._bar_lbl.setText(l_intel.get("queue_activity", "Queue Activity"))
-        self._intel_monitor._spark_lbl.setText(l_intel.get("dispatched_per_cycle", "Dispatched / Cycle"))
+        self._busy_lbl.setText(l_intel.get("busy", "Busy"))
+        self._bar_lbl.setText(l_intel.get("queue_activity", "Queue Activity"))
+        self._spark_lbl.setText(l_intel.get("dispatched_per_cycle", "Dispatched / Cycle"))
 
     def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
