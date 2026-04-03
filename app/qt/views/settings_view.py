@@ -77,7 +77,7 @@ class QtSettingsView(QWidget):
         self._setup_ui()
         self._load_settings()
 
-    def _on_language_changed(self, new_language) -> None:
+    def _on_language_changed(self, topic, new_language) -> None:
         self.language = new_language
         self._l = self.language.get("settings_page", {})
         

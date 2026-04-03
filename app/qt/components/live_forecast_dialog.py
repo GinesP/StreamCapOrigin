@@ -216,7 +216,7 @@ class LiveForecastDialog(QDialog):
         
         self._setup_ui()
 
-    def _on_language_changed(self, new_language):
+    def _on_language_changed(self, topic, new_language):
         self._retranslate_ui()
 
     def _retranslate_ui(self):
@@ -324,7 +324,8 @@ class LiveForecastDialog(QDialog):
             # Only consider items with a likelihood >= 50% to be "likely soon"
             # Or if they are currently live
             # Also check if they have valid time info
-            state, time_text, time_color = _get_forecast_time_info(rec)
+            info = _get_forecast_time_info(rec)
+            state = info.get("state")
             if rec.is_live or (score >= 0.50 and state in ('expected', 'delayed', 'countdown', 'live_range')):
                 forecasts.append((rec, score))
                 

@@ -489,7 +489,7 @@ class IntelligenceMonitor(QFrame):
         self.app.event_bus.subscribe("intelligence_cycle", self._on_intelligence_cycle)
         self.app.event_bus.subscribe("language_changed", self._on_language_changed)
 
-    def _on_language_changed(self, new_language) -> None:
+    def _on_language_changed(self, topic, new_language) -> None:
         self._retranslate_ui()
 
     def _retranslate_ui(self) -> None:
@@ -692,7 +692,7 @@ class QtHomeView(QWidget):
         # Theme changes
         theme_manager.themeChanged.connect(self._on_theme_changed)
 
-    def _on_language_changed(self, new_language) -> None:
+    def _on_language_changed(self, topic, new_language) -> None:
         self.language = new_language
         self._l = self.language.get("home_page", {})
         self._retranslate_ui()
