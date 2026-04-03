@@ -769,7 +769,6 @@ class QtHomeView(QWidget):
 
         self._build_header()
         self._build_stat_cards()
-        self._build_intelligence_monitor()
         self._build_quick_actions()
         self._build_feature_cards()
         self._build_tip_section()
