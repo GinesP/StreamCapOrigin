@@ -806,6 +806,13 @@ class QtHomeView(QWidget):
         self.btn_add_stream.clicked.connect(self._on_add_stream)
         row.addWidget(self.btn_add_stream)
 
+        self.btn_live_forecast = QuickActionButton(
+            "🔮", "Previsión",
+            accent="#4A4A6A",
+        )
+        self.btn_live_forecast.clicked.connect(self._on_live_forecast)
+        row.addWidget(self.btn_live_forecast)
+
         self.btn_go_recordings = QuickActionButton(
             "▶", self.language.get("sidebar", {}).get("recordings", "View Recordings"),
             accent="#4A4A6A",
@@ -931,6 +938,12 @@ class QtHomeView(QWidget):
     def _on_add_stream(self) -> None:
         from app.qt.components.add_stream_dialog import QtAddStreamDialog
         dialog = QtAddStreamDialog(self.app, self)
+        dialog.exec()
+
+    def _on_live_forecast(self) -> None:
+        from app.qt.components.live_forecast_dialog import LiveForecastDialog
+        recordings = self.app.record_manager.recordings
+        dialog = LiveForecastDialog(self.app, recordings, self)
         dialog.exec()
 
     def _on_go_recordings(self) -> None:
