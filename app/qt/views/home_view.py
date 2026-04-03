@@ -482,10 +482,61 @@ class IntelligenceMonitor(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self._setup_ui()
+        self._retranslate_ui()
         theme_manager.themeChanged.connect(self._on_theme_changed)
 
         # Subscribe to intelligence events from the record manager
         self.app.event_bus.subscribe("intelligence_cycle", self._on_intelligence_cycle)
+        self.app.event_bus.subscribe("language_changed", self._on_language_changed)
+
+    def _on_language_changed(self, new_language) -> None:
+        self._retranslate_ui()
+
+    def _retranslate_ui(self) -> None:
+        c = theme_manager.colors
+        self._header_title_lbl.setText("StreamCap")
+        self._header_subtitle_lbl.setText(self._l.get("tagline", "Multi-platform live-stream recording dashboard"))
+        self._section_overview_lbl.setText(self._l.get("stats", "Overview"))
+        self._section_intelligence_lbl.setText(self._l.get("intelligence_monitor", "INTELLIGENCE"))
+        
+        # Stat cards
+        defs = [
+            ("total",     self._l.get("total_rooms", "Total Streams")),
+            ("recording", self._l.get("active_recordings", "Recording")),
+            ("live",      self.language.get("recording_manager", {}).get("is_live", "Live")),
+            ("offline",   self.language.get("recording_card", {}).get("offline", "Offline")),
+        ]
+        for key, label in defs:
+            if key in self._stat_cards:
+                self._stat_cards[key].title_lbl.setText(label)
+
+        self._section_actions_lbl.setText(self.language.get("recordings_page", {}).get("operations", "Quick Actions"))
+        
+        # Quick Actions
+        self.btn_add_stream.setText(f"+  {self.language.get('recordings_page', {}).get('add_record', 'Add Stream')}")
+        self.btn_live_forecast.setText(f"🔮  {'Previsión'}")
+        self.btn_go_recordings.setText(f"▶  {self.language.get('sidebar', {}).get('recordings', 'View Recordings')}")
+        self.btn_settings.setText(f"✦  {self.language.get('sidebar', {}).get('settings', 'Settings')}")
+
+        self._section_features_lbl.setText(self._l.get("main_features", "Features"))
+        
+        # Tip
+        self._tip_text_lbl.setText(
+            f"<b>{self.language.get('recordings_page', {}).get('refresh_success_tip', 'Pro tip').split(':')[0]}:</b> "
+            "Use the Recordings view filter bar to quickly find streams "
+            f"by status ({self.language.get('recording_manager', {}).get('is_live', 'Live')}, "
+            f"{self.language.get('recording_card', {}).get('recording', 'Recording')}, "
+            f"{self.language.get('recording_card', {}).get('offline', 'Offline')})."
+        )
+        
+        # Monitor retranslation
+        l_intel = self.app.language_manager.language.get("home_view", {})
+        self._intel_monitor._title_lbl.setText(l_intel.get("intelligence_monitor", "🧠 Intelligence Monitor"))
+        for lbl, key in self._intel_monitor._legend_items:
+            lbl.setText(l_intel.get(key, key.capitalize()))
+        self._intel_monitor._busy_lbl.setText(l_intel.get("busy", "Busy"))
+        self._intel_monitor._bar_lbl.setText(l_intel.get("queue_activity", "Queue Activity"))
+        self._intel_monitor._spark_lbl.setText(l_intel.get("dispatched_per_cycle", "Dispatched / Cycle"))
 
     def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
@@ -494,7 +545,7 @@ class IntelligenceMonitor(QFrame):
 
         # ── Header row ─────────────────────────────────────────────
         hdr = QHBoxLayout()
-        self._title_lbl = QLabel("🧠  Intelligence Monitor")
+        self._title_lbl = QLabel() # Empty initially
         self._title_lbl.setStyleSheet(
             f"font-size: 13px; font-weight: 700; "
             f"color: {theme_manager.get_color('text')}; background: transparent;"
@@ -502,26 +553,28 @@ class IntelligenceMonitor(QFrame):
         hdr.addWidget(self._title_lbl)
         hdr.addStretch()
 
-        # Legend
-        for color, label in [(_FAST_COLOR, "Fast"), (_MEDIUM_COLOR, "Med"), (_SLOW_COLOR, "Slow")]:
+        # Legend labels stored
+        self._legend_items = []
+        for color, label_key in [(_FAST_COLOR, "fast"), (_MEDIUM_COLOR, "med"), (_SLOW_COLOR, "slow")]:
             dot = QLabel("●")
             dot.setStyleSheet(f"color: {color}; font-size: 10px; background: transparent;")
-            lbl = QLabel(label)
+            lbl = QLabel()
             lbl.setStyleSheet(
                 f"color: {theme_manager.get_color('text_muted')}; font-size: 10px; background: transparent;"
             )
             hdr.addWidget(dot)
             hdr.addWidget(lbl)
+            self._legend_items.append((lbl, label_key))
 
         # Legend: dimmed = busy
         dim_dot = QLabel("●")
         dim_dot.setStyleSheet(f"color: rgba(200,200,200,0.4); font-size: 10px; background: transparent;")
-        dim_lbl = QLabel("Busy")
-        dim_lbl.setStyleSheet(
+        self._busy_lbl = QLabel()
+        self._busy_lbl.setStyleSheet(
             f"color: {theme_manager.get_color('text_muted')}; font-size: 10px; background: transparent;"
         )
         hdr.addWidget(dim_dot)
-        hdr.addWidget(dim_lbl)
+        hdr.addWidget(self._busy_lbl)
 
         root.addLayout(hdr)
 
@@ -531,12 +584,11 @@ class IntelligenceMonitor(QFrame):
 
         # Bar chart
         bar_col = QVBoxLayout()
-        bar_lbl = QLabel("Queue Activity")
-        bar_lbl.setStyleSheet(
+        self._bar_lbl = QLabel()
+        self._bar_lbl.setStyleSheet(
             f"font-size: 10px; color: {theme_manager.get_color('text_muted')}; background: transparent;"
         )
-        self._bar_lbl = bar_lbl
-        bar_col.addWidget(bar_lbl)
+        bar_col.addWidget(self._bar_lbl)
         self._bar_chart = QueueBarChart()
         bar_col.addWidget(self._bar_chart)
         charts_row.addLayout(bar_col, 1)
@@ -549,12 +601,11 @@ class IntelligenceMonitor(QFrame):
 
         # Sparkline
         spark_col = QVBoxLayout()
-        spark_lbl = QLabel("Dispatched / Cycle")
-        spark_lbl.setStyleSheet(
+        self._spark_lbl = QLabel()
+        self._spark_lbl.setStyleSheet(
             f"font-size: 10px; color: {theme_manager.get_color('text_muted')}; background: transparent;"
         )
-        self._spark_lbl = spark_lbl
-        spark_col.addWidget(spark_lbl)
+        spark_col.addWidget(self._spark_lbl)
         self._sparkline = SparklineChart()
         spark_col.addWidget(self._sparkline)
         charts_row.addLayout(spark_col, 2)
@@ -658,7 +709,10 @@ class QtHomeView(QWidget):
         self._l = self.language.get("home_page", {})
         self._stat_cards: dict[str, StatCard] = {}
 
+        self.app.event_bus.subscribe("language_changed", self._on_language_changed)
+        
         self._setup_ui()
+        self._retranslate_ui()
         self._refresh_stats()
 
         # Live-update stats every 10 seconds
@@ -674,6 +728,58 @@ class QtHomeView(QWidget):
 
         # Theme changes
         theme_manager.themeChanged.connect(self._on_theme_changed)
+
+    def _on_language_changed(self, new_language) -> None:
+        self.language = new_language
+        self._l = self.language.get("home_page", {})
+        self._retranslate_ui()
+
+    def _retranslate_ui(self) -> None:
+        c = theme_manager.colors
+        self._header_title_lbl.setText("StreamCap")
+        self._header_subtitle_lbl.setText(self._l.get("tagline", "Multi-platform live-stream recording dashboard"))
+        self._section_overview_lbl.setText(self._l.get("stats", "Overview"))
+        
+        # Stat cards
+        defs = [
+            ("total",     self._l.get("total_rooms", "Total Streams")),
+            ("recording", self._l.get("active_recordings", "Recording")),
+            ("live",      self.language.get("recording_manager", {}).get("is_live", "Live")),
+            ("offline",   self.language.get("recording_card", {}).get("offline", "Offline")),
+        ]
+        for key, label in defs:
+            if key in self._stat_cards:
+                self._stat_cards[key].title_lbl.setText(label)
+
+        self._section_intelligence_lbl.setText("INTELLIGENCE")
+        self._section_actions_lbl.setText(self.language.get("recordings_page", {}).get("operations", "Quick Actions"))
+        
+        # Quick Actions
+        self.btn_add_stream.setText(f"+  {self.language.get('recordings_page', {}).get('add_record', 'Add Stream')}")
+        # Assuming forecast text should also be translated, but it's hardcoded "Previsión" above
+        self.btn_live_forecast.setText(f"🔮  {'Previsión'}")
+        self.btn_go_recordings.setText(f"▶  {self.language.get('sidebar', {}).get('recordings', 'View Recordings')}")
+        self.btn_settings.setText(f"✦  {self.language.get('sidebar', {}).get('settings', 'Settings')}")
+
+        self._section_features_lbl.setText(self._l.get("main_features", "Features"))
+        
+        # Tip
+        self._tip_text_lbl.setText(
+            f"<b>{self.language.get('recordings_page', {}).get('refresh_success_tip', 'Pro tip').split(':')[0]}:</b> "
+            "Use the Recordings view filter bar to quickly find streams "
+            f"by status ({self.language.get('recording_manager', {}).get('is_live', 'Live')}, "
+            f"{self.language.get('recording_card', {}).get('recording', 'Recording')}, "
+            f"{self.language.get('recording_card', {}).get('offline', 'Offline')})."
+        )
+        
+        # Monitor retranslation
+        l_intel = self.app.language_manager.language.get("home_view", {})
+        self._intel_monitor._title_lbl.setText(l_intel.get("intelligence_monitor", "🧠 Intelligence Monitor"))
+        for lbl, key in self._intel_monitor._legend_items:
+            lbl.setText(l_intel.get(key, key.capitalize()))
+        self._intel_monitor._busy_lbl.setText(l_intel.get("busy", "Busy"))
+        self._intel_monitor._bar_lbl.setText(l_intel.get("queue_activity", "Queue Activity"))
+        self._intel_monitor._spark_lbl.setText(l_intel.get("dispatched_per_cycle", "Dispatched / Cycle"))
 
     # ── UI Construction ───────────────────────────────────────────
 
@@ -735,6 +841,7 @@ class QtHomeView(QWidget):
         subtitle = QLabel(
             self._l.get("tagline", "Multi-platform live-stream recording dashboard")
         )
+        self._header_subtitle_lbl = subtitle
         subtitle.setStyleSheet(
             f"font-size: 14px; color: {c['text_sec']}; background: transparent;"
         )
@@ -753,34 +860,13 @@ class QtHomeView(QWidget):
         )
         self._main_layout.addWidget(section_lbl)
         self._section_overview_lbl = section_lbl
-
-        row = QHBoxLayout()
-        row.setSpacing(12)
-
-        defs = [
-            ("total",     "▣",  self._l.get("total_rooms", "Total Streams"),  "use_theme_accent"),
-            ("recording", "◉",  self._l.get("active_recordings", "Recording"),      STATUS_COLORS["recording"]),
-            ("live",      "◎",  self.language.get("recording_manager", {}).get("is_live", "Live"),           STATUS_COLORS["living"]),
-            ("offline",   "○",  self.language.get("recording_card", {}).get("offline", "Offline"),        STATUS_COLORS["offline"]),
-        ]
-
-        for key, icon, label, accent in defs:
-            card = StatCard(icon, label, "0", accent=accent)
-            row.addWidget(card)
-            self._stat_cards[key] = card
-
-        self._main_layout.addLayout(row)
-
-    def _build_intelligence_monitor(self) -> None:
-        c = theme_manager.colors
-
-        section_lbl = QLabel("INTELLIGENCE")
-        section_lbl.setStyleSheet(
+        self._section_intelligence_lbl = QLabel()
+        self._section_intelligence_lbl.setStyleSheet(
             f"font-size: 12px; font-weight: 700; letter-spacing: 1px; "
             f"color: {c['text_muted']}; text-transform: uppercase;"
         )
-        self._main_layout.addWidget(section_lbl)
-        self._section_intelligence_lbl = section_lbl
+        self._main_layout.addWidget(self._section_intelligence_lbl)
+
 
         self._intel_monitor = IntelligenceMonitor(self.app)
         self._main_layout.addWidget(self._intel_monitor)
@@ -799,6 +885,7 @@ class QtHomeView(QWidget):
         row = QHBoxLayout()
         row.setSpacing(10)
 
+        # Quick Actions
         self.btn_add_stream = QuickActionButton(
             "+", self.language.get("recordings_page", {}).get("add_record", "Add Stream"),
             accent="use_theme_accent",

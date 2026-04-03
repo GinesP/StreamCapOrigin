@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QScrollArea, QWidget, QFrame, QSizePolicy
 )
 from PySide6.QtGui import QColor
+from app.utils.i18n import tr
 
 from app.core.recording.history_manager import HistoryManager
 from app.qt.themes.theme import theme_manager
@@ -27,8 +28,8 @@ def _get_platform_color(platform: str | None) -> str:
     p_lower = platform.lower()
     return _PLATFORM_COLORS.get(p_lower, _PLATFORM_COLORS["default"])
 
-def _get_forecast_time_info(recording) -> tuple[str, str, str]:
-    """Return (state, display_text, color_hint) for the forecast time column."""
+def _get_forecast_time_info(recording) -> dict:
+    """Return dict with state, text_key, text, color, prefix for the forecast time column."""
     from datetime import datetime
     
     now = datetime.now()
@@ -38,7 +39,7 @@ def _get_forecast_time_info(recording) -> tuple[str, str, str]:
     active_hours = intervals.get(day_str, [])
     
     if not active_hours:
-        return ("none", "", "")
+        return {"state": "none", "text": "", "color": ""}
     
     sorted_hours = sorted(active_hours)
     first_h = sorted_hours[0]
@@ -51,22 +52,22 @@ def _get_forecast_time_info(recording) -> tuple[str, str, str]:
     # Currently in the active window
     if current_hour in active_hours:
         if is_live:
-            return ("live_range", f"🔴 {range_str}", "#E53935")
+            return {"state": "live_range", "text_key": "live_forecast_dialog.status_live", "text": range_str, "color": "#E53935", "prefix": "🔴 "}
         # Not live but within expected window
         minutes_into = (current_hour - first_h) * 60 + now.minute
         if minutes_into <= 15:
-            return ("expected", "⏳ Esperado", "#FF9800")
+            return {"state": "expected", "text_key": "live_forecast_dialog.status_expected", "text": "", "color": "#FF9800", "prefix": "⏳ "}
         else:
-            return ("delayed", "⚠ Retrasado", "#FF5252")
+            return {"state": "delayed", "text_key": "live_forecast_dialog.status_delayed", "text": "", "color": "#FF5252", "prefix": "⚠ "}
     
     # Next hour is in active hours → countdown
     next_hour = (current_hour + 1) % 24
     if next_hour in active_hours:
         minutes_left = 60 - now.minute
-        return ("countdown", f"⏱ En ~{minutes_left}min", "#4CAF50")
+        return {"state": "countdown", "text_key": "live_forecast_dialog.status_countdown", "color": "#4CAF50", "prefix": "⏱ ", "args": {"minutes": minutes_left}}
     
     # Far from active window — show start hour
-    return ("upcoming", f"{first_h:02d}:00", "")
+    return {"state": "upcoming", "text": f"{first_h:02d}:00", "color": ""}
 
 class ForecastItemWidget(QFrame):
     """Single streamer forecast item with a clean UI."""
@@ -162,19 +163,39 @@ class ForecastItemWidget(QFrame):
         layout.addWidget(lik_lbl)
         
         # Time / Status
-        state, time_text, time_color = _get_forecast_time_info(self.recording)
-        time_lbl = QLabel(time_text or "No info")
-        color = time_color if time_color else c['text_muted']
-        time_lbl.setStyleSheet(f"""
+        self.time_lbl = QLabel()
+        self.time_lbl.setFixedWidth(100)
+        self.time_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self.time_lbl)
+        
+        self.update_time_info()
+
+    def update_time_info(self):
+        c = theme_manager.colors
+        info = _get_forecast_time_info(self.recording)
+        
+        if info["state"] == "none":
+            self.time_lbl.setText("")
+            return
+            
+        if "text_key" in info:
+            translated_text = tr(info["text_key"])
+            if "args" in info:
+                translated_text = translated_text.format(**info["args"])
+            text = f"{info.get('prefix', '')}{translated_text} {info.get('text', '')}"
+        else:
+            text = info.get("text", "")
+            
+        color = info.get("color") if info.get("color") else c['text_muted']
+        
+        self.time_lbl.setText(text)
+        self.time_lbl.setStyleSheet(f"""
             font-size: 11px; 
-            font-weight: {'bold' if state in ('expected', 'delayed', 'countdown', 'live_range') else 'normal'};
+            font-weight: {'bold' if info["state"] in ('expected', 'delayed', 'countdown', 'live_range') else 'normal'};
             color: {color}; 
             border: none;
             background: transparent;
         """)
-        time_lbl.setFixedWidth(100)
-        time_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(time_lbl)
 
 
 class LiveForecastDialog(QDialog):
@@ -187,11 +208,27 @@ class LiveForecastDialog(QDialog):
         self.app = app_context
         self.recordings = recordings
         
-        self.setWindowTitle("Previsión de Streams")
+        self.app.event_bus.subscribe("language_changed", self._on_language_changed)
+        
+        self.setWindowTitle(tr("live_forecast_dialog.title"))
         self.setMinimumSize(600, 450)
         self.resize(650, 500)
         
         self._setup_ui()
+
+    def _on_language_changed(self, new_language):
+        self._retranslate_ui()
+
+    def _retranslate_ui(self):
+        self.setWindowTitle(tr("live_forecast_dialog.title"))
+        # Header
+        self.title_lbl.setText(tr("live_forecast_dialog.title"))
+        self.subtitle_lbl.setText(tr("live_forecast_dialog.subtitle"))
+        # Footer
+        self.close_btn.setText(tr("live_forecast_dialog.close"))
+        
+        # Re-populate list to update item text
+        self._populate_list()
 
     def _setup_ui(self):
         c = theme_manager.colors
@@ -209,13 +246,13 @@ class LiveForecastDialog(QDialog):
         header_layout = QVBoxLayout()
         header_layout.setSpacing(4)
         
-        title_lbl = QLabel("🔮 Previsión de Streams")
-        title_lbl.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {c['text']};")
-        header_layout.addWidget(title_lbl)
+        self.title_lbl = QLabel(tr("live_forecast_dialog.title"))
+        self.title_lbl.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {c['text']};")
+        header_layout.addWidget(self.title_lbl)
         
-        subtitle_lbl = QLabel("Streams próximos a estar online basados en el historial reciente.")
-        subtitle_lbl.setStyleSheet(f"font-size: 12px; color: {c['text_muted']};")
-        header_layout.addWidget(subtitle_lbl)
+        self.subtitle_lbl = QLabel(tr("live_forecast_dialog.subtitle"))
+        self.subtitle_lbl.setStyleSheet(f"font-size: 12px; color: {c['text_muted']};")
+        header_layout.addWidget(self.subtitle_lbl)
         
         layout.addLayout(header_layout)
         
@@ -261,17 +298,23 @@ class LiveForecastDialog(QDialog):
         btns = QHBoxLayout()
         btns.addStretch()
         
-        close_btn = QPushButton("Cerrar")
-        close_btn.setProperty("class", "primary") # Use app theme primary class
-        close_btn.setMinimumWidth(100)
-        close_btn.setFixedHeight(36)
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.clicked.connect(self.accept)
-        btns.addWidget(close_btn)
+        self.close_btn = QPushButton(tr("live_forecast_dialog.close"))
+        self.close_btn.setProperty("class", "primary") # Use app theme primary class
+        self.close_btn.setMinimumWidth(100)
+        self.close_btn.setFixedHeight(36)
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.close_btn.clicked.connect(self.accept)
+        btns.addWidget(self.close_btn)
         
         layout.addLayout(btns)
         
     def _populate_list(self):
+        # Clear existing items
+        while self.scroll_layout.count():
+            item = self.scroll_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
         c = theme_manager.colors
         
         # Gather forecasts
@@ -289,12 +332,13 @@ class LiveForecastDialog(QDialog):
         forecasts.sort(key=lambda x: (x[1], x[0].consistency_score or 0.0), reverse=True)
         
         if not forecasts:
-            empty_lbl = QLabel("No hay streams próximos según el historial.")
+            empty_lbl = QLabel(tr("live_forecast_dialog.no_forecast"))
             empty_lbl.setStyleSheet(f"font-size: 13px; color: {c['text_muted']}; font-style: italic;")
             empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.scroll_layout.addWidget(empty_lbl)
             return
-
+        
         for rec, score in forecasts:
             item_widget = ForecastItemWidget(rec, score, parent=self.scroll_content)
             self.scroll_layout.addWidget(item_widget)
+
