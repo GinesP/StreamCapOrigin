@@ -769,6 +769,7 @@ class QtHomeView(QWidget):
 
         self._build_header()
         self._build_stat_cards()
+        self._build_intelligence_monitor()
         self._build_quick_actions()
         self._build_feature_cards()
         self._build_tip_section()
@@ -822,6 +823,27 @@ class QtHomeView(QWidget):
         )
         self._main_layout.addWidget(section_lbl)
         self._section_overview_lbl = section_lbl
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
+
+        defs = [
+            ("total",     "▣",  self._l.get("total_rooms", "Total Streams"),  "use_theme_accent"),
+            ("recording", "◉",  self._l.get("active_recordings", "Recording"),      STATUS_COLORS["recording"]),
+            ("live",      "◎",  self.language.get("recording_manager", {}).get("is_live", "Live"),           STATUS_COLORS["living"]),
+            ("offline",   "○",  self.language.get("recording_card", {}).get("offline", "Offline"),        STATUS_COLORS["offline"]),
+        ]
+
+        for key, icon, label, accent in defs:
+            card = StatCard(icon, label, "0", accent=accent)
+            row.addWidget(card)
+            self._stat_cards[key] = card
+
+        self._main_layout.addLayout(row)
+
+    def _build_intelligence_monitor(self) -> None:
+        c = theme_manager.colors
+
         self._section_intelligence_lbl = QLabel()
         self._section_intelligence_lbl.setStyleSheet(
             f"font-size: 12px; font-weight: 700; letter-spacing: 1px; "

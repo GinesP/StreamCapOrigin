@@ -80,21 +80,21 @@ class QtSettingsView(QWidget):
     def _on_language_changed(self, new_language) -> None:
         self.language = new_language
         self._l = self.language.get("settings_page", {})
-        self._retranslate_ui()
-
-    def _retranslate_ui(self) -> None:
+        
+        # Rebuild tabs entirely since there are too many dynamic labels to track
+        self.tabs.clear()
+        self.tabs.addTab(self._create_recording_tab(), self._l.get("basic_settings", "Recording"))
+        self.tabs.addTab(self._create_push_tab(), self._l.get("push_notifications", "Notifications"))
+        self.tabs.addTab(self._create_cookies_tab(), self._l.get("cookies_settings", "Cookies"))
+        self.tabs.addTab(self._create_accounts_tab(), self._l.get("accounts_settings", "Accounts"))
+        
         self.title_lbl.setText(self.language.get("sidebar", {}).get("settings", "Settings"))
         self.restore_btn.setText(self._l.get("restore_defaults", "Restore Defaults"))
         
-        # Tabs
-        self.tabs.setTabText(0, self._l.get("basic_settings", "Recording"))
-        self.tabs.setTabText(1, self._l.get("push_notifications", "Notifications"))
-        self.tabs.setTabText(2, self._l.get("cookies_settings", "Cookies"))
-        self.tabs.setTabText(3, self._l.get("accounts_settings", "Accounts"))
+        self._load_settings()
 
-        # Add more UI elements here as they are created...
-        # For simplicity, update existing widgets that have labels if needed
-        # This requires tracking all labels/buttons in instance variables
+    def _retranslate_ui(self) -> None:
+        pass
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
