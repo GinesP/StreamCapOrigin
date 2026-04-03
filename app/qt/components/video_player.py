@@ -20,6 +20,7 @@ from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
 from app.utils.logger import logger
+from app.utils.i18n import tr
 
 
 class QtVideoPlayer(QDialog):
@@ -162,7 +163,7 @@ class QtVideoPlayer(QDialog):
         is_muted = self.audio_output.isMuted()
         self.audio_output.setMuted(not is_muted)
         if hasattr(self.app.main_window, "show_toast"):
-            msg = "Muted" if not is_muted else "Unmuted"
+            msg = tr("toast.muted", default="Muted") if not is_muted else tr("toast.unmuted", default="Unmuted")
             self.app.main_window.show_toast(msg, "info", 1000)
 
     async def preview_video(self, source, is_file_path=True, room_url=None):

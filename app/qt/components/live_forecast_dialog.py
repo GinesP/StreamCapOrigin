@@ -219,6 +219,10 @@ class LiveForecastDialog(QDialog):
     def _on_language_changed(self, topic, new_language):
         self._retranslate_ui()
 
+    def closeEvent(self, event):
+        self.app.event_bus.unsubscribe("language_changed", self._on_language_changed)
+        super().closeEvent(event)
+
     def _retranslate_ui(self):
         self.setWindowTitle(tr("live_forecast_dialog.title"))
         # Header

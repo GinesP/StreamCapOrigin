@@ -41,8 +41,7 @@ from PySide6.QtWidgets import (
 
 from app.models.recording.recording_status_model import RecordingStatus, CardStateType
 from app.utils.logger import logger
-
-
+from app.utils.i18n import tr
 from app.qt.themes.theme import theme_manager
 
 # ── Palette ───────────────────────────────────────────────────────────────────
@@ -596,7 +595,7 @@ class QtRecordingCard(QFrame):
                 )
                 self.app.event_bus.publish("delete", rec)
                 if hasattr(self.app.main_window, "show_toast"):
-                    self.app.main_window.show_toast(f"Deleted: {rec.streamer_name}", "info")
+                    self.app.main_window.show_toast(tr("toast.deleted_stream", default="Deleted: {streamer_name}").format(streamer_name=rec.streamer_name), "info")
 
         elif name == "edit":
             self._open_edit_dialog()

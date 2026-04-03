@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.utils.logger import logger
+from app.utils.i18n import tr
 
 
 class SettingsGroup(QGroupBox):
@@ -145,7 +146,7 @@ class QtSettingsView(QWidget):
             self.app.event_bus.run_task(self.settings.restore_default_config)
             
             if hasattr(self.app.main_window, "show_toast"):
-                self.app.main_window.show_toast("Settings restored to defaults", "success")
+                self.app.main_window.show_toast(tr("toast.settings_restored", default="Settings restored to defaults"), "success")
                 
             QTimer.singleShot(200, self._load_settings)
 
@@ -371,17 +372,17 @@ class QtSettingsView(QWidget):
                         self._save_cookie(plat, cookie_string) # Automatically save
                         
                         if hasattr(self.app.main_window, "show_toast"):
-                            self.app.main_window.show_toast(f"Cookies imported successfully from {path.split('/')[-1]}", "success")
+                            self.app.main_window.show_toast(tr("toast.cookies_imported", default="Cookies imported successfully from {filename}").format(filename=path.split('/')[-1]), "success")
                     else:
                         if hasattr(self.app.main_window, "show_toast"):
-                            self.app.main_window.show_toast("Failed to convert cookies from JSON.", "error")
+                            self.app.main_window.show_toast(tr("toast.cookies_conversion_failed", default="Failed to convert cookies from JSON."), "error")
                 else:
                     if hasattr(self.app.main_window, "show_toast"):
-                        self.app.main_window.show_toast("No cookies found in file.", "error")
+                        self.app.main_window.show_toast(tr("toast.no_cookies_found", default="No cookies found in file."), "error")
             except Exception as e:
                 logger.error(f"Error importing cookies: {e}")
                 if hasattr(self.app.main_window, "show_toast"):
-                    self.app.main_window.show_toast(f"Error importing cookies: {e}", "error")
+                    self.app.main_window.show_toast(tr("toast.cookies_import_error", default="Error importing cookies: {error}").format(error=e), "error")
 
     def _create_accounts_tab(self):
         content = QWidget()

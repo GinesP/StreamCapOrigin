@@ -30,6 +30,7 @@ from app.qt.views.settings_view import QtSettingsView
 from app.qt.views.home_view import QtHomeView
 from app.qt.views.log_view import QtLogView
 from app.qt.components.toast import QtToastManager
+from app.utils.i18n import tr
 # NOTE: QtAboutView, QtVideoPlayer are imported lazily
 # to avoid loading PySide6.QtMultimedia at module level, which activates
 # the DirectShow backend on Windows and causes a brief spurious window.
@@ -377,7 +378,7 @@ class MainWindow(QMainWindow):
 
             # Update UI to show shutdown state
             self.setEnabled(False)
-            self.show_toast("Shutting down safely, saving recordings...", duration=15000)
+            self.show_toast(tr("main_window.shutting_down"), duration=15000)
 
             # Launch async sequence to wait for transcoding tasks
             import asyncio

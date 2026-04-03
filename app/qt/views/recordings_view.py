@@ -24,6 +24,7 @@ from app.qt.components.recording_card import QtRecordingCard
 from app.qt.utils.filters import RecordingFilters
 from app.qt.themes.theme import theme_manager
 from app.utils.logger import logger
+from app.utils.i18n import tr
 
 
 class QtRecordingsView(QWidget):
@@ -497,7 +498,7 @@ class QtRecordingsView(QWidget):
         from app.qt.main_window import MainWindow
         main_window = self.window()
         if isinstance(main_window, MainWindow):
-            main_window.show_toast(f"Starting monitor for {len(visible_recordings)} visible stream(s)...", duration=3000)
+            main_window.show_toast(tr("toast.starting_monitor", default="Starting monitor for {count} visible stream(s)...").format(count=len(visible_recordings)), duration=3000)
             
         asyncio.ensure_future(self.app.record_manager.start_monitor_recordings(visible_recordings))
 
@@ -521,6 +522,6 @@ class QtRecordingsView(QWidget):
         from app.qt.main_window import MainWindow
         main_window = self.window()
         if isinstance(main_window, MainWindow):
-            main_window.show_toast(f"Stopping monitor for {len(visible_recordings)} visible stream(s)...", duration=3000)
+            main_window.show_toast(tr("toast.stopping_monitor", default="Stopping monitor for {count} visible stream(s)...").format(count=len(visible_recordings)), duration=3000)
             
         asyncio.ensure_future(self.app.record_manager.stop_monitor_recordings(visible_recordings))

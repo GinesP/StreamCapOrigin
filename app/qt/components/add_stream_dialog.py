@@ -281,7 +281,7 @@ class QtAddStreamDialog(QDialog):
             self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
             
             if hasattr(self.app.main_window, "show_toast"):
-                self.app.main_window.show_toast(f"Updated: {self.recording.streamer_name}", "success")
+                self.app.main_window.show_toast(tr("toast.updated_stream", default="Updated: {streamer_name}").format(streamer_name=self.recording.streamer_name), "success")
             self.accept()
             return
 
@@ -329,6 +329,7 @@ class QtAddStreamDialog(QDialog):
             self.app.event_bus.run_task(self.app.record_manager.check_if_live, new_rec)
         
         if hasattr(self.app.main_window, "show_toast"):
-            self.app.main_window.show_toast(f"Stream added: {data['streamer_name']}", "success")
+            from app.utils.i18n import tr
+            self.app.main_window.show_toast(tr("toast.stream_added", default="Stream added: {streamer_name}").format(streamer_name=data['streamer_name']), "success")
             
         self.accept()
