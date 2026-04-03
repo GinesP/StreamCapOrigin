@@ -514,9 +514,13 @@
     "confirm_exit_content": "Are you sure you want to exit the application?",
     "minimize_to_tray": "Minimize to Tray",
     "exit_program": "Exit Program",
-    "minimize_to_tray_tip": "Clicking \"Minimize to Tray\" will hide the program to system tray where it continues running"
-  },
-  "tray_manager": {
+        "minimize_to_tray_tip": "Clicking \"Minimize to Tray\" will hide the program to system tray where it continues running"
+    },
+    "main_window": {
+        "shutting_down": "Shutting down application..."
+    },
+    "tray_manager": {
+
     "restore": "Restore Window",
     "exit": "Exit Program"
   },

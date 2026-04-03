@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.qt.themes.theme import theme_manager
+from app.utils.i18n import tr
 
 class QtConfirmDialog(QDialog):
     def __init__(self, title, message, sub_message="", type="warning", parent=None):
@@ -55,12 +56,12 @@ class QtConfirmDialog(QDialog):
         btn_lay = QHBoxLayout()
         btn_lay.setSpacing(12)
         
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton(tr("base.cancel"))
         self.cancel_btn.setProperty("class", "secondary")
         self.cancel_btn.setMinimumWidth(100)
         self.cancel_btn.clicked.connect(self.reject)
         
-        self.confirm_btn = QPushButton("Confirm")
+        self.confirm_btn = QPushButton(tr("base.confirm"))
         if type == "danger":
             self.confirm_btn.setProperty("class", "danger")
         else:

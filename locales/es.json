@@ -516,6 +516,9 @@
         "exit_program": "Salir del Programa",
         "minimize_to_tray_tip": "Hacer clic en \"Minimizar a la Bandeja\" ocultará el programa en la bandeja del sistema donde continúa ejecutándose"
     },
+    "main_window": {
+        "shutting_down": "Cerrando aplicación..."
+    },
     "tray_manager": {
         "restore": "Restaurar Ventana",
         "exit": "Salir del Programa"

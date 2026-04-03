@@ -98,12 +98,28 @@ class Sidebar(QFrame):
         self._setup_ui()
         self._load_translations()
         self._select_item(0)
+        
+        # Subscribe to language changes
+        self.app.event_bus.subscribe("language_changed", self._retranslate_ui)
+
+    def _retranslate_ui(self, *args):
+        """Retranslate UI elements."""
+        self._load_translations()
+        
+        # Update theme button text
+        sidebar_labels = self.app.language_manager.language.get("sidebar", {})
+        if theme_manager.is_dark:
+            text = sidebar_labels.get("dark_theme", "Dark")
+            self.theme_btn.setText(f"🌙  {text}")
+        else:
+            text = sidebar_labels.get("light_theme", "Light")
+            self.theme_btn.setText(f"☀️  {text}")
 
     def _load_translations(self):
         """Load translated labels from the app context."""
         try:
             language = self.app.language_manager.language
-            sidebar_labels = language.get("record_sidebar", {})
+            sidebar_labels = language.get("sidebar", {})
             
             # Map of sidebar keys to page names
             keys_map = {

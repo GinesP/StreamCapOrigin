@@ -356,11 +356,12 @@ class MainWindow(QMainWindow):
             return
 
         from app.qt.components.confirm_dialog import QtConfirmDialog
+        from app.utils.i18n import tr
         if QtConfirmDialog.confirm(
             self,
-            "Exit StreamCap",
-            "Are you sure you want to close the application?",
-            "Any active recordings will be stopped and processed before exit.",
+            tr("app_close_handler.confirm_exit"),
+            tr("app_close_handler.confirm_exit_content"),
+            tr("app_close_handler.minimize_to_tray_tip"),
             type="warning"
         ):
             self._is_shutting_down = True
