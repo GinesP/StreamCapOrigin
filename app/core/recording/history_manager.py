@@ -1,3 +1,4 @@
+import random
 from datetime import datetime
 from ...models.recording.recording_model import Recording
 
@@ -36,15 +37,34 @@ class HistoryManager:
     @staticmethod
     def get_adjusted_interval(recording: Recording, base_interval: int) -> int:
         """
-        Returns an adjusted check interval based on the likelihood score.
+        Returns an adjusted check interval based on the likelihood score and priority score.
+        Applies a 15% jitter to prevent thundering herd / predictable bot patterns.
         """
-        likelihood = HistoryManager.get_likelihood_score(recording)
-        
-        if likelihood >= 0.9:
-            return 60  # Check every minute in high-probability windows
-        elif likelihood >= 0.5:
-            return base_interval // 2  # Double the frequency
-        elif likelihood <= 0.2:
-            return base_interval * 2  # Half the frequency
+        # 1. Deep Sleep Check (Anti-Bot & Resource Optimization)
+        # If the channel is practically dead (priority score near 0)
+        # Wait at least 1 hour (3600 seconds) between checks
+        if getattr(recording, 'priority_score', 0.0) < 0.01 and recording.live_check_count > 10:
+            target_interval = 3600
+        else:
+            # 2. Regular Likelihood Adjustment
+            likelihood = HistoryManager.get_likelihood_score(recording)
             
-        return base_interval
+            if likelihood >= 0.9:
+                target_interval = 60  # Check every minute in high-probability windows
+            elif likelihood >= 0.5:
+                target_interval = base_interval // 2  # Double the frequency
+            elif likelihood <= 0.2:
+                target_interval = base_interval * 2  # Half the frequency
+            else:
+                target_interval = base_interval
+
+        # 3. Apply 15% Jitter (Anti-Bot Pattern Randomization)
+        # Calculates a random value between 85% and 115% of the target interval
+        jitter_min = int(target_interval * 0.85)
+        jitter_max = int(target_interval * 1.15)
+        
+        # Ensure we don't go below a sensible minimum (e.g., 45 seconds)
+        jitter_min = max(45, jitter_min)
+        jitter_max = max(jitter_min + 5, jitter_max)
+        
+        return random.randint(jitter_min, jitter_max)

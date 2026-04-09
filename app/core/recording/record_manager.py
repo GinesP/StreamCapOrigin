@@ -469,9 +469,11 @@ class RecordingManager:
 
             semaphore = self.platform_semaphores[platform_key]
             recorder = LiveStreamRecorder(self.app, recording, recording_info)
+            
+            # Stagger requests slightly *before* acquiring the semaphore to avoid blocking workers
+            await asyncio.sleep(random.uniform(0.5, 3.0))
+            
             async with semaphore:
-                # Stagger requests slightly to avoid rate limiting
-                await asyncio.sleep(random.uniform(2.0, 5.0))
                 stream_info = await recorder.fetch_stream()
                 logger.info(f"Stream Data: {stream_info.anchor_name if stream_info else 'None'}")
             
