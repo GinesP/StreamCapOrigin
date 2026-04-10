@@ -42,9 +42,9 @@ class HistoryManager:
         """
         # 1. Deep Sleep Check (Anti-Bot & Resource Optimization)
         # If the channel is practically dead (priority score near 0)
-        # Wait at least 1 hour (3600 seconds) between checks
-        if getattr(recording, 'priority_score', 0.0) < 0.01 and recording.live_check_count > 10:
-            target_interval = 3600
+        # Wait longer between checks, but not too long to avoid missing streams
+        if getattr(recording, 'priority_score', 0.0) < 0.01 and recording.live_check_count > 30:
+            target_interval = base_interval * 3
         else:
             # 2. Regular Likelihood Adjustment
             likelihood = HistoryManager.get_likelihood_score(recording)
@@ -54,7 +54,7 @@ class HistoryManager:
             elif likelihood >= 0.5:
                 target_interval = base_interval // 2  # Double the frequency
             elif likelihood <= 0.2:
-                target_interval = base_interval * 2  # Half the frequency
+                target_interval = int(base_interval * 1.5)  # Less aggressive slowdown
             else:
                 target_interval = base_interval
 
