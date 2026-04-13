@@ -1,11 +1,14 @@
+from app.core.recording.recording_state_logic import RecordingStateLogic
 from app.models.recording.recording_status_model import RecordingStatus
 
 class RecordingFilters:
     @staticmethod
+    def is_recording(recording) -> bool:
+        return recording.is_recording
+
+    @staticmethod
     def is_error(recording) -> bool:
-        # ERROR_STATUSES from RecordingCardState
-        error_statuses = [RecordingStatus.RECORDING_ERROR, RecordingStatus.LIVE_STATUS_CHECK_ERROR]
-        return recording.status_info in error_statuses
+        return recording.status_info in RecordingStateLogic.ERROR_STATUSES
     
     @staticmethod
     def is_live(recording) -> bool:
@@ -30,7 +33,7 @@ class RecordingFilters:
     @classmethod
     def matches_status(cls, recording, filter_type) -> bool:
         if filter_type == "all": return True
-        if filter_type == "recording": return recording.is_recording
+        if filter_type == "recording": return cls.is_recording(recording)
         if filter_type == "living": return cls.is_live(recording)
         if filter_type == "error": return cls.is_error(recording)
         if filter_type == "offline": return cls.is_offline(recording)

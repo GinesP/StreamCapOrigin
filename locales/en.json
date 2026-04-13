@@ -14,6 +14,7 @@
     "colors": "Color List"
   },
   "home_page": {
+    "app_title": "StreamCap",
     "welcome": "Welcome to StreamCap",
     "tagline": "Record every exciting moment of the live broadcast",
     "start_recording": "Start Recording",
@@ -36,6 +37,7 @@
     "stats": "Statistics",
     "total_rooms": "Total Rooms",
     "active_recordings": "Active Recordings",
+    "streams_with_errors": "Streams with Errors",
     "stop_monitoring": "Stop Monitoring",
     "recent_added_recordings": "Recent Added",
     "no_recordings": "No Recordings",
@@ -44,13 +46,27 @@
     "greeting_evening": "Good Evening"
   },
   "home_view": {
+    "section_title": "INTELLIGENCE",
     "intelligence_monitor": "🧠  Intelligence Monitor",
     "fast": "Fast",
     "med": "Med",
     "slow": "Slow",
+    "waiting": "waiting",
     "busy": "Busy",
     "queue_activity": "Queue Activity",
-    "dispatched_per_cycle": "Dispatched / Cycle"
+    "dispatched_per_cycle": "Dispatched / Cycle",
+    "counter_disp_fast": "↑F",
+    "counter_disp_medium": "↑M",
+    "counter_disp_slow": "↑S",
+    "counter_busy_fast": "~F",
+    "counter_busy_medium": "~M",
+    "counter_busy_slow": "~S",
+    "counter_waiting": "⏸ wait",
+    "forecast_button": "Forecast",
+    "feature_auto_record_desc": "Start recording automatically when your favourite streamer goes live.",
+    "feature_theme_switch_desc": "Switch themes instantly without restarting the app.",
+    "tip_prefix": "Tip",
+    "tip_text": "Use the Recordings view filter bar to quickly find streams by status ({live}, {recording}, {offline})."
   },
   "recordings_page": {
     "recording_list": "Recording List",

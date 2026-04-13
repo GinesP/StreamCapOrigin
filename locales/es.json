@@ -14,6 +14,7 @@
         "colors": "Lista de Colores"
     },
     "home_page": {
+        "app_title": "StreamCap",
         "welcome": "Bienvenido a StreamCap",
         "tagline": "Graba cada momento emocionante de la transmisión en vivo",
         "start_recording": "Iniciar Grabación",
@@ -36,6 +37,7 @@
         "stats": "Estadísticas",
         "total_rooms": "Total de Salas",
         "active_recordings": "Grabaciones Activas",
+        "streams_with_errors": "Streams con errores",
         "stop_monitoring": "Detener Monitoreo",
         "recent_added_recordings": "Añadido Recientemente",
         "no_recordings": "Sin Grabaciones",
@@ -44,13 +46,27 @@
         "greeting_evening": "Buenas Noches"
     },
     "home_view": {
+        "section_title": "INTELIGENCIA",
         "intelligence_monitor": "🧠 Monitor de Inteligencia",
         "fast": "Rápido",
         "med": "Medio",
         "slow": "Lento",
+        "waiting": "en espera",
         "busy": "Ocupado",
         "queue_activity": "Actividad de Cola",
-        "dispatched_per_cycle": "Despachado / Ciclo"
+        "dispatched_per_cycle": "Despachado / Ciclo",
+        "counter_disp_fast": "↑R",
+        "counter_disp_medium": "↑M",
+        "counter_disp_slow": "↑L",
+        "counter_busy_fast": "~R",
+        "counter_busy_medium": "~M",
+        "counter_busy_slow": "~L",
+        "counter_waiting": "⏸ espera",
+        "forecast_button": "Previsión",
+        "feature_auto_record_desc": "Comienza a grabar automáticamente cuando tu streamer favorito entra en vivo.",
+        "feature_theme_switch_desc": "Cambia el tema al instante sin reiniciar la aplicación.",
+        "tip_prefix": "Consejo",
+        "tip_text": "Usa la barra de filtros de Grabaciones para encontrar streams rápidamente por estado ({live}, {recording}, {offline})."
     },
     "recordings_page": {
         "recording_list": "Lista de Grabaciones",
