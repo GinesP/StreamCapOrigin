@@ -18,12 +18,12 @@ from PySide6.QtWidgets import (
     QComboBox,
     QButtonGroup
 )
-from PySide6.QtGui import QFont
 
 from app.qt.components.recording_card import QtRecordingCard
 from app.qt.utils.filters import RecordingFilters
 from app.qt.themes.theme import theme_manager
 from app.qt.utils.elevation import apply_elevation
+from app.qt.utils.iconography import apply_button_icon
 from app.utils.logger import logger
 from app.utils.i18n import tr
 
@@ -90,45 +90,50 @@ class QtRecordingsView(QWidget):
         header.addStretch()
 
         # View Mode Toggle
-        self.view_toggle_btn = QPushButton("⊞")  # Show grid icon while in list mode
+        self.view_toggle_btn = QPushButton()
         self.view_toggle_btn.setStyleSheet("font-size: 20px;")
         self.view_toggle_btn.setToolTip(self._l.get("toggle_view", "Toggle Grid/List View"))
         self.view_toggle_btn.setProperty("class", "icon")
         self.view_toggle_btn.setFixedSize(36, 36)
         self.view_toggle_btn.clicked.connect(self._toggle_view_mode)
+        apply_button_icon(self.view_toggle_btn, "grid", size=16, color=theme_manager.get_color("text_sec"))
         header.addWidget(self.view_toggle_btn)
         
         # Refresh button
-        self.refresh_btn = QPushButton("↻")
+        self.refresh_btn = QPushButton()
         self.refresh_btn.setToolTip(self._l.get("refresh", "Refresh List"))
         self.refresh_btn.setProperty("class", "icon")
         self.refresh_btn.setFixedSize(36, 36)
         self.refresh_btn.clicked.connect(self.refresh)
+        apply_button_icon(self.refresh_btn, "refresh", size=16, color=theme_manager.get_color("text_sec"))
         header.addWidget(self.refresh_btn)
 
         # Add button
-        self.add_btn = QPushButton("+")
+        self.add_btn = QPushButton()
         self.add_btn.setToolTip(self._l.get("add_record", "Add New Stream"))
         self.add_btn.setProperty("class", "primary-btn") # Keep it prominent but smaller
         self.add_btn.setFixedSize(36, 36)
         self.add_btn.setStyleSheet("font-size: 20px; font-weight: bold; padding: 0;")
         self.add_btn.clicked.connect(self._on_add_stream_clicked)
+        apply_button_icon(self.add_btn, "add", size=16, color="#FFFFFF")
         header.addWidget(self.add_btn)
 
         # Batch Start Button
-        self.batch_start_btn = QPushButton("▶")
+        self.batch_start_btn = QPushButton()
         self.batch_start_btn.setToolTip(self._l.get("batch_start", "Start Monitor (Visible Streams)"))
         self.batch_start_btn.setProperty("class", "icon")
         self.batch_start_btn.setFixedSize(36, 36)
         self.batch_start_btn.clicked.connect(self._on_batch_start_clicked)
+        apply_button_icon(self.batch_start_btn, "play", size=16, color=theme_manager.get_color("text_sec"))
         header.addWidget(self.batch_start_btn)
 
         # Batch Stop Button
-        self.batch_stop_btn = QPushButton("■")
+        self.batch_stop_btn = QPushButton()
         self.batch_stop_btn.setToolTip(self._l.get("batch_stop", "Stop Monitor (Visible Streams)"))
         self.batch_stop_btn.setProperty("class", "icon")
         self.batch_stop_btn.setFixedSize(36, 36)
         self.batch_stop_btn.clicked.connect(self._on_batch_stop_clicked)
+        apply_button_icon(self.batch_stop_btn, "stop", size=16, color=theme_manager.get_color("text_sec"))
         header.addWidget(self.batch_stop_btn)
         
         main_layout.addLayout(header)
@@ -242,10 +247,10 @@ class QtRecordingsView(QWidget):
         self._view_mode = "grid" if self._view_mode == "list" else "list"
         
         # Update icon and tooltip only (no text to avoid clipping in 36x36 btn)
-        icon = "⊞" if self._view_mode == "list" else "≣"
+        icon = "grid" if self._view_mode == "list" else "list"
         tip = self._l.get("toggle_view", "Switch View")
-        
-        self.view_toggle_btn.setText(icon)
+
+        apply_button_icon(self.view_toggle_btn, icon, size=16, color=theme_manager.get_color("text_sec"))
         self.view_toggle_btn.setToolTip(tip)
         
         for card in self._cards.values():
@@ -291,6 +296,11 @@ class QtRecordingsView(QWidget):
                 """)
         if hasattr(self, "_filter_bar_frame"):
             apply_elevation(self._filter_bar_frame, level=1)
+        apply_button_icon(self.view_toggle_btn, "grid" if self._view_mode == "list" else "list", size=16, color=theme_manager.get_color("text_sec"))
+        apply_button_icon(self.refresh_btn, "refresh", size=16, color=theme_manager.get_color("text_sec"))
+        apply_button_icon(self.batch_start_btn, "play", size=16, color=theme_manager.get_color("text_sec"))
+        apply_button_icon(self.batch_stop_btn, "stop", size=16, color=theme_manager.get_color("text_sec"))
+        apply_button_icon(self.add_btn, "add", size=16, color="#FFFFFF")
 
     def _update_platform_list(self):
         """Populate platform combo with existing platforms."""

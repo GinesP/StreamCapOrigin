@@ -16,14 +16,16 @@ from PySide6.QtWidgets import (
 )
 
 from app.qt.themes.theme import theme_manager
+from app.qt.utils.iconography import apply_button_icon, apply_label_icon
 
 
 class SidebarItem(QPushButton):
     """A single navigation item in the sidebar."""
 
-    def __init__(self, icon_char: str, label: str, name: str, parent=None):
+    def __init__(self, icon_name: str, label: str, name: str, parent=None):
         super().__init__(parent)
         self.name = name
+        self.icon_name = icon_name
         self._selected = False
         self._label_text = label
 
@@ -37,7 +39,7 @@ class SidebarItem(QPushButton):
         layout.setSpacing(12)
         self._layout = layout
 
-        self.icon_label = QLabel(icon_char)
+        self.icon_label = QLabel()
         self.icon_label.setFixedWidth(24)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setStyleSheet("font-size: 18px; background: transparent;")
@@ -58,6 +60,8 @@ class SidebarItem(QPushButton):
         self.setProperty("selected", "true" if value else "false")
         self.style().unpolish(self)
         self.style().polish(self)
+        icon_color = theme_manager.get_color("accent") if value else theme_manager.get_color("text_sec")
+        apply_label_icon(self.icon_label, self.icon_name, size=18, color=icon_color)
 
     def set_label(self, text: str):
         """Update the displayed label text (for language changes)."""
@@ -96,11 +100,11 @@ class Sidebar(QFrame):
     ANIMATION_MS = 160
 
     NAV_ITEMS = [
-        ("🏠", "Home", "home"),
-        ("📺", "Recordings", "recordings"),
-        ("⚙️", "Settings", "settings"),
-        ("📜", "Logs", "logs"),
-        ("ℹ️", "About", "about"),
+        ("home", "Home", "home"),
+        ("recordings", "Recordings", "recordings"),
+        ("settings", "Settings", "settings"),
+        ("logs", "Logs", "logs"),
+        ("about", "About", "about"),
     ]
 
     def __init__(self, app_context, parent=None):
@@ -115,7 +119,6 @@ class Sidebar(QFrame):
         self._collapsed = False
         self._auto_forced = False
         self._label_cache: dict[str, str] = {}
-
         self._width_anim = QVariantAnimation(self)
         self._width_anim.setDuration(self.ANIMATION_MS)
         self._width_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -196,7 +199,7 @@ class Sidebar(QFrame):
         )
         header_layout.addWidget(self.title_lbl, 1)
 
-        self.toggle_btn = QPushButton("«")
+        self.toggle_btn = QPushButton()
         self.toggle_btn.setProperty("class", "sidebar-toggle")
         self.toggle_btn.setFixedSize(28, 28)
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -207,8 +210,8 @@ class Sidebar(QFrame):
         self._header = header
 
         # Navigation items
-        for icon_char, label, name in self.NAV_ITEMS:
-            item = SidebarItem(icon_char, label, name, self)
+        for icon_name, label, name in self.NAV_ITEMS:
+            item = SidebarItem(icon_name, label, name, self)
             item.clicked.connect(lambda checked=False, n=name: self._on_item_clicked(n))
             self._items.append(item)
             layout.addWidget(item)
@@ -216,7 +219,7 @@ class Sidebar(QFrame):
         layout.addStretch()
 
         # Theme Toggle
-        self.theme_btn = QPushButton("🌙  Dark")
+        self.theme_btn = QPushButton("Dark")
         self.theme_btn.setProperty("class", "sidebar-item")
         self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.theme_btn.setFixedHeight(44)
@@ -243,7 +246,14 @@ class Sidebar(QFrame):
         self.set_collapsed(not self._collapsed, source="manual", animate=True)
 
     def _refresh_toggle_icon(self):
-        self.toggle_btn.setText("»" if self._collapsed else "«")
+        icon_name = "expand" if self._collapsed else "collapse"
+        apply_button_icon(
+            self.toggle_btn,
+            icon_name,
+            size=14,
+            color=theme_manager.get_color("text_sec"),
+            fallback_text=True,
+        )
 
     def _refresh_toggle_tooltip(self):
         sidebar_labels = self.app.language_manager.language.get("sidebar", {})
@@ -269,12 +279,19 @@ class Sidebar(QFrame):
         sidebar_labels = self.app.language_manager.language.get("sidebar", {})
         if theme_manager.is_dark:
             text = sidebar_labels.get("dark_theme", "Dark")
-            emoji = "🌙"
+            icon_name = "theme_dark"
         else:
             text = sidebar_labels.get("light_theme", "Light")
-            emoji = "☀️"
+            icon_name = "theme_light"
 
-        self.theme_btn.setText(emoji if self._collapsed else f"{emoji}  {text}")
+        apply_button_icon(
+            self.theme_btn,
+            icon_name,
+            size=14,
+            color=theme_manager.get_color("text_sec"),
+            fallback_text=True,
+        )
+        self.theme_btn.setText("" if self._collapsed else text)
         self.theme_btn.setToolTip(text)
 
     def _on_item_clicked(self, name: str):
@@ -307,7 +324,7 @@ class Sidebar(QFrame):
     def set_theme_text(self, text: str):
         """Update the theme toggle button label."""
         if self._collapsed:
-            self.theme_btn.setText(text.split()[0] if text else "🌙")
+            self.theme_btn.setText("")
         else:
             self.theme_btn.setText(text)
 
@@ -315,4 +332,6 @@ class Sidebar(QFrame):
         self.title_lbl.setStyleSheet(
             f"font-size: 18px; font-weight: 700; color: {theme_manager.get_color('accent')}; background: transparent;"
         )
+        for item in self._items:
+            item.selected = item.selected
         self._refresh_theme_button_text()

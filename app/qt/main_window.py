@@ -297,9 +297,8 @@ class MainWindow(QMainWindow):
         self._update_theme_btn()
 
     def _update_theme_btn(self):
-        emoji = "☀️" if self._dark_mode else "🌙"
         label = "Light" if self._dark_mode else "Dark"
-        self.sidebar.set_theme_text(f"{emoji}  {label}")
+        self.sidebar.set_theme_text(label)
 
         # ensure we save the preference
         mode_str = "dark" if self._dark_mode else "light"

@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import os
 
-from PySide6.QtCore import QFileSystemWatcher, QObject, Signal
+from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -172,8 +172,9 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
     QMainWindow, QDialog, QWidget {{
         background-color: {c["bg"]};
         color: {c["text"]};
-        font-family: "Segoe UI", "Arial", sans-serif;
+        font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Arial", sans-serif;
         font-size: 13px;
+        font-weight: 500;
     }}
 
     /* ── Scroll areas ──────────────────────────────────────────── */
@@ -586,9 +587,9 @@ class ThemeManager(QObject):
         self.colors: dict[str, str] = {}
 
         # File watcher for hot-reload
-        self._watcher = QFileSystemWatcher()
+        self._watcher: QFileSystemWatcher | None = None
         self._theme_file: str | None = None
-        self._watcher.fileChanged.connect(self._on_file_changed)
+        self._ensure_watcher()
 
         # Apply default palette immediately
         self._rebuild_colors()
@@ -611,10 +612,11 @@ class ThemeManager(QObject):
 
     def set_theme_file(self, path: str) -> None:
         """Register an external JSON file for hot-reload (§1)."""
-        if self._theme_file:
+        self._ensure_watcher()
+        if self._theme_file and self._watcher:
             self._watcher.removePath(self._theme_file)
         self._theme_file = path
-        if os.path.exists(path):
+        if os.path.exists(path) and self._watcher:
             self._watcher.addPath(path)
             self._load_from_file(path)
 
@@ -642,6 +644,15 @@ class ThemeManager(QObject):
             base["input_focus"] = self._accent
         self.colors = base
 
+    def _ensure_watcher(self) -> None:
+        """Create QFileSystemWatcher only after a Q(Core)Application exists."""
+        if self._watcher is not None:
+            return
+        if QCoreApplication.instance() is None:
+            return
+        self._watcher = QFileSystemWatcher()
+        self._watcher.fileChanged.connect(self._on_file_changed)
+
     def _apply_to_app(self, app: QApplication | None = None) -> None:
         target = app or QApplication.instance()
         if target:
@@ -653,7 +664,8 @@ class ThemeManager(QObject):
         if not os.path.exists(path):
             return
         # Re-watch (some editors unwatch on save)
-        self._watcher.addPath(path)
+        if self._watcher:
+            self._watcher.addPath(path)
         self._load_from_file(path)
 
     def _load_from_file(self, path: str) -> None:

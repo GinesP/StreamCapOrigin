@@ -12,7 +12,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QGraphicsOpacityEffect
 )
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor
+from app.qt.utils.iconography import apply_label_icon, icon_glyph
 
 
 class ToastWidget(QFrame):
@@ -78,12 +79,13 @@ class ToastWidget(QFrame):
         
         # Icon
         icons = {
-            "info": "ℹ️",
-            "success": "✅",
-            "error": "❌",
-            "warning": "⚠️"
+            "info": icon_glyph("info"),
+            "success": icon_glyph("success"),
+            "error": icon_glyph("error"),
+            "warning": icon_glyph("warning")
         }
-        icon_label = QLabel(icons.get(self.toast_type, "ℹ️"))
+        icon_label = QLabel(icons.get(self.toast_type, icon_glyph("info")))
+        apply_label_icon(icon_label, self.toast_type if self.toast_type in ("info", "success", "error", "warning") else "info", size=14, color="#FFFFFF")
         content_layout.addWidget(icon_label)
         
         # Message

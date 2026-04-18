@@ -43,6 +43,7 @@ from app.models.recording.recording_status_model import RecordingStatus, CardSta
 from app.utils.logger import logger
 from app.utils.i18n import tr
 from app.qt.themes.theme import theme_manager
+from app.qt.utils.iconography import apply_button_icon
 
 # ── Palette ───────────────────────────────────────────────────────────────────
 
@@ -106,12 +107,13 @@ class _Badge(QFrame):
         )
 
 
-def _mk_btn(icon: str, tip: str, parent: QWidget) -> QPushButton:
+def _mk_btn(icon_name: str, tip: str, parent: QWidget) -> QPushButton:
     """Create a small icon action button with premium styling."""
-    b = QPushButton(icon, parent)
+    b = QPushButton(parent)
     b.setToolTip(tip)
     b.setFixedSize(38, 26)
     b.setCursor(Qt.CursorShape.PointingHandCursor)
+    apply_button_icon(b, icon_name, size=14, color=theme_manager.get_color("text_sec"))
     
     accent = theme_manager.get_color("accent")
     text_sec = theme_manager.get_color("text_sec")
@@ -124,7 +126,6 @@ def _mk_btn(icon: str, tip: str, parent: QWidget) -> QPushButton:
             color: {text_sec};
             border: none;
             border-radius: 4px;
-            font-size: 15px; /* Larger for emojis */
             padding: 4px;
             margin: 0;
         }}
@@ -141,13 +142,13 @@ def _mk_btn(icon: str, tip: str, parent: QWidget) -> QPushButton:
 
 # ── Card ──────────────────────────────────────────────────────────────────────
 
-_ACTIONS = [
-    ("folder",  "📁",   "Open Folder"),
-    ("play",    "▶️",   "Start / Stop"),
-    ("preview", "👁️",   "Preview"),
-    ("edit",    "✏️",   "Edit"),
-    ("info",    "ℹ️",   "Info"),
-    ("delete",  "🗑️",   "Delete"),
+_ACTION_DEFS = [
+    ("folder", "folder", "Open Folder"),
+    ("play", "play", "Start / Stop"),
+    ("preview", "preview", "Preview"),
+    ("edit", "edit", "Edit"),
+    ("info", "info", "Info"),
+    ("delete", "delete", "Delete"),
 ]
 
 
@@ -171,6 +172,7 @@ class QtRecordingCard(QFrame):
         self._hovered    = False
         self._mode       = "list"
         self._status_color = theme_manager.get_color("card")
+        self._play_icon_key = "play"
         
         # Subscribe to theme changes
         theme_manager.themeChanged.connect(self.update)
@@ -260,8 +262,8 @@ class QtRecordingCard(QFrame):
         ab.setSpacing(3)
 
         self._g_btns: dict[str, QPushButton] = {}
-        for name, icon, tip in _ACTIONS:
-            btn = _mk_btn(icon, tip, self._g_actions)
+        for name, icon_key, tip in _ACTION_DEFS:
+            btn = _mk_btn(icon_key, tip, self._g_actions)
             btn.clicked.connect(lambda _, n=name: self._on_action(n))
             ab.addWidget(btn)
             self._g_btns[name] = btn
@@ -322,8 +324,8 @@ class QtRecordingCard(QFrame):
         btn_lay.setSpacing(3)
 
         self._l_btns: dict[str, QPushButton] = {}
-        for name, icon, tip in _ACTIONS:
-            btn = _mk_btn(icon, tip, btn_w)
+        for name, icon_key, tip in _ACTION_DEFS:
+            btn = _mk_btn(icon_key, tip, btn_w)
             btn.clicked.connect(lambda _, n=name: self._on_action(n))
             btn_lay.addWidget(btn)
             self._l_btns[name] = btn
@@ -408,17 +410,17 @@ class QtRecordingCard(QFrame):
         play_btn_l = self._l_btns.get("play")
         
         if rec.is_recording:
-            text, tip = "⏹️", "Stop Recording"
+            icon_key, tip = "stop", "Stop Recording"
         elif rec.monitor_status:
-            text, tip = "⏹️", "Stop Monitoring"
+            icon_key, tip = "stop", "Stop Monitoring"
         else:
-            text, tip = "▶️", "Start Monitoring"
+            icon_key, tip = "play", "Start Monitoring"
             
         if play_btn_g:
-            play_btn_g.setText(text)
+            apply_button_icon(play_btn_g, icon_key, size=14, color=theme_manager.get_color("text_sec"))
             play_btn_g.setToolTip(tip)
         if play_btn_l:
-            play_btn_l.setText(text)
+            apply_button_icon(play_btn_l, icon_key, size=14, color=theme_manager.get_color("text_sec"))
             play_btn_l.setToolTip(tip)
 
         # Badges
