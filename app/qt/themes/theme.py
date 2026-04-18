@@ -60,6 +60,10 @@ NEUTRAL_DARK: dict[str, str] = {
     # Tooltip
     "tooltip_bg":  "#1A1A1A",
     "tooltip_text":"#E1E1E1",
+    # Elevation / shell depth
+    "surface_border_soft": "#404040",
+    "elevation_1": "rgba(0, 0, 0, 0.18)",
+    "elevation_2": "rgba(0, 0, 0, 0.28)",
 }
 
 NEUTRAL_LIGHT: dict[str, str] = {
@@ -101,6 +105,10 @@ NEUTRAL_LIGHT: dict[str, str] = {
     # Tooltip
     "tooltip_bg":  "#2D2D2D",
     "tooltip_text":"#E1E1E1",
+    # Elevation / shell depth
+    "surface_border_soft": "#D7D7E2",
+    "elevation_1": "rgba(0, 0, 0, 0.10)",
+    "elevation_2": "rgba(0, 0, 0, 0.18)",
 }
 
 # Status / queue badge colors (shared)
@@ -383,7 +391,11 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
     /* ── Sidebar ───────────────────────────────────────────────── */
     QFrame[class="sidebar"] {{
         background-color: {c["sidebar"]};
-        border-right: 1px solid {c["divider"]};
+        border-right: 1px solid {c["surface_border_soft"]};
+    }}
+    QStackedWidget[class="shell-surface"] {{
+        background-color: {c["bg"]};
+        border-left: none;
     }}
     QPushButton[class="sidebar-item"] {{
         background-color: transparent;
@@ -403,6 +415,22 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
         color: {c["accent"]};
         font-weight: 700;
     }}
+    QPushButton[class="sidebar-toggle"] {{
+        background-color: transparent;
+        color: {c["text_sec"]};
+        border: 1px solid transparent;
+        border-radius: 6px;
+        padding: 6px;
+        font-size: 14px;
+    }}
+    QPushButton[class="sidebar-toggle"]:hover {{
+        background-color: {c["sb_hover"]};
+        color: {c["text"]};
+        border-color: {c["surface_border_soft"]};
+    }}
+    QPushButton[class="sidebar-toggle"]:disabled {{
+        color: {c["text_muted"]};
+    }}
 
     /* ── Dividers ──────────────────────────────────────────────── */
     QFrame[class="divider-h"] {{
@@ -410,7 +438,7 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
         max-height: 1px; min-height: 1px;
     }}
     QFrame[class="divider-v"] {{
-        background-color: {c["divider"]};
+        background-color: {c["surface_border_soft"]};
         max-width: 1px; min-width: 1px;
     }}
 

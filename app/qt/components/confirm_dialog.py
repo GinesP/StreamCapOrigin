@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.qt.themes.theme import theme_manager
+from app.qt.utils.elevation import apply_elevation
 from app.utils.i18n import tr
 
 class QtConfirmDialog(QDialog):
@@ -18,11 +19,13 @@ class QtConfirmDialog(QDialog):
         self.setWindowTitle(title)
         self.setMinimumWidth(380)
         self.setModal(True)
+        apply_elevation(self, level=2)
         
         # We don't want standard title bar icons if we want a clean look
         # but for simplicity we keep them for now.
         
         self._setup_ui(title, message, sub_message, type)
+        theme_manager.themeChanged.connect(self._on_theme_changed)
 
     def _setup_ui(self, title, message, sub_message, type):
         layout = QVBoxLayout(self)
@@ -74,6 +77,9 @@ class QtConfirmDialog(QDialog):
         btn_lay.addWidget(self.confirm_btn)
         
         layout.addLayout(btn_lay)
+
+    def _on_theme_changed(self) -> None:
+        apply_elevation(self, level=2)
 
     @classmethod
     def confirm(cls, parent, title, message, sub_message="", type="warning"):

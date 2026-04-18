@@ -11,7 +11,10 @@
     "theme_color": "主题颜色",
     "toggle_day_theme": "切换为白天模式",
     "toggle_night_theme": "切换为黑夜模式",
-    "colors": "颜色列表"
+    "colors": "颜色列表",
+    "collapse_sidebar": "收起侧边栏",
+    "expand_sidebar": "展开侧边栏",
+    "sidebar_compact_auto": "窗口较窄时已启用紧凑模式"
   },
   "home_page": {
     "app_title": "StreamCap",

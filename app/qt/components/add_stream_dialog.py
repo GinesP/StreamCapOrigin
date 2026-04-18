@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 from app.utils.logger import logger
 from app.models.recording.recording_model import Recording
 from app.core.platforms.platform_handlers import get_platform_info
+from app.qt.themes.theme import theme_manager
+from app.qt.utils.elevation import apply_elevation
 
 
 class QtAddStreamDialog(QDialog):
@@ -28,8 +30,10 @@ class QtAddStreamDialog(QDialog):
         self.setWindowTitle("Edit Stream" if self.is_edit else "Add New Stream")
         self.setMinimumWidth(500)
         self.setMinimumHeight(450)
+        apply_elevation(self, level=2)
         
         self._setup_ui()
+        theme_manager.themeChanged.connect(self._on_theme_changed)
         if self.is_edit:
             self._fill_data()
         else:
@@ -79,6 +83,9 @@ class QtAddStreamDialog(QDialog):
         btn_layout.addWidget(self.save_btn)
         
         layout.addLayout(btn_layout)
+
+    def _on_theme_changed(self) -> None:
+        apply_elevation(self, level=2)
 
     def _setup_general_tab(self):
         lay = QVBoxLayout(self.tab_general)

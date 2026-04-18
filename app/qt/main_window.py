@@ -13,7 +13,6 @@ from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QFont, QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -49,6 +48,7 @@ class MainWindow(QMainWindow):
     MIN_WIDTH = 950
     MIN_HEIGHT = 600
     WINDOW_TITLE = "StreamCap"
+    SIDEBAR_COLLAPSE_BREAKPOINT = 1024
 
     def __init__(self, app_context):
         super().__init__()
@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 750)
 
         self._dark_mode = self.app.settings.user_config.get("theme_mode", "dark") == "dark"
+        self._sidebar_user_collapsed = bool(self.app.settings.user_config.get("sidebar_collapsed", False))
         self._pages: dict[str, QWidget] = {}
 
         self._setup_ui()
@@ -143,23 +144,20 @@ class MainWindow(QMainWindow):
         # Sidebar
         self.sidebar = Sidebar(self.app)
         self.sidebar.page_changed.connect(self._on_page_changed)
+        self.sidebar.collapsed_changed.connect(self._on_sidebar_collapsed_changed)
         self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
         main_layout.addWidget(self.sidebar)
 
         # Register EventBus listeners
         self.app.event_bus.subscribe("language_changed", self._on_language_changed)
 
-        # Vertical divider
-        divider = QFrame()
-        divider.setProperty("class", "divider-v")
-        divider.setFrameShape(QFrame.Shape.VLine)
-        divider.setFixedWidth(1)
-        main_layout.addWidget(divider)
-
         # Content stack
         self.content_stack = QStackedWidget()
+        self.content_stack.setProperty("class", "shell-surface")
         self.content_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         main_layout.addWidget(self.content_stack)
+
+        self._sync_sidebar_layout(animate=False)
 
         # Show initial page
         self.show_page("home")
@@ -230,6 +228,10 @@ class MainWindow(QMainWindow):
     def _on_page_changed(self, name: str):
         """Handle sidebar navigation click."""
         self.show_page(name)
+
+    def resizeEvent(self, event):
+        self._sync_sidebar_layout(animate=True)
+        super().resizeEvent(event)
 
     # ── Video Player (lazy) ──────────────────────────────────────────
 
@@ -386,6 +388,35 @@ class MainWindow(QMainWindow):
             asyncio.ensure_future(self._perform_shutdown())
         else:
             event.ignore()
+
+    def _sync_sidebar_layout(self, animate: bool) -> None:
+        forced_compact = self.width() < self.SIDEBAR_COLLAPSE_BREAKPOINT
+        self.sidebar.set_auto_forced(forced_compact)
+
+        if forced_compact:
+            self.sidebar.set_collapsed(True, source="auto", animate=animate)
+        else:
+            self.sidebar.set_collapsed(self._sidebar_user_collapsed, source="auto", animate=animate)
+
+    def _on_sidebar_collapsed_changed(self, collapsed: bool, source: str) -> None:
+        if source != "manual":
+            return
+
+        # Under the compact breakpoint we enforce collapsed mode.
+        if self.width() < self.SIDEBAR_COLLAPSE_BREAKPOINT:
+            self.sidebar.set_collapsed(True, source="auto", animate=False)
+            return
+
+        self._sidebar_user_collapsed = collapsed
+        current = self.app.settings.user_config.get("sidebar_collapsed")
+        if current == collapsed:
+            return
+
+        self.app.settings.user_config["sidebar_collapsed"] = collapsed
+        self.app.event_bus.run_task(
+            self.app.config_manager.save_user_config,
+            self.app.settings.user_config,
+        )
 
     async def _perform_shutdown(self):
         """Wait for recordings and background tasks to finish, then quit."""

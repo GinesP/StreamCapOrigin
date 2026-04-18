@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.qt.themes.theme import theme_manager, STATUS_COLORS
+from app.qt.utils.elevation import apply_elevation
 from app.qt.utils.filters import RecordingFilters
 from app.utils.logger import logger
 
@@ -42,6 +43,7 @@ class StatCard(QFrame):
         self.setFixedHeight(110)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._setup(icon, title, value)
+        apply_elevation(self, level=1)
 
         theme_manager.themeChanged.connect(self._refresh_colors)
 
@@ -90,6 +92,14 @@ class StatCard(QFrame):
         p.setBrush(QBrush(QColor(self._accent)))
         p.drawRoundedRect(QRectF(2, 1, r.width() - 4, 4), 2, 2)
 
+    def enterEvent(self, event) -> None:  # noqa: N802
+        apply_elevation(self, level=1, hovered=True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        apply_elevation(self, level=1, hovered=False)
+        super().leaveEvent(event)
+
     def _refresh_colors(self) -> None:
         if self._initial_accent_setting == "use_theme_accent":
             self._accent = theme_manager.get_color("accent")
@@ -101,6 +111,7 @@ class StatCard(QFrame):
             f"font-size: 28px; font-weight: 800; color: {self._accent}; background: transparent;"
         )
         self.update()
+        apply_elevation(self, level=1)
 
 
 class FeatureCard(QFrame):
@@ -419,6 +430,7 @@ class IntelligenceMonitor(QFrame):
         self.app = app_context
         self.setProperty("class", "card")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        apply_elevation(self, level=1)
 
         self._setup_ui()
         self._retranslate_ui()
@@ -579,6 +591,7 @@ class IntelligenceMonitor(QFrame):
             )
         self._bar_chart.update()
         self._sparkline.update()
+        apply_elevation(self, level=1)
 
 
 class QtHomeView(QWidget):
@@ -892,6 +905,7 @@ class QtHomeView(QWidget):
         self._tip_bulb_lbl = bulb
         self._tip_text_lbl = tip_text
         self._main_layout.addWidget(tip)
+        apply_elevation(tip, level=1)
 
     def _refresh_stats(self) -> None:
         try:
@@ -977,3 +991,4 @@ class QtHomeView(QWidget):
             f"font-size: 16px; font-weight: 900; "
             f"color: {c['accent']}; background: transparent;"
         )
+        apply_elevation(self._tip_frame, level=1)

@@ -11,7 +11,10 @@
     "theme_color": "Theme Color",
     "toggle_day_theme": "Toggle Day Theme",
     "toggle_night_theme": "Toggle Night Theme",
-    "colors": "Color List"
+    "colors": "Color List",
+    "collapse_sidebar": "Collapse sidebar",
+    "expand_sidebar": "Expand sidebar",
+    "sidebar_compact_auto": "Compact mode enabled for narrow window"
   },
   "home_page": {
     "app_title": "StreamCap",

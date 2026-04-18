@@ -23,6 +23,7 @@ from PySide6.QtGui import QFont
 from app.qt.components.recording_card import QtRecordingCard
 from app.qt.utils.filters import RecordingFilters
 from app.qt.themes.theme import theme_manager
+from app.qt.utils.elevation import apply_elevation
 from app.utils.logger import logger
 from app.utils.i18n import tr
 
@@ -134,7 +135,10 @@ class QtRecordingsView(QWidget):
 
         # ── Filter Bar ────────────────────────────────────────────────
         # Use two rows to handle long translated strings gracefully
-        filter_bar_layout = QVBoxLayout()
+        filter_bar_frame = QFrame()
+        filter_bar_frame.setProperty("class", "card")
+        filter_bar_layout = QVBoxLayout(filter_bar_frame)
+        filter_bar_layout.setContentsMargins(14, 12, 14, 12)
         filter_bar_layout.setSpacing(12)
         
         top_filter_row = QHBoxLayout()
@@ -210,7 +214,9 @@ class QtRecordingsView(QWidget):
         top_filter_row.addWidget(self.platform_combo)
         
         filter_bar_layout.insertLayout(0, top_filter_row)
-        main_layout.addLayout(filter_bar_layout)
+        main_layout.addWidget(filter_bar_frame)
+        apply_elevation(filter_bar_frame, level=1)
+        self._filter_bar_frame = filter_bar_frame
 
         # Scrollable Area for cards
         self.scroll = QScrollArea()
@@ -283,6 +289,8 @@ class QtRecordingsView(QWidget):
                         color: white;
                     }}
                 """)
+        if hasattr(self, "_filter_bar_frame"):
+            apply_elevation(self._filter_bar_frame, level=1)
 
     def _update_platform_list(self):
         """Populate platform combo with existing platforms."""
