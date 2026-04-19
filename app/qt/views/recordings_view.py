@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.qt.components.recording_card import QtRecordingCard
-from app.qt.themes.theme import theme_manager
+from app.qt.themes.theme import QUEUE_COLORS, theme_manager
 from app.qt.utils.elevation import apply_elevation
 from app.qt.utils.filters import RecordingFilters
 from app.qt.utils.iconography import apply_button_icon, icon_pixmap
@@ -157,7 +157,8 @@ class RecordingListDelegate(QStyledItemDelegate):
         painter.drawText(QRect(text_x, row.y() + 41, name_right - text_x, 18), status_text)
 
         badge_x = row.right() - 520
-        self._draw_badge(painter, QRect(badge_x, row.y() + 26, 36, 22), self._queue_label(rec), "#FF9800")
+        queue_label, queue_color = self._queue_badge(rec)
+        self._draw_badge(painter, QRect(badge_x, row.y() + 26, 36, 22), queue_label, queue_color)
         likelihood = self._likelihood(rec)
         if likelihood > 0:
             label = "High" if likelihood >= 0.8 else "Normal"
@@ -214,9 +215,13 @@ class RecordingListDelegate(QStyledItemDelegate):
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
 
     @staticmethod
-    def _queue_label(rec) -> str:
+    def _queue_badge(rec) -> tuple[str, str]:
         interval = getattr(rec, "loop_time_seconds", 60) or 60
-        return "F" if interval <= 60 else "M" if interval <= 180 else "S"
+        if interval <= 60:
+            return "F", QUEUE_COLORS["fast"]
+        if interval <= 180:
+            return "M", QUEUE_COLORS["medium"]
+        return "S", QUEUE_COLORS["slow"]
 
     @staticmethod
     def _likelihood(rec) -> float:
