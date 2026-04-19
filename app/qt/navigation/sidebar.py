@@ -5,7 +5,7 @@ Replaces the Flet NavigationSidebar / LeftNavigationMenu with a
 PySide6 implementation using QPushButtons inside a QVBoxLayout.
 """
 
-from PySide6.QtCore import Qt, Signal, QEasingCurve, QVariantAnimation
+from PySide6.QtCore import QEasingCurve, Qt, QVariantAnimation, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -27,6 +27,8 @@ class SidebarItem(QPushButton):
         self.name = name
         self.icon_name = icon_name
         self._selected = False
+        self._hovered = False
+        self._icon_initialized = False
         self._label_text = label
 
         self.setProperty("class", "sidebar-item")
@@ -49,6 +51,7 @@ class SidebarItem(QPushButton):
         self.text_label.setStyleSheet("background: transparent; font-size: 13px;")
         layout.addWidget(self.text_label)
         layout.addStretch()
+        self._refresh_visuals()
 
     @property
     def selected(self) -> bool:
@@ -56,12 +59,46 @@ class SidebarItem(QPushButton):
 
     @selected.setter
     def selected(self, value: bool):
+        if self._selected == value and self._icon_initialized:
+            return
         self._selected = value
-        self.setProperty("selected", "true" if value else "false")
-        self.style().unpolish(self)
-        self.style().polish(self)
-        icon_color = theme_manager.get_color("accent") if value else theme_manager.get_color("text_sec")
+        if self.property("selected") != ("true" if value else "false"):
+            self.setProperty("selected", "true" if value else "false")
+            self.style().unpolish(self)
+            self.style().polish(self)
+        self._refresh_visuals()
+
+    def refresh_theme_icon(self) -> None:
+        self._refresh_visuals()
+
+    def _refresh_visuals(self) -> None:
+        icon_color = (
+            theme_manager.get_color("accent")
+            if self._selected or self._hovered
+            else theme_manager.get_color("text_sec")
+        )
+        text_color = (
+            theme_manager.get_color("accent")
+            if self._selected
+            else theme_manager.get_color("text")
+            if self._hovered
+            else theme_manager.get_color("text_sec")
+        )
         apply_label_icon(self.icon_label, self.icon_name, size=18, color=icon_color)
+        self.text_label.setStyleSheet(
+            f"background: transparent; font-size: 13px; color: {text_color};"
+        )
+        self._icon_initialized = True
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        self._hovered = True
+        self._refresh_visuals()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self._hovered = False
+        self._refresh_visuals()
+        super().leaveEvent(event)
 
     def set_label(self, text: str):
         """Update the displayed label text (for language changes)."""
@@ -333,5 +370,5 @@ class Sidebar(QFrame):
             f"font-size: 18px; font-weight: 700; color: {theme_manager.get_color('accent')}; background: transparent;"
         )
         for item in self._items:
-            item.selected = item.selected
+            item.refresh_theme_icon()
         self._refresh_theme_button_text()

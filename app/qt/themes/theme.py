@@ -12,10 +12,15 @@ from __future__ import annotations
 
 import json
 import os
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 
 from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QWidget
+
+from app.utils.logger import logger
 
 
 # ── Design Token Palettes ────────────────────────────────────────────────────
@@ -139,6 +144,54 @@ ACCENT_COLORS: dict[str, str] = {
 
 # ── Helper ───────────────────────────────────────────────────────────────────
 
+_THEME_PROFILE_ENV = "STREAMCAP_THEME_PROFILE"
+
+
+def _theme_profile_enabled() -> bool:
+    return os.getenv(_THEME_PROFILE_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+        "debug",
+    }
+
+
+@dataclass
+class _ThemeProfileRun:
+    operation: str
+    started: float = field(default_factory=time.perf_counter)
+    steps: list[tuple[str, float]] = field(default_factory=list)
+
+    @contextmanager
+    def step(self, name: str):
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.steps.append((name, (time.perf_counter() - start) * 1000))
+
+    def log(self) -> None:
+        total_ms = (time.perf_counter() - self.started) * 1000
+        step_text = ", ".join(f"{name}={duration:.2f}ms" for name, duration in self.steps)
+        logger.debug(
+            "Theme profile | {} total={:.2f}ms{}{}",
+            self.operation,
+            total_ms,
+            " | " if step_text else "",
+            step_text,
+        )
+
+
+class _NullThemeProfileRun(_ThemeProfileRun):
+    @contextmanager
+    def step(self, name: str):
+        yield
+
+    def log(self) -> None:
+        return
+
+
 def _derive_accent_variants(accent_hex: str) -> tuple[str, str]:
     """Return (lighter, darker) hex variants of an accent color."""
     c = QColor(accent_hex)
@@ -184,14 +237,14 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
     }}
     QScrollBar:vertical {{
         background: transparent;
-        width: 8px;
+        width: 12px;
         margin: 0;
     }}
     QScrollBar::handle:vertical {{
         background: {c["scroll"]};
         min-height: 36px;
-        border-radius: 4px;
-        margin: 2px;
+        border-radius: 5px;
+        margin: 2px 3px;
     }}
     QScrollBar::handle:vertical:hover {{
         background: {c["scroll_h"]};
@@ -199,14 +252,14 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
     QScrollBar:horizontal {{
         background: transparent;
-        height: 8px;
+        height: 12px;
         margin: 0;
     }}
     QScrollBar::handle:horizontal {{
         background: {c["scroll"]};
         min-width: 36px;
-        border-radius: 4px;
-        margin: 2px;
+        border-radius: 5px;
+        margin: 3px 2px;
     }}
     QScrollBar::handle:horizontal:hover {{
         background: {c["scroll_h"]};
@@ -598,17 +651,27 @@ class ThemeManager(QObject):
 
     def set_mode(self, dark: bool) -> None:
         """Switch between dark and light mode and emit themeChanged."""
-        self._dark = dark
-        self._rebuild_colors()
-        self._apply_to_app()
-        self.themeChanged.emit()
+        profile = self._profile_run("set_mode")
+        with profile.step("rebuild_colors"):
+            self._dark = dark
+            self._rebuild_colors()
+        with profile.step("apply_qss"):
+            self._apply_to_app()
+        with profile.step("themeChanged"):
+            self._emit_theme_changed()
+        profile.log()
 
     def set_accent(self, hex_color: str) -> None:
         """Override the accent/brand colour and emit themeChanged."""
-        self._accent = hex_color
-        self._rebuild_colors()
-        self._apply_to_app()
-        self.themeChanged.emit()
+        profile = self._profile_run("set_accent")
+        with profile.step("rebuild_colors"):
+            self._accent = hex_color
+            self._rebuild_colors()
+        with profile.step("apply_qss"):
+            self._apply_to_app()
+        with profile.step("themeChanged"):
+            self._emit_theme_changed()
+        profile.log()
 
     def set_theme_file(self, path: str) -> None:
         """Register an external JSON file for hot-reload (§1)."""
@@ -658,6 +721,39 @@ class ThemeManager(QObject):
         if target:
             target.setStyleSheet(_generate_stylesheet(self.colors))
 
+    def _profile_run(self, operation: str) -> _ThemeProfileRun:
+        if _theme_profile_enabled():
+            return _ThemeProfileRun(operation)
+        return _NullThemeProfileRun(operation)
+
+    def _emit_theme_changed(self) -> None:
+        self._clear_theme_dependent_caches()
+        self.themeChanged.emit()
+        if _theme_profile_enabled():
+            self._log_icon_cache_stats()
+
+    def _clear_theme_dependent_caches(self) -> None:
+        try:
+            from app.qt.utils.iconography import clear_icon_cache
+
+            clear_icon_cache()
+        except Exception as exc:
+            if _theme_profile_enabled():
+                logger.debug("Theme profile | icon cache clear skipped: {}", exc)
+
+    def _log_icon_cache_stats(self) -> None:
+        try:
+            from app.qt.utils.iconography import icon_cache_stats
+
+            stats = icon_cache_stats()
+            logger.debug(
+                "Theme profile | icon cache entries={} renders={}",
+                stats["entries"],
+                stats["renders"],
+            )
+        except Exception as exc:
+            logger.debug("Theme profile | icon cache stats skipped: {}", exc)
+
     def _on_file_changed(self, path: str) -> None:
         """QFileSystemWatcher callback: reload JSON and propagate."""
         # Some editors write-and-replace (file is briefly missing)
@@ -678,7 +774,7 @@ class ThemeManager(QObject):
             if overrides:
                 self.colors.update(overrides)
                 self._apply_to_app()
-                self.themeChanged.emit()
+                self._emit_theme_changed()
         except Exception:
             pass  # Never crash on a bad JSON edit
 

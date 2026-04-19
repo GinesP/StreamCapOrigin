@@ -293,7 +293,7 @@ class MainWindow(QMainWindow):
         
         theme_manager._rebuild_colors()
         theme_manager._apply_to_app()
-        theme_manager.themeChanged.emit()
+        theme_manager._emit_theme_changed()
         self._update_theme_btn()
 
     def _update_theme_btn(self):
