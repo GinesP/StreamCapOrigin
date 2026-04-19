@@ -107,6 +107,71 @@ python main.py --web
 
 如果程序提示缺少 FFmpeg，请访问 FFmpeg 官方下载页面[Download FFmpeg](https://ffmpeg.org/download.html)，下载预编译的 FFmpeg 可执行文件，并配置环境变量。
 
+## 🏗️ Compilación Qt para Windows (Nuitka)
+
+El build oficial de la versión Qt se realiza con `build_qt_nuitka.bat`. Este script compila `main_qt.py` con Nuitka, valida primero que la metadata de versión esté sincronizada y genera un reporte de empaquetado en `dist/nuitka-report.xml`.
+
+### Requisitos
+
+- Windows con el entorno virtual en `venv/`.
+- Dependencias instaladas dentro de `venv`.
+- Nuitka y `zstandard` instalados previamente en el entorno. El build no instala herramientas automáticamente para evitar builds no reproducibles.
+- Toolchain MSVC disponible; el script usa `--msvc=latest`.
+
+Para preparar el entorno de build, instala las herramientas una sola vez:
+
+```powershell
+.\venv\Scripts\python.exe -m pip install Nuitka zstandard
+```
+
+Para compilar:
+
+```powershell
+.\build_qt_nuitka.bat
+```
+
+El ejecutable queda en:
+
+```text
+dist\main_qt.dist\StreamCap.exe
+```
+
+El reporte de Nuitka queda en:
+
+```text
+dist\nuitka-report.xml
+```
+
+Después de compilar, revisa el reporte si necesitas confirmar qué módulos entraron en el paquete. En especial, valida que no aparezcan dependencias inesperadas como `flet`, `fastapi`, `uvicorn` o `app.api` en el runtime Qt.
+
+### Versionado de releases
+
+La versión técnica principal vive en `pyproject.toml`. El archivo `config/version.json` se mantiene sincronizado para la información visible de la aplicación y las notas de versión.
+
+El helper de versionado es:
+
+```powershell
+.\venv\Scripts\python.exe scripts\bump_version.py --check
+.\venv\Scripts\python.exe scripts\bump_version.py --current
+.\venv\Scripts\python.exe scripts\bump_version.py --patch
+.\venv\Scripts\python.exe scripts\bump_version.py --set 1.1.0
+```
+
+Uso recomendado:
+
+- `--check`: valida que `pyproject.toml` y `config/version.json` estén sincronizados.
+- `--current`: imprime la versión actual usada por el build.
+- `--patch`: incrementa solo el tercer dígito (`1.0.X`), por ejemplo `1.0.3 -> 1.0.4`.
+- `--set X.Y.Z`: fija manualmente una versión completa cuando haya cambio de major/minor.
+
+El build no incrementa versiones automáticamente. Primero se prepara la release con `bump_version.py` y después se compila con `build_qt_nuitka.bat`.
+
+Para comprobar qué versión de StreamGet está usando el entorno de build:
+
+```powershell
+.\venv\Scripts\python.exe -m pip show streamget
+```
+
 ## 🐋容器运行
 
 本机无需Python环境运行，在运行命令之前，请确保您的机器上安装了 [Docker](https://docs.docker.com/get-docker/) 和 [Docker Compose](https://docs.docker.com/compose/install/) 

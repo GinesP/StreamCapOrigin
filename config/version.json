@@ -7,7 +7,7 @@
   "open_source_license": "Apache License 2.0",
   "version_updates": [
     {
-      "version": "1.0.2",
+      "version": "1.0.5",
       "kernel_version": "4.0.8",
       "updates": {
         "en": [
@@ -24,7 +24,7 @@
       "announcement": {
         "en": [
           {
-            "title": "StreamCap v1.0.2 is officially released",
+            "title": "StreamCap v1.0.5 is officially released",
             "content": "New multi-platform support, web adaptation for mobile, bug fixes, and stability improvements"
           },
           {
@@ -38,7 +38,7 @@
         ],
         "zh_CN": [
           {
-            "title": "StreamCap v1.0.2 正式发布",
+            "title": "StreamCap v1.0.5 正式发布",
             "content": "新增平台支持，进行移动端web适配，修复已知问题，提升稳定性"
           },
           {
@@ -52,7 +52,7 @@
         ],
         "es": [
           {
-            "title": "StreamCap v1.0.2 lanzado oficialmente",
+            "title": "StreamCap v1.0.5 lanzado oficialmente",
             "content": "Nuevo soporte multiplataforma, adaptación web para móviles, corrección de errores y mejoras de estabilidad"
           },
           {

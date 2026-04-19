@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import random
 import time
 
-from ...messages import desktop_notify, message_pusher
+
 from ...models.recording.recording_model import Recording
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
@@ -153,10 +153,8 @@ class RecordingManager:
                 selected=False,
             )
 
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-            self.app.page.pubsub.send_others_on_topic("update", recording)
-
-            self.app.page.run_task(self.check_if_live, recording)
+            self.app.event_bus.publish("update", recording)
+            self.app.event_bus.run_task(self.check_if_live, recording)
 
             await self.persist_recordings()
 
@@ -165,29 +163,41 @@ class RecordingManager:
         Stop monitoring a single recording if it is currently being monitored.
         """
         if recording.monitor_status:
+            # If it's recording, stop it first
+            self.stop_recording(recording, manually_stopped=True)
+
+            # Now update to stopped monitoring state
+            monitor_stopped_label = self._.get('monitor_stopped', 'Stopped monitoring')
             await self._update_recording(
                 recording=recording,
                 monitor_status=False,
-                display_title=f"[{self._['monitor_stopped']}] {recording.title}",
+                display_title=f"[{monitor_stopped_label}] {recording.title}",
                 status_info=RecordingStatus.STOPPED_MONITORING,
                 selected=False,
             )
-            self.stop_recording(recording, manually_stopped=True)
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-            self.app.page.pubsub.send_others_on_topic("update", recording)
+            self.app.event_bus.publish("update", recording)
             await self.persist_recordings()
 
-    async def start_monitor_recordings(self):
+    async def start_monitor_recordings(self, selected_recordings: list[Recording | None] | None = None):
         """
         Start monitoring multiple recordings based on user selection or all recordings if none are selected.
         """
-        selected_recordings = await self.get_selected_recordings()
+        if not selected_recordings:
+            selected_recordings = await self.get_selected_recordings()
         pre_start_monitor_recordings = selected_recordings if selected_recordings else self.recordings
-        cards_obj = self.app.record_card_manager.cards_obj
-        for recording in pre_start_monitor_recordings:
-            if cards_obj[recording.rec_id]["card"].visible:
-                self.app.page.run_task(self.start_monitor_recording, recording, auto_save=False)
-        self.app.page.run_task(self.persist_recordings)
+        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+            cards_obj = self.app.record_card_manager.cards_obj
+            for recording in pre_start_monitor_recordings:
+                # If card manager exists, check visibility
+                if recording.rec_id in cards_obj and cards_obj[recording.rec_id]["card"].visible:
+                    self.app.event_bus.run_task(self.start_monitor_recording, recording, auto_save=False)
+        else:
+            # In Qt version, we just start all selected/filtered recordings for now
+            # TODO: Improve filtering for Qt version batch actions
+            for recording in pre_start_monitor_recordings:
+                self.app.event_bus.run_task(self.start_monitor_recording, recording, auto_save=False)
+        
+        self.app.event_bus.run_task(self.persist_recordings)
         logger.info(f"Batch Start Monitor Recordings: {[i.rec_id for i in pre_start_monitor_recordings]}")
 
     async def stop_monitor_recordings(self, selected_recordings: list[Recording | None] | None = None):
@@ -197,11 +207,16 @@ class RecordingManager:
         if not selected_recordings:
             selected_recordings = await self.get_selected_recordings()
         pre_stop_monitor_recordings = selected_recordings or self.recordings
-        cards_obj = self.app.record_card_manager.cards_obj
-        for recording in pre_stop_monitor_recordings:
-            if cards_obj[recording.rec_id]["card"].visible:
-                self.app.page.run_task(self.stop_monitor_recording, recording, auto_save=False)
-        self.app.page.run_task(self.persist_recordings)
+        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+            cards_obj = self.app.record_card_manager.cards_obj
+            for recording in pre_stop_monitor_recordings:
+                if recording.rec_id in cards_obj and cards_obj[recording.rec_id]["card"].visible:
+                    self.app.event_bus.run_task(self.stop_monitor_recording, recording, auto_save=False)
+        else:
+            for recording in pre_stop_monitor_recordings:
+                self.app.event_bus.run_task(self.stop_monitor_recording, recording, auto_save=False)
+        
+        self.app.event_bus.run_task(self.persist_recordings)
         logger.info(f"Batch Stop Monitor Recordings: {[i.rec_id for i in pre_stop_monitor_recordings]}")
 
     async def get_selected_recordings(self):
@@ -250,7 +265,7 @@ class RecordingManager:
                 alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
                 alpha_offline = float(self.settings.user_config.get("ema_alpha_offline", 0.01))
                 recording.increment_live_counts(is_live=True, alpha_active=alpha_active, alpha_offline=alpha_offline)
-                self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                self.app.event_bus.publish("update", recording)
                 continue
 
             # 1. Apply Smart Predictive Polling (Intelligence)
@@ -304,7 +319,20 @@ class RecordingManager:
                 f"Busy({busy_fast}F+{busy_medium}M+{busy_slow}S) | "
                 f"{skipping_count} waiting</yellow>"
             )
-        
+
+        # Publish structured data so the dashboard can update in real-time
+        self.app.event_bus.publish("intelligence_cycle", {
+            "disp_fast":   dispatched_fast,
+            "disp_medium": dispatched_medium,
+            "disp_slow":   dispatched_slow,
+            "busy_fast":   busy_fast,
+            "busy_medium": busy_medium,
+            "busy_slow":   busy_slow,
+            "waiting":     skipping_count,
+            "total_disp":  dispatched_fast + dispatched_medium + dispatched_slow,
+            "total_busy":  busy_fast + busy_medium + busy_slow,
+        })
+
         # Persist all recording updates once after all checks are queued
         await self.persist_recordings()
 
@@ -384,7 +412,7 @@ class RecordingManager:
             if not recording.monitor_status:
                 recording.display_title = f"[{self._['monitor_stopped']}] {recording.title}"
                 recording.status_info = RecordingStatus.STOPPED_MONITORING
-                self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                self.app.event_bus.publish("update", recording)
                 return
 
             recording.detection_time = datetime.now().time()
@@ -392,7 +420,7 @@ class RecordingManager:
             
             # Always update UI to show "Checking" status at the start of detection
             recording.status_info = RecordingStatus.STATUS_CHECKING
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+            self.app.event_bus.publish("update", recording)
 
             if recording.scheduled_recording:
                 scheduled_time_range_list = await self.get_scheduled_time_range(
@@ -408,7 +436,7 @@ class RecordingManager:
                     recording.status_info = RecordingStatus.NOT_IN_SCHEDULED_CHECK
                     recording.is_live = False
                     logger.info(f"Skip Detection: {recording.url} not in scheduled check range {scheduled_time_range_list}")
-                    self.app.page.run_task(self.app.record_card_manager.update_card, recording)
+                    self.app.event_bus.publish("update", recording)
                     return
 
             recording.status_info = RecordingStatus.STATUS_CHECKING
@@ -441,9 +469,11 @@ class RecordingManager:
 
             semaphore = self.platform_semaphores[platform_key]
             recorder = LiveStreamRecorder(self.app, recording, recording_info)
+            
+            # Stagger requests slightly *before* acquiring the semaphore to avoid blocking workers
+            await asyncio.sleep(random.uniform(0.5, 3.0))
+            
             async with semaphore:
-                # Stagger requests slightly to avoid rate limiting
-                await asyncio.sleep(random.uniform(2.0, 5.0))
                 stream_info = await recorder.fetch_stream()
                 logger.info(f"Stream Data: {stream_info.anchor_name if stream_info else 'None'}")
             
@@ -451,8 +481,8 @@ class RecordingManager:
                 logger.error(f"Fetch stream data failed: {recording.url}")
                 recording.status_info = RecordingStatus.LIVE_STATUS_CHECK_ERROR
                 if recording.monitor_status:
-                    self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-                    self.app.page.pubsub.send_others_on_topic("update", recording)
+                    self.app.event_bus.publish("update", recording)
+                    self.app.event_bus.publish("update", recording)
                 return
                 
             if self.settings.user_config.get("remove_emojis"):
@@ -483,38 +513,12 @@ class RecordingManager:
                     recording.notified_live_start = False
                     recording.notified_live_end = False
 
-                    if desktop_notify.should_push_notification(self.app):
-                        desktop_notify.send_notification(
-                            title=self._["notify"],
-                            message=recording.streamer_name + ' | ' + self._["live_recording_started_message"],
-                            app_icon=self.app.tray_manager.icon_path
-                        )
-
-                msg_manager = message_pusher.MessagePusher(self.settings)
-                user_config = self.settings.user_config
-                if (msg_manager.should_push_message(self.settings, recording, message_type='start')
-                        and not recording.notified_live_start):
-                    push_content = self._["push_content"]
-                    begin_push_message_text = user_config.get("custom_stream_start_content")
-                    if begin_push_message_text:
-                        push_content = begin_push_message_text
-
-                    push_at = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
-                    push_content = push_content.replace("[room_name]", recording.streamer_name).replace(
-                        "[time]", push_at).replace("[title]", recording.live_title or "None")
-                    msg_title = user_config.get("custom_notification_title").strip()
-                    msg_title = msg_title or self._["status_notify"]
-
-                    BackgroundService.get_instance().add_task(
-                        msg_manager.push_messages_sync, msg_title, push_content
-                    )
-                    recording.notified_live_start = True
-
                 if not recording.only_notify_no_record:
                     recording.status_info = RecordingStatus.PREPARING_RECORDING
                     recording.loop_time_seconds = self.loop_time_seconds
                     self.start_update(recording)
-                    self.app.page.run_task(recorder.start_recording, stream_info)
+                    # Explicitly start recording loop instead of relying on a potentially unsubscribed event
+                    self.app.event_bus.run_task(recorder.start_recording, stream_info)
                 else:
                     if recording.notified_live_start:
                         notify_loop_time = user_config.get("notify_loop_time")
@@ -535,7 +539,7 @@ class RecordingManager:
                 recording.is_recording = False
                 if recording.is_live:
                     recording.is_live = False
-                    self.app.page.run_task(recorder.end_message_push)
+                    pass # removed message push
 
                 recording.status_info = RecordingStatus.MONITORING
                 title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[recording.quality]}"
@@ -551,9 +555,7 @@ class RecordingManager:
 
         finally:
             recording.is_checking = False
-            self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-        self.app.page.run_task(self.app.record_card_manager.update_card, recording)
-        self.app.page.pubsub.send_others_on_topic("update", recording)
+            self.app.event_bus.publish("update", recording)
         return
 
     @staticmethod
@@ -604,7 +606,7 @@ class RecordingManager:
             recording.status_info = RecordingStatus.NOT_RECORDING
             logger.info(f"Stopped recording for {recording.title}")
 
-            self.app.page.run_task(self.persist_recordings)
+            self.app.event_bus.publish("persist_recordings")
 
     def get_duration(self, recording: Recording):
         """Get the duration of the current recording session in a formatted string."""
@@ -619,12 +621,12 @@ class RecordingManager:
             return str(total_duration).split(".")[0]
 
     async def delete_recording_cards(self, recordings: list[Recording]):
-        self.app.page.run_task(self.app.record_card_manager.remove_recording_card, recordings)
-        self.app.page.pubsub.send_others_on_topic('delete', recordings)
+        self.app.event_bus.publish("update", recordings)
+        self.app.event_bus.publish("delete", recordings)
         await self.remove_recordings(recordings)
 
-        # update the filter area of the recording list page
-        if hasattr(self.app, 'current_page') and hasattr(self.app.current_page, 'view_container'):
+        # update the filter area of the recording list page (Flet specific)
+        if self.app.page and hasattr(self.app, 'current_page') and hasattr(self.app.current_page, 'view_container'):
             current_page = self.app.current_page
             if hasattr(current_page, 'create_filter_area') and len(current_page.view_container.controls) > 1:
                 current_page.view_container.controls[1] = current_page.create_filter_area()
@@ -638,12 +640,16 @@ class RecordingManager:
             logger.error(
                 f"Disk space remaining is below {disk_space_limit} GB. Recording function disabled"
             )
-            self.app.page.run_task(
-                self.app.snack_bar.show_snack_bar,
-                self._["not_disk_space_tip"],
-                duration=86400,
-                show_close_icon=True
-            )
+            if hasattr(self.app, 'snack_bar') and self.app.snack_bar:
+                self.app.event_bus.run_task(
+                    self.app.snack_bar.show_snack_bar,
+                    self._["not_disk_space_tip"],
+                    duration=86400,
+                    show_close_icon=True
+                )
+            else:
+                # In Qt or if page is missing, just log it; Qt version of snackbar is not yet implemented
+                logger.warning(self._["not_disk_space_tip"])
 
         else:
             self.app.recording_enabled = True

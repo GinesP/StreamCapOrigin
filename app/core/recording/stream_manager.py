@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from typing import TypeVar
 
-from ...messages import desktop_notify, message_pusher
+
 from ...models.media.video_quality_model import VideoQuality
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
@@ -132,7 +132,8 @@ class LiveStreamRecorder:
                 output_dir = os.path.join(output_dir, f"{now[:10]}_{live_title}")
         os.makedirs(output_dir, exist_ok=True)
         self.recording.recording_dir = output_dir
-        self.app.page.run_task(self.app.record_manager.persist_recordings)
+        # Use event_bus instead of page to be framework-agnostic
+        self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
         return output_dir
 
     def _get_save_path(self, filename: str, use_direct_download: bool = False) -> str:
@@ -261,7 +262,7 @@ class LiveStreamRecorder:
                 proxy=self.proxy
             )
 
-            self.app.page.run_task(
+            self.app.event_bus.run_task(
                 self.start_direct_download,
                 stream_info.anchor_name,
                 self.live_url,
@@ -281,7 +282,7 @@ class LiveStreamRecorder:
                 headers=self.get_headers_params(record_url, self.platform_key)
             )
             ffmpeg_command = ffmpeg_builder.build_command()
-            self.app.page.run_task(
+            self.app.event_bus.run_task(
                 self.start_ffmpeg,
                 stream_info.anchor_name,
                 self.live_url,
@@ -307,7 +308,7 @@ class LiveStreamRecorder:
             if recording_duration > self.min_valid_recording_duration:
                 if self.app.recording_enabled:
                     # Perform extra checks outside the normal cycle to catch transient disconnects
-                    self.app.page.run_task(self.app.record_manager.check_if_live_with_retry, self.recording)
+                    self.app.event_bus.run_task(self.app.record_manager.check_if_live_with_retry, self.recording)
             else:
                 self.recording.status_info = RecordingStatus.RECORDING_ERROR
 
@@ -397,11 +398,13 @@ class LiveStreamRecorder:
 
                     try:
                         self.app.record_manager.stop_recording(self.recording)
-                        await self.app.record_card_manager.update_card(self.recording)
-                        self.app.page.pubsub.send_others_on_topic("update", self.recording)
-                        await self.app.snack_bar.show_snack_bar(
-                            record_name + " " + self._["record_stream_error"], duration=2000
-                        )
+                        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                            await self.app.record_card_manager.update_card(self.recording)
+                        self.app.event_bus.publish("update", self.recording)
+                        if hasattr(self.app, 'snack_bar') and self.app.snack_bar:
+                            await self.app.snack_bar.show_snack_bar(
+                                record_name + " " + self._["record_stream_error"], duration=2000
+                            )
                     except Exception as e:
                         logger.debug(f"Failed to update UI: {e}")
 
@@ -420,18 +423,19 @@ class LiveStreamRecorder:
                         logger.success(f"Live recording has stopped: {record_name}")
                     else:
                         logger.success(tr("console.live_recording_completed", "Live recording completed: {}").format(record_name))
-                        self.app.page.run_task(self.end_message_push)
+                        pass # removed message push
                     
                     try:
                         self.recording.update({"display_title": display_title})
-                        self.app.page.run_task(self.app.record_card_manager.update_card, self.recording)
-                        self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                        if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                            await self.app.record_card_manager.update_card(self.recording)
+                        self.app.event_bus.publish("update", self.recording)
                     except Exception as e:
                         logger.debug(f"Failed to update UI: {e}")
 
                 if not self.app.recording_enabled:
                     self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
-                    self.app.page.run_task(self.stop_recording_notify)
+                    self.app.event_bus.run_task(self.stop_recording_notify)
 
                 await self.recheck_live_status()
 
@@ -442,7 +446,7 @@ class LiveStreamRecorder:
                         for path in file_paths:
                             if prefix in path:
                                 try:
-                                    self.app.page.run_task(
+                                    self.app.event_bus.run_task(
                                         self.converts_mp4, path, self.user_config["delete_original"]
                                     )
                                 except Exception as e:
@@ -450,7 +454,7 @@ class LiveStreamRecorder:
                                     await self.converts_mp4(path, self.user_config["delete_original"])
                     else:
                         try:
-                            self.app.page.run_task(
+                            self.app.event_bus.run_task(
                                 self.converts_mp4, save_file_path, self.user_config["delete_original"]
                             )
                         except Exception as e:
@@ -460,7 +464,7 @@ class LiveStreamRecorder:
                 if self.user_config.get("execute_custom_script") and script_command:
                     logger.info("Prepare a direct script in the background")
                     try:
-                        self.app.page.run_task(
+                        self.app.event_bus.run_task(
                             self.custom_script_execute,
                             script_command,
                             record_name,
@@ -487,11 +491,13 @@ class LiveStreamRecorder:
 
             try:
                 self.app.record_manager.stop_recording(self.recording)
-                await self.app.record_card_manager.update_card(self.recording)
-                self.app.page.pubsub.send_others_on_topic("update", self.recording)
-                await self.app.snack_bar.show_snack_bar(
-                    record_name + " " + self._["no_ffmpeg_tip"], duration=4000
-                )
+                if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                    await self.app.record_card_manager.update_card(self.recording)
+                self.app.event_bus.publish("update", self.recording)
+                if hasattr(self.app, 'snack_bar') and self.app.snack_bar:
+                    await self.app.snack_bar.show_snack_bar(
+                        record_name + " " + self._["no_ffmpeg_tip"], duration=4000
+                    )
             except Exception as e:
                 logger.debug(f"Failed to update UI: {e}")
             return False
@@ -527,34 +533,63 @@ class LiveStreamRecorder:
         save_path = None
         try:
             converts_file_path = converts_file_path.replace("\\", "/")
-            if os.path.exists(converts_file_path) and os.path.getsize(converts_file_path) > 0:
-                save_path = converts_file_path.rsplit(".", maxsplit=1)[0] + ".mp4"
-                ffmpeg_command = [
-                    "ffmpeg",
-                    "-i", converts_file_path,
-                    "-c:v", "copy",
-                    "-c:a", "copy",
-                    "-f", "mp4",
-                    "-movflags", "+faststart",
-                    save_path
-                ]
-                process = await asyncio.create_subprocess_exec(
-                    *ffmpeg_command,
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    startupinfo=self.subprocess_start_info
-                )
 
-                self.app.add_ffmpeg_process(process)
-                task = asyncio.create_task(process.communicate())
-                _, stderr = await task
-                if process.returncode == 0:
-                    converts_success = True
-                    logger.info(f"Video transcoding completed: {save_path}")
+            # On Windows the recording ffmpeg process may hold the file handle briefly
+            # after it reports completion. Retry opening the file until it is unlocked.
+            max_wait_attempts = 10
+            wait_interval = 2  # seconds between attempts
+            file_ready = False
+            for attempt in range(max_wait_attempts):
+                if os.path.exists(converts_file_path) and os.path.getsize(converts_file_path) > 0:
+                    try:
+                        # Try to open the file exclusively to verify it is not locked
+                        with open(converts_file_path, "rb") as _f:
+                            pass
+                        file_ready = True
+                        break
+                    except (PermissionError, OSError) as lock_err:
+                        logger.warning(
+                            f"TS file is still locked by another process (attempt {attempt + 1}/{max_wait_attempts}): "
+                            f"{converts_file_path} - {lock_err}"
+                        )
+                        await asyncio.sleep(wait_interval)
                 else:
-                    logger.error(
-                        f"Video transcoding failed! Error message: {stderr.decode() if stderr else 'Unknown error'}")
+                    await asyncio.sleep(wait_interval)
+
+            if not file_ready:
+                logger.error(
+                    f"Cannot convert TS file after {max_wait_attempts} attempts, file is still locked or missing: "
+                    f"{converts_file_path}"
+                )
+                return
+
+            save_path = converts_file_path.rsplit(".", maxsplit=1)[0] + ".mp4"
+            ffmpeg_command = [
+                "ffmpeg",
+                "-i", converts_file_path,
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-f", "mp4",
+                "-movflags", "+faststart",
+                save_path
+            ]
+            process = await asyncio.create_subprocess_exec(
+                *ffmpeg_command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                startupinfo=self.subprocess_start_info
+            )
+
+            self.app.add_ffmpeg_process(process)
+            task = asyncio.create_task(process.communicate())
+            _, stderr = await task
+            if process.returncode == 0:
+                converts_success = True
+                logger.info(f"Video transcoding completed: {save_path}")
+            else:
+                logger.error(
+                    f"Video transcoding failed! Error message: {stderr.decode() if stderr else 'Unknown error'}")
 
         except subprocess.CalledProcessError as e:
             logger.error(f"Video transcoding failed! Error message: {e.output.decode()}")
@@ -562,10 +597,14 @@ class LiveStreamRecorder:
         try:
             if converts_success:
                 if is_original_delete:
-                    await asyncio.sleep(1)
-                    if os.path.exists(converts_file_path):
-                        os.remove(converts_file_path)
-                    logger.info(f"Delete Original File: {converts_file_path}")
+                    deleted = await self._delete_with_retry(converts_file_path)
+                    if not deleted:
+                        # Schedule one final attempt after a much longer wait (60 s).
+                        # By then any AV scanner or OS indexer should have finished.
+                        logger.warning(
+                            f"Scheduling deferred deletion in 60 s for: {converts_file_path}"
+                        )
+                        asyncio.create_task(self._deferred_delete(converts_file_path, delay=60))
                 else:
                     converts_dir = f"{os.path.dirname(save_path)}/original"
                     os.makedirs(converts_dir, exist_ok=True)
@@ -576,6 +615,46 @@ class LiveStreamRecorder:
             logger.error(f"Error occurred during conversion: {e}")
         except Exception as e:
             logger.error(f"An unknown error occurred: {e}")
+
+    async def _delete_with_retry(self, file_path: str, attempts: int = 10, interval: int = 3) -> bool:
+        """Try to delete *file_path* up to *attempts* times, waiting *interval* seconds between each.
+
+        Returns True if the file was deleted (or no longer exists), False if all attempts failed.
+        """
+        # Give the OS / conversion process a moment before the first try
+        await asyncio.sleep(2)
+        for attempt in range(attempts):
+            try:
+                if not os.path.exists(file_path):
+                    logger.info(f"Delete Original File (already gone): {file_path}")
+                    return True
+                os.remove(file_path)
+                logger.info(f"Delete Original File: {file_path}")
+                return True
+            except (PermissionError, OSError) as err:
+                remaining = attempts - attempt - 1
+                if remaining > 0:
+                    logger.warning(
+                        f"Cannot delete TS file yet (attempt {attempt + 1}/{attempts}): "
+                        f"{file_path} - {err}"
+                    )
+                    await asyncio.sleep(interval)
+                else:
+                    logger.error(
+                        f"Exhausted {attempts} deletion attempts for: {file_path} - {err}"
+                    )
+        return False
+
+    async def _deferred_delete(self, file_path: str, delay: int = 60) -> None:
+        """Wait *delay* seconds, then make one final deletion attempt."""
+        await asyncio.sleep(delay)
+        try:
+            if not os.path.exists(file_path):
+                return
+            os.remove(file_path)
+            logger.info(f"Deferred deletion succeeded: {file_path}")
+        except Exception as err:
+            logger.error(f"Deferred deletion failed (giving up): {file_path} - {err}")
 
     async def custom_script_execute(
             self,
@@ -610,7 +689,7 @@ class LiveStreamRecorder:
             logger.info("Application is closing, adding script execution task to background service")
             BackgroundService.get_instance().add_task(self.run_script_sync, script_command)
         else:
-            self.app.page.run_task(self.run_script_async, script_command)
+            self.app.event_bus.run_task(self.run_script_async, script_command)
 
         logger.success("Script command execution initiated!")
 
@@ -725,25 +804,26 @@ class LiveStreamRecorder:
                     logger.success(f"Direct Downloading Stopped: {record_name}")
                 else:
                     logger.success(f"Direct Downloading Completed: {record_name}")
-                    self.app.page.run_task(self.end_message_push)
+                    pass # removed message push
 
                 try:
                     self.recording.update({"display_title": display_title})
-                    await self.app.record_card_manager.update_card(self.recording)
-                    self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                    if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                        await self.app.record_card_manager.update_card(self.recording)
+                    self.app.event_bus.publish("update", self.recording)
                 except Exception as e:
                     logger.debug(f"Failed to update UI: {e}")
 
             if not self.app.recording_enabled:
                 self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
-                self.app.page.run_task(self.stop_recording_notify)
+                self.app.event_bus.run_task(self.stop_recording_notify)
 
             await self.recheck_live_status()
 
             if self.user_config.get("execute_custom_script") and script_command:
                 logger.info("Prepare to execute custom script in the background")
                 try:
-                    self.app.page.run_task(
+                    self.app.event_bus.run_task(
                         self.custom_script_execute,
                         script_command,
                         record_name,
@@ -772,8 +852,9 @@ class LiveStreamRecorder:
 
             try:
                 self.app.record_manager.stop_recording(self.recording)
-                await self.app.record_card_manager.update_card(self.recording)
-                self.app.page.pubsub.send_others_on_topic("update", self.recording)
+                if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
+                    await self.app.record_card_manager.update_card(self.recording)
+                self.app.event_bus.publish("update", self.recording)
                 await self.app.snack_bar.show_snack_bar(
                     record_name + " " + self._["record_stream_error"], duration=2000
                 )
@@ -784,33 +865,7 @@ class LiveStreamRecorder:
             self.recording.record_url = None
 
     async def stop_recording_notify(self):
-        if desktop_notify.should_push_notification(self.app):
-            desktop_notify.send_notification(
-                title=self._["notify"],
-                message=self.recording.streamer_name + ' | ' + self._["live_recording_stopped_message"],
-                app_icon=self.app.tray_manager.icon_path
-            )
-
-    async def end_message_push(self):
-        msg_manager = message_pusher.MessagePusher(self.settings)
-        user_config = self.settings.user_config
-
-        if (self.app.recording_enabled and msg_manager.should_push_message(
-                self.settings, self.recording, check_manually_stopped=True, message_type='end') and
-                not self.recording.notified_live_end):
-            self.recording.notified_live_end = True
-            push_content = self._["push_content_end"]
-            end_push_message_text = user_config.get("custom_stream_end_content")
-            if end_push_message_text:
-                push_content = end_push_message_text
-
-            push_at = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
-            push_content = push_content.replace("[room_name]", self.recording.streamer_name).replace(
-                "[time]", push_at).replace("[title]", self.recording.live_title or "None")
-            msg_title = user_config.get("custom_notification_title").strip()
-            msg_title = msg_title or self._["status_notify"]
-
-            self.app.page.run_task(msg_manager.push_messages, msg_title, push_content)
+        pass
 
     def request_stop(self):
         logger.info(f"Stop requested for recorder: {self.recording.url}, rec_id: {self.recording.rec_id}")

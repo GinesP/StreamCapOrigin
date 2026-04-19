@@ -1,4 +1,4 @@
-import flet as ft
+from typing import Optional, Any
 
 from ..scripts.ffmpeg_install import check_ffmpeg_installed, install_ffmpeg
 from ..scripts.node_install import check_nodejs_installed, install_nodejs
@@ -8,7 +8,7 @@ from ..utils.logger import logger
 class InstallationManager:
     def __init__(self, app):
         self.app = app
-        self.page: ft.Page = app.page
+        self.page: Optional[Any] = app.page  # None in Qt context, ft.Page in Flet
         self.install_dialog = None
         self.components_to_install = []
         self.completed_components = set()
@@ -180,8 +180,14 @@ class InstallationManager:
         if not self.app.settings.user_config.get("hide_install_dialog", False):
             await self.get_install_components()
             if self.components_to_install:
+                logger.debug(f"DEBUG: InstallationManager check_env found missing components: {self.components_to_install}. self.page is {self.page}")
                 logger.info(f"Missing components: {[i['name'] for i in self.components_to_install]}")
-                self.page.run_task(self.show_install_dialog)
+                if self.page:
+                    logger.debug("DEBUG: Triggering Flet install dialog")
+                    self.app.event_bus.run_task(self.show_install_dialog)
+                else:
+                    logger.debug("DEBUG: Publishing missing_components event for Qt/Gen")
+                    self.app.event_bus.publish("missing_components", self.components_to_install)
         else:
             from ..scripts import ffmpeg_install, node_install
             ffmpeg_install.update_env_path()
