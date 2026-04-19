@@ -109,6 +109,7 @@ https://www.youtube.com/watch?v=5KpV0y_hNXQ
 ## Documentación
 
 - Documentación técnica de inteligencia: `docs/INTELLIGENCE_ES.md`.
+- Distribución Windows: `docs/WINDOWS_DISTRIBUTION.md`.
 - README en inglés: `README_EN.md`.
 - Wiki del proyecto original: <https://github.com/ihmily/StreamCap/wiki>.
 

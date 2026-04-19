@@ -7,13 +7,13 @@ echo ====================================================
 
 if not exist "venv\Scripts\python.exe" (
     echo [ERROR] Virtual environment not found in "venv".
-    pause
+    if not "%STREAMCAP_SKIP_BUILD_PAUSE%"=="1" pause
     exit /b 1
 )
 
 if not exist "scripts\bump_version.py" (
     echo [ERROR] Version helper not found at "scripts\bump_version.py".
-    pause
+    if not "%STREAMCAP_SKIP_BUILD_PAUSE%"=="1" pause
     exit /b 1
 )
 
@@ -22,14 +22,14 @@ echo [1/3] Validating version metadata...
 if %ERRORLEVEL% neq 0 (
     echo.
     echo [ERROR] Version metadata validation failed.
-    pause
+    if not "%STREAMCAP_SKIP_BUILD_PAUSE%"=="1" pause
     exit /b 1
 )
 
 for /f "delims=" %%V in ('venv\Scripts\python.exe scripts\bump_version.py --current') do set "APP_VERSION=%%V"
 if not defined APP_VERSION (
     echo [ERROR] Could not read application version.
-    pause
+    if not "%STREAMCAP_SKIP_BUILD_PAUSE%"=="1" pause
     exit /b 1
 )
 
@@ -78,9 +78,11 @@ if %ERRORLEVEL% equ 0 (
     echo Executable located at: dist\main_qt.dist\StreamCap.exe
     echo Nuitka report located at: dist\nuitka-report.xml
     echo ====================================================
+    if not "%STREAMCAP_SKIP_BUILD_PAUSE%"=="1" pause
+    exit /b 0
 ) else (
     echo.
     echo [ERROR] Build failed. Check the Nuitka logs above.
+    if not "%STREAMCAP_SKIP_BUILD_PAUSE%"=="1" pause
+    exit /b 1
 )
-
-pause

@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import sqlite3
+import sys
 import uuid
 from typing import TypeVar
 
@@ -14,16 +15,35 @@ from ...utils.logger import logger
 T = TypeVar("T")
 
 
+MUTABLE_CONFIG_FILES = (
+    "user_settings.json",
+    "cookies.json",
+    "accounts.json",
+    "web_auth.json",
+    "recordings.db",
+    "recordings.db-journal",
+    "recordings.db-shm",
+    "recordings.db-wal",
+    "recordings.json",
+    "recordings.json.bak",
+)
+
+
 class ConfigManager:
-    def __init__(self, run_path, bundle_path=None):
-        # user-writable data dir (beside the exe, or project root)
-        self.config_path = os.path.join(run_path, "config")
+    def __init__(self, run_path, bundle_path=None, user_data_path=None):
+        self.run_path = run_path
+        self.user_data_path = user_data_path or self.get_default_user_data_path(run_path)
+
+        # User-writable data dir. In packaged Windows installs this lives under
+        # %LOCALAPPDATA%\StreamCap instead of beside StreamCap.exe, so updates can
+        # replace program files without touching user configuration or recordings.
+        self.config_path = os.path.join(self.user_data_path, "config")
         # read-only bundled resources dir (sys._MEIPASS when frozen, else same as run_path)
         bundle_config_path = os.path.join(bundle_path or run_path, "config")
 
-        self.language_config_path = os.path.join(self.config_path, "language.json")
+        self.language_config_path = os.path.join(bundle_config_path, "language.json")
         self.language_config_bundle_path = os.path.join(bundle_config_path, "language.json")
-        self.default_config_path = os.path.join(self.config_path, "default_settings.json")
+        self.default_config_path = os.path.join(bundle_config_path, "default_settings.json")
         self.default_config_bundle_path = os.path.join(bundle_config_path, "default_settings.json")
         self.user_config_path = os.path.join(self.config_path, "user_settings.json")
         self.cookies_config_path = os.path.join(self.config_path, "cookies.json")
@@ -36,7 +56,40 @@ class ConfigManager:
         self._cache = {}
         self._recordings_state_cache = {}
         os.makedirs(self.config_path, exist_ok=True)
+        self.migrate_legacy_config()
         self.init()
+
+    @staticmethod
+    def get_default_user_data_path(run_path):
+        override = os.environ.get("STREAMCAP_USER_DATA_DIR")
+        if override:
+            return override
+
+        if sys.platform == "win32":
+            local_app_data = os.environ.get("LOCALAPPDATA")
+            if local_app_data:
+                return os.path.join(local_app_data, "StreamCap")
+
+        return run_path
+
+    def migrate_legacy_config(self):
+        legacy_config_path = os.path.join(self.run_path, "config")
+        if os.path.abspath(legacy_config_path) == os.path.abspath(self.config_path):
+            return
+        if not os.path.isdir(legacy_config_path):
+            return
+
+        for filename in MUTABLE_CONFIG_FILES:
+            source_path = os.path.join(legacy_config_path, filename)
+            dest_path = os.path.join(self.config_path, filename)
+            if not os.path.exists(source_path) or os.path.exists(dest_path):
+                continue
+
+            try:
+                shutil.copy2(source_path, dest_path)
+                logger.info(f"Migrated legacy configuration file to user data dir: {filename}")
+            except Exception as e:
+                logger.error(f"Failed to migrate legacy configuration file {filename}: {e}")
 
     def init(self):
         self.init_default_config()
@@ -72,20 +125,14 @@ class ConfigManager:
                 logger.error(f"Failed to initialize configuration file {config_path}: {e}")
 
     def init_default_config(self):
-        """Copy default_settings from bundle if not present in user data dir."""
+        """Validate bundled default_settings exists; it is not user-mutable."""
         if not os.path.exists(self.default_config_path):
-            if os.path.exists(self.default_config_bundle_path):
-                shutil.copy(self.default_config_bundle_path, self.default_config_path)
-            else:
-                self._init_config(self.default_config_path, {})
+            logger.warning(f"Bundled default settings not found: {self.default_config_path}")
 
     def init_language_config(self):
-        """Copy language.json from bundle if not present in user data dir."""
+        """Validate bundled language.json exists; it is not user-mutable."""
         if not os.path.exists(self.language_config_path):
-            if os.path.exists(self.language_config_bundle_path):
-                shutil.copy(self.language_config_bundle_path, self.language_config_path)
-            else:
-                self._init_config(self.language_config_path, {})
+            logger.warning(f"Bundled language config not found: {self.language_config_path}")
 
     def init_user_config(self):
         if os.path.exists(self.user_config_path) and self._load_config(self.user_config_path, "Check user config"):

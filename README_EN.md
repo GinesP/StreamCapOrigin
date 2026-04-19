@@ -308,6 +308,8 @@ https://www.picarto.tv/cuteavalanche
 
 For full documentation and advanced usage, visit the [official documentation](https://github.com/ihmily/StreamCap/wiki).
 
+Windows distribution notes are available in [`docs/WINDOWS_DISTRIBUTION.md`](./docs/WINDOWS_DISTRIBUTION.md).
+
 ## ❤️Contributors
 
 <a href="https://github.com/ihmily/StreamCap/graphs/contributors">
