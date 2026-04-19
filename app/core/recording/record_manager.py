@@ -1,19 +1,16 @@
 import asyncio
+import random
 import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
-import random
-import time
-
 
 from ...models.recording.recording_model import Recording
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
+from ...utils.delay import DelayedTaskExecutor
 from ...utils.i18n import tr
 from ...utils.logger import logger
-from ...utils.delay import DelayedTaskExecutor
 from ..platforms.platform_handlers import get_platform_info
-from ..runtime.process_manager import BackgroundService
 from .stream_manager import LiveStreamRecorder
 
 
@@ -184,7 +181,7 @@ class RecordingManager:
         """
         if not selected_recordings:
             selected_recordings = await self.get_selected_recordings()
-        pre_start_monitor_recordings = selected_recordings if selected_recordings else self.recordings
+        pre_start_monitor_recordings = selected_recordings or self.recordings
         if hasattr(self.app, 'record_card_manager') and self.app.record_card_manager:
             cards_obj = self.app.record_card_manager.cards_obj
             for recording in pre_start_monitor_recordings:
@@ -288,9 +285,12 @@ class RecordingManager:
 
                 # 4. Prevent redundant queuing if already checking or in queue
                 if recording.is_checking:
-                    if prio_key == "F": busy_fast += 1
-                    elif prio_key == "M": busy_medium += 1
-                    else: busy_slow += 1
+                    if prio_key == "F":
+                        busy_fast += 1
+                    elif prio_key == "M":
+                        busy_medium += 1
+                    else:
+                        busy_slow += 1
                     continue
 
                 recording.is_checking = True
@@ -306,7 +306,10 @@ class RecordingManager:
                     self._queue_slow.put_nowait(recording)
                     dispatched_slow += 1
                 
-                logger.debug(f"Intelligence: Dispatched {recording.streamer_name} to {prio_key} queue (Likelihood {likelihood:.2f})")
+                logger.debug(
+                    f"Intelligence: Dispatched {recording.streamer_name} "
+                    f"to {prio_key} queue (Likelihood {likelihood:.2f})"
+                )
             else:
                 skipping_count += 1
 
@@ -407,7 +410,9 @@ class RecordingManager:
                     logger.debug(f"Skip check_if_live because recorder is active: {recording.url}")
                     return
                 else:
-                    logger.debug(f"Proceeding with check_if_live because existing recorder is stopping: {recording.url}")
+                    logger.debug(
+                        f"Proceeding with check_if_live because existing recorder is stopping: {recording.url}"
+                    )
 
             if not recording.monitor_status:
                 recording.display_title = f"[{self._['monitor_stopped']}] {recording.title}"
@@ -435,7 +440,9 @@ class RecordingManager:
                 if not in_scheduled:
                     recording.status_info = RecordingStatus.NOT_IN_SCHEDULED_CHECK
                     recording.is_live = False
-                    logger.info(f"Skip Detection: {recording.url} not in scheduled check range {scheduled_time_range_list}")
+                    logger.info(
+                        f"Skip Detection: {recording.url} not in scheduled check range {scheduled_time_range_list}"
+                    )
                     self.app.event_bus.publish("update", recording)
                     return
 
@@ -447,8 +454,7 @@ class RecordingManager:
                 recording.platform_key = platform_key
                 await self.persist_recordings()
 
-            if self.settings.user_config["language"] != "zh_CN":
-                platform = platform_key
+            recording_platform = platform_key or platform
 
             output_dir = self.settings.get_video_save_path()
             await self.check_free_space(output_dir)
@@ -457,7 +463,7 @@ class RecordingManager:
                 return
             
             recording_info = {
-                "platform": platform,
+                "platform": recording_platform,
                 "platform_key": platform_key,
                 "live_url": recording.url,
                 "output_dir": output_dir,

@@ -1,71 +1,70 @@
 name: 🐛 Bug report
-description: 创建Bug报告以帮助项目改进。
-title: 🐛[BUG] 请输入标题
+description: Create a bug report to help improve the project.
+title: 🐛[BUG] Enter a title
 labels: bug
 body:
   - type: markdown
     attributes:
       value: |
-        📝 **请在上方的`title`中填写一个简洁明了的标题**，格式建议为：🐛[Bug] 简短描述。
-        例如：🐛[Bug] B站某些直播间无法录制。
+        📝 **Use the title field above to provide a clear, concise title**, for example: 🐛[Bug] Bilibili rooms fail to record.
   - type: checkboxes
     attributes:
-      label: ⚠️ 确认是否已存在类似问题
+      label: ⚠️ Check for existing issues
       description: >
-        🔍 [点击这里搜索历史issue](https://github.com/ihmily/StreamCap/issues?q=is%3Aissue) 
-        请确保你的问题没有被报告过。
+        🔍 [Search existing issues](https://github.com/ihmily/StreamCap/issues?q=is%3Aissue)
+        and make sure this problem has not already been reported.
       options:
-        - label: 我已经搜索过issues，没有找到类似问题
+        - label: I have searched existing issues and found no duplicate.
           required: true
   - type: dropdown
     attributes:
-      label: 🔧 运行方式
-      description: 请选择你是如何运行程序的。
+      label: 🔧 Runtime mode
+      description: Select how you run the application.
       options:
-        - 直接运行预构建的程序
-        - 使用源代码运行
+        - Prebuilt application
+        - Source code
     validations:
       required: true
   - type: dropdown
     attributes:
-      label: 🐍 如果是使用源代码运行，请选择你的Python环境版本
-      description: 请选择你运行程序的Python版本。
+      label: 🐍 Python version, if running from source
+      description: Select the Python version used to run the application.
       options:
         - Python 3.10
         - Python 3.11
         - Python 3.12
         - Python 3.13
-        - Other (请在问题中说明)
+        - Other (describe it in the issue)
     validations:
       required: false
   - type: dropdown
     attributes:
-      label: 💻 请选择你的系统环境
-      description: 请选择你运行程序的具体系统版本。
+      label: 💻 Operating system
+      description: Select your operating system.
       options:
         - Windows 10
         - Windows 11
         - macOS (Intel)
         - macOS (Apple Silicon)
-        - Other (请在问题中说明)
+        - Other (describe it in the issue)
     validations:
       required: true
   - type: checkboxes
     attributes:
-      label: ⚠️ 确认是否已经重试多次
+      label: ⚠️ Confirm that you retried
       description: >
-        有时可能是你的设备或者网络问题导致的。
+        Some failures can be caused by local device or network issues.
       options:
-        - label: 我已经尝试过多次，仍然出现问题
+        - label: I have retried multiple times and the problem still occurs.
           required: true
   - type: textarea
     attributes:
-      label: 🕹 复现步骤
+      label: 🕹 Reproduction steps
       description: |
-        **⚠️ 不能复现将会关闭issue.**
-        请按照以下格式填写：
-        1. 录制的直播间地址是...
-        2. 使用的录制格式是...
+        **⚠️ Issues that cannot be reproduced may be closed.**
+        Please use this format:
+        1. The stream URL is...
+        2. The recording format is...
         3. ...
       placeholder: |
         1. ...
@@ -75,13 +74,13 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: 😯 问题描述
-      description: 详细描述出现的问题，或提供有关截图。
+      label: 😯 Problem description
+      description: Describe the problem in detail. Screenshots are welcome.
     validations:
       required: true
   - type: textarea
     attributes:
-      label: 📜 错误信息
-      description: 如果有，请贴出相关的日志错误信息或者截图。
+      label: 📜 Error output
+      description: Paste relevant logs, errors, or screenshots if available.
     validations:
       required: false

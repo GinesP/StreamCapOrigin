@@ -406,7 +406,6 @@
     "success_restore_tip": "Tip: Default configuration has been restored",
     "query_restore_config_tip": "Are you sure you want to restore the default configuration?",
     "success_save_config_tip": "Tip: Configuration has been saved",
-    "Chinese": "简体中文",
     "English": "English",
     "Spanish": "Español",
     "select_btn_tip": "Select the save path",

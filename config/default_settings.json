@@ -1,5 +1,5 @@
 {
-    "language": "Chinese",
+    "language": "English",
     "live_save_path": "",
     "filename_includes_title": false,
     "remove_emojis": false,
@@ -39,7 +39,7 @@
     "serverchan_enabled": false,
     "serverchan_sendkey": "",
     "serverchan_channel": "9",
-    "serverchan_tags": "直播通知",
+    "serverchan_tags": "Live notification",
     "telegram_enabled": false,
     "email_enabled": false,
     "dingtalk_webhook_url": "",

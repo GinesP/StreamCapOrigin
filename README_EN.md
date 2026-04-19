@@ -13,7 +13,7 @@
       <img alt="Downloads" src="https://img.shields.io/github/downloads/ihmily/StreamCap/total"></a>
 </p>
 <div align="center">
-  English / <a href="./README.md">Chinese</a>
+  English / <a href="./README.md">Español</a>
 </div><br>
 
 
@@ -77,7 +77,7 @@ pip install -r requirements.txt
 pip install -r requirements-web.txt
 ```
 
-3.**Configure the Runtime Environment**：
+3.**Configure the Runtime Environment**:
 
 Copy the `.env.example` sample configuration file and rename it to `.env`
 
@@ -149,7 +149,7 @@ If no specific note is provided, the live stream room URL is used for recording 
 Douyin:
 https://live.douyin.com/745964462470
 https://v.douyin.com/iQFeBnt/ (Node.js Required)
-https://live.douyin.com/yall1102  （Link+unique ID）
+https://live.douyin.com/yall1102  (Link + unique ID)
 https://v.douyin.com/CeiU5cbX  (Anchor's homepage URL)
 
 TikTok:
