@@ -3,9 +3,9 @@
 </div>
 <p align="center">
   <img alt="Python version" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
-  <a href="https://github.com/ihmily/StreamCap">
+  <a href="https://github.com/GinesP/StreamCapOrigin">
       <img alt="Supported Platforms" src="https://img.shields.io/badge/Platforms-Win%20%7C%20Mac%20%7C%20Linux-6B5BFF.svg"></a>
-  <a href="https://hub.docker.com/r/ihmily/streamcap/tags">
+  <a href="https://hub.docker.com/r/GinesP/StreamCapOrigin/tags">
       <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/ihmily/streamcap?label=Docker%20Pulls&color=2496ED&logo=docker"></a>
   <a href="https://github.com/GinesP/StreamCapOrigin/releases/latest">
       <img alt="Latest Release" src="https://img.shields.io/github/v/release/GinesP/StreamCapOrigin"></a>
