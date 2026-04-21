@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -83,7 +84,7 @@ class RecordingListDelegate(QStyledItemDelegate):
     ACTIONS = [
         ("folder", "folder"),
         ("play", "play"),
-        ("stop_monitoring", "stop"),
+        ("stop_monitoring", "pause"),
         ("preview", "preview"),
         ("edit", "edit"),
         ("info", "info"),
@@ -93,7 +94,26 @@ class RecordingListDelegate(QStyledItemDelegate):
     def __init__(self, app_context, parent=None):
         super().__init__(parent)
         self.app = app_context
+        self._card_l = self.app.language_manager.language.get("recording_card", {})
         self.hovered_action: tuple[str, str] | None = None
+
+    def action_tooltip(self, action: str, rec) -> str:
+        if action == "play":
+            if RecordingStateLogic.is_actively_recording(rec):
+                return self._card_l.get("stop_record", "Stop Recording")
+            if rec.monitor_status:
+                return self._card_l.get("stop_monitor", "Stop Monitoring")
+            return self._card_l.get("start_monitor", "Start Monitoring")
+
+        tooltips = {
+            "folder": self._card_l.get("open_folder", "Open Folder"),
+            "stop_monitoring": self._card_l.get("stop_monitor", "Stop Monitoring"),
+            "preview": "Preview",
+            "edit": self._card_l.get("edit_record_config", "Edit"),
+            "info": self._card_l.get("recording_info", "Info"),
+            "delete": self._card_l.get("delete_monitor", "Delete"),
+        }
+        return tooltips.get(action, "")
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:  # noqa: N802
         return QSize(option.rect.width(), self.ROW_HEIGHT)
@@ -191,9 +211,11 @@ class RecordingListDelegate(QStyledItemDelegate):
             if action == "stop_monitoring" and not (rec is not None and RecordingStateLogic.should_show_stop_monitoring_action(rec)):
                 continue
             actual_icon = icon_name
-            is_active = rec is not None and RecordingStateLogic.has_active_session(rec)
-            if action == "play" and is_active:
-                actual_icon = "stop"
+            if action == "play" and rec is not None:
+                if RecordingStateLogic.is_actively_recording(rec):
+                    actual_icon = "stop"
+                elif getattr(rec, "monitor_status", False):
+                    actual_icon = "pause"
             rects.append((action, actual_icon, QRect(x, row_rect.y() + 23, 38, 28)))
             x -= 62
         rects.reverse()
@@ -470,13 +492,14 @@ class QtRecordingsView(QWidget):
 
     def eventFilter(self, obj, event):  # noqa: N802
         if obj is self.list_view.viewport() and event.type() == QEvent.Type.MouseMove:
-            self._update_list_cursor(event.position().toPoint())
+            self._update_list_cursor(event.position().toPoint(), event.globalPosition().toPoint())
         elif obj is self.list_view.viewport() and event.type() in {
             QEvent.Type.Leave,
             QEvent.Type.HoverLeave,
         }:
             self._set_hovered_list_action(None)
             self.list_view.viewport().unsetCursor()
+            QToolTip.hideText()
         elif obj is self.list_view.viewport() and event.type() == QEvent.Type.MouseButtonRelease:
             index = self.list_view.indexAt(event.position().toPoint())
             if index.isValid():
@@ -488,11 +511,12 @@ class QtRecordingsView(QWidget):
                     return True
         return super().eventFilter(obj, event)
 
-    def _update_list_cursor(self, pos) -> None:
+    def _update_list_cursor(self, pos, global_pos) -> None:
         index = self.list_view.indexAt(pos)
         if not index.isValid():
             self._set_hovered_list_action(None)
             self.list_view.viewport().unsetCursor()
+            QToolTip.hideText()
             return
 
         rec = index.data(_RECORDING_ROLE)
@@ -501,9 +525,15 @@ class QtRecordingsView(QWidget):
         if action:
             self._set_hovered_list_action((rec.rec_id, action))
             self.list_view.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
+            tooltip = self.list_delegate.action_tooltip(action, rec)
+            if tooltip:
+                QToolTip.showText(global_pos, tooltip, self.list_view.viewport())
+            else:
+                QToolTip.hideText()
         else:
             self._set_hovered_list_action(None)
             self.list_view.viewport().unsetCursor()
+            QToolTip.hideText()
 
     def _set_hovered_list_action(self, hovered_action: tuple[str, str] | None) -> None:
         if self._hovered_list_action == hovered_action:

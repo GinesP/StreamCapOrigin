@@ -146,7 +146,7 @@ def _mk_btn(icon_name: str, tip: str, parent: QWidget) -> QPushButton:
 _ACTION_DEFS = [
     ("folder", "folder", "Open Folder"),
     ("play", "play", "Start / Stop"),
-    ("stop_monitoring", "stop", "Stop Monitoring"),
+    ("stop_monitoring", "pause", "Stop Monitoring"),
     ("preview", "preview", "Preview"),
     ("edit", "edit", "Edit"),
     ("info", "info", "Info"),
@@ -416,7 +416,7 @@ class QtRecordingCard(QFrame):
         if RecordingStateLogic.is_actively_recording(rec):
             icon_key, tip = "stop", "Stop Recording"
         elif rec.monitor_status:
-            icon_key, tip = "stop", "Stop Monitoring"
+            icon_key, tip = "pause", "Stop Monitoring"
         else:
             icon_key, tip = "play", "Start Monitoring"
             
