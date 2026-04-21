@@ -19,6 +19,7 @@
 - `pyproject.toml` is the technical version source of truth.
 - Keep `config/version.json` synchronized with `pyproject.toml` via `scripts/bump_version.py`.
 - The Windows Qt release build uses `build_qt_nuitka.bat`, which validates version metadata before compiling `main_qt.py`.
+- `package_windows_installer.bat` is the current packaging entry point; in release mode it can validate/bump version metadata, create the release version commit, and create the git tag after a successful installer build.
 - The build output is `dist\main_qt.dist\StreamCap.exe`; the Nuitka report is `dist\nuitka-report.xml`.
 
 ## Python
