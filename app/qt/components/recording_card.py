@@ -39,11 +39,12 @@ from PySide6.QtWidgets import (
     QSizePolicy, QVBoxLayout, QWidget,
 )
 
-from app.models.recording.recording_status_model import RecordingStatus, CardStateType
+from app.models.recording.recording_status_model import CardStateType
 from app.utils.logger import logger
 from app.utils.i18n import tr
 from app.qt.themes.theme import theme_manager
 from app.qt.utils.iconography import apply_button_icon
+from app.core.recording.recording_state_logic import RecordingStateLogic
 
 # ── Palette ───────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,7 @@ def _mk_btn(icon_name: str, tip: str, parent: QWidget) -> QPushButton:
 _ACTION_DEFS = [
     ("folder", "folder", "Open Folder"),
     ("play", "play", "Start / Stop"),
+    ("stop_monitoring", "stop", "Stop Monitoring"),
     ("preview", "preview", "Preview"),
     ("edit", "edit", "Edit"),
     ("info", "info", "Info"),
@@ -359,14 +361,13 @@ class QtRecordingCard(QFrame):
     def update_content(self) -> None:
         rec = self.recording
 
-        from app.core.recording.recording_state_logic import RecordingStateLogic
         state = RecordingStateLogic.get_card_state(rec)
         color = _STATUS_COLOR.get(state, "#546E7A")
         self._status_color = color
 
         # Title
         name = rec.streamer_name or "Unknown"
-        if rec.status_info == RecordingStatus.RECORDING and getattr(rec, "live_title", None):
+        if RecordingStateLogic.should_show_live_title(rec):
             name = f"{rec.streamer_name} — {rec.live_title}"
 
         if self._g_name.text() != name:
@@ -375,7 +376,8 @@ class QtRecordingCard(QFrame):
 
         # Duration
         dur = self.app.record_manager.get_duration(rec)
-        dur_t = f"  {dur}" if (rec.is_recording or rec.is_live) and dur != "00:00:00" else ""
+        show_duration = RecordingStateLogic.should_show_duration(rec)
+        dur_t = f"  {dur}" if show_duration and dur != "00:00:00" else ""
 
         # Avatar letter
         letter = rec.streamer_name[0].upper() if rec.streamer_name else "?"
@@ -408,8 +410,10 @@ class QtRecordingCard(QFrame):
         # play button
         play_btn_g = self._g_btns.get("play")
         play_btn_l = self._l_btns.get("play")
+        stop_monitor_btn_g = self._g_btns.get("stop_monitoring")
+        stop_monitor_btn_l = self._l_btns.get("stop_monitoring")
         
-        if rec.is_recording:
+        if RecordingStateLogic.is_actively_recording(rec):
             icon_key, tip = "stop", "Stop Recording"
         elif rec.monitor_status:
             icon_key, tip = "stop", "Stop Monitoring"
@@ -422,6 +426,14 @@ class QtRecordingCard(QFrame):
         if play_btn_l:
             apply_button_icon(play_btn_l, icon_key, size=14, color=theme_manager.get_color("text_sec"))
             play_btn_l.setToolTip(tip)
+
+        show_stop_monitoring = RecordingStateLogic.should_show_stop_monitoring_action(rec)
+        if stop_monitor_btn_g:
+            stop_monitor_btn_g.setVisible(show_stop_monitoring)
+            stop_monitor_btn_g.setToolTip("Stop Monitoring")
+        if stop_monitor_btn_l:
+            stop_monitor_btn_l.setVisible(show_stop_monitoring)
+            stop_monitor_btn_l.setToolTip("Stop Monitoring")
 
         # Badges
         self._fill_badges(rec, self._g_badge_row, self, "grid")
@@ -557,13 +569,23 @@ class QtRecordingCard(QFrame):
             utils.open_folder(path)
 
         elif name == "play":
-            if rec.is_recording or rec.monitor_status:
+            if RecordingStateLogic.is_actively_recording(rec):
+                self.app.record_manager.stop_recording(rec, manually_stopped=True)
+                self.app.event_bus.publish("update", rec)
+                self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
+            elif RecordingStateLogic.has_active_session(rec):
                 self.app.event_bus.run_task(
                     self.app.record_manager.stop_monitor_recording, rec
                 )
             else:
                 self.app.event_bus.run_task(
                     self.app.record_manager.start_monitor_recording, rec
+                )
+
+        elif name == "stop_monitoring":
+            if RecordingStateLogic.should_show_stop_monitoring_action(rec):
+                self.app.event_bus.run_task(
+                    self.app.record_manager.stop_monitor_recording, rec
                 )
 
         elif name == "preview":

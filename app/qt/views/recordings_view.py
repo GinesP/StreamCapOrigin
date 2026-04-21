@@ -32,6 +32,7 @@ from app.qt.themes.theme import QUEUE_COLORS, theme_manager
 from app.qt.utils.elevation import apply_elevation
 from app.qt.utils.filters import RecordingFilters
 from app.qt.utils.iconography import apply_button_icon, icon_pixmap
+from app.core.recording.recording_state_logic import RecordingStateLogic
 from app.utils.i18n import tr
 from app.utils.logger import logger
 
@@ -82,6 +83,7 @@ class RecordingListDelegate(QStyledItemDelegate):
     ACTIONS = [
         ("folder", "folder"),
         ("play", "play"),
+        ("stop_monitoring", "stop"),
         ("preview", "preview"),
         ("edit", "edit"),
         ("info", "info"),
@@ -101,7 +103,6 @@ class RecordingListDelegate(QStyledItemDelegate):
         if rec is None:
             return
 
-        from app.core.recording.recording_state_logic import RecordingStateLogic
         from app.qt.components.recording_card import _STATUS_COLOR
 
         state = RecordingStateLogic.get_card_state(rec)
@@ -139,7 +140,7 @@ class RecordingListDelegate(QStyledItemDelegate):
         action_left = row.right() - 360
         name_right = max(text_x + 120, action_left - 20)
         name = rec.streamer_name or "Unknown"
-        if rec.status_info and getattr(rec, "is_recording", False) and getattr(rec, "live_title", None):
+        if RecordingStateLogic.should_show_live_title(rec):
             name = f"{rec.streamer_name} — {rec.live_title}"
 
         painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
@@ -187,10 +188,10 @@ class RecordingListDelegate(QStyledItemDelegate):
         x = row_rect.right() - 34
         rects: list[tuple[str, str, QRect]] = []
         for action, icon_name in reversed(cls.ACTIONS):
+            if action == "stop_monitoring" and not (rec is not None and RecordingStateLogic.should_show_stop_monitoring_action(rec)):
+                continue
             actual_icon = icon_name
-            is_active = rec is not None and (
-                getattr(rec, "is_recording", False) or getattr(rec, "monitor_status", False)
-            )
+            is_active = rec is not None and RecordingStateLogic.has_active_session(rec)
             if action == "play" and is_active:
                 actual_icon = "stop"
             rects.append((action, actual_icon, QRect(x, row_rect.y() + 23, 38, 28)))
@@ -849,10 +850,18 @@ class QtRecordingsView(QWidget):
             utils.open_folder(path)
 
         elif name == "play":
-            if rec.is_recording or rec.monitor_status:
+            if RecordingStateLogic.is_actively_recording(rec):
+                self.app.record_manager.stop_recording(rec, manually_stopped=True)
+                self.app.event_bus.publish("update", rec)
+                self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
+            elif RecordingStateLogic.has_active_session(rec):
                 self.app.event_bus.run_task(self.app.record_manager.stop_monitor_recording, rec)
             else:
                 self.app.event_bus.run_task(self.app.record_manager.start_monitor_recording, rec)
+
+        elif name == "stop_monitoring":
+            if RecordingStateLogic.should_show_stop_monitoring_action(rec):
+                self.app.event_bus.run_task(self.app.record_manager.stop_monitor_recording, rec)
 
         elif name == "preview":
             self._preview_recording(rec)

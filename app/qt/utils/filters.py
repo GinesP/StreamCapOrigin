@@ -4,7 +4,7 @@ from app.models.recording.recording_status_model import RecordingStatus
 class RecordingFilters:
     @staticmethod
     def is_recording(recording) -> bool:
-        return recording.is_recording
+        return RecordingStateLogic.is_actively_recording(recording)
 
     @staticmethod
     def is_error(recording) -> bool:

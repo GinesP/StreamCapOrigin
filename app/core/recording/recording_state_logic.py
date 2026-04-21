@@ -2,6 +2,7 @@ from app.models.recording.recording_status_model import CardStateType, Recording
 
 class RecordingStateLogic:
     ERROR_STATUSES = [RecordingStatus.RECORDING_ERROR, RecordingStatus.LIVE_STATUS_CHECK_ERROR]
+    ACTIVE_RECORDING_STATUSES = [RecordingStatus.RECORDING, RecordingStatus.PREPARING_RECORDING]
     
     @staticmethod
     def get_card_state(recording) -> CardStateType:
@@ -20,3 +21,29 @@ class RecordingStateLogic:
               recording.status_info == RecordingStatus.NOT_IN_SCHEDULED_CHECK):
             return CardStateType.STOPPED
         return CardStateType.UNKNOWN
+
+    @classmethod
+    def is_actively_recording(cls, recording) -> bool:
+        return bool(
+            getattr(recording, "is_recording", False)
+            or getattr(recording, "status_info", None) in cls.ACTIVE_RECORDING_STATUSES
+        )
+
+    @classmethod
+    def should_show_duration(cls, recording) -> bool:
+        return cls.is_actively_recording(recording)
+
+    @classmethod
+    def should_show_live_title(cls, recording) -> bool:
+        return cls.is_actively_recording(recording) and bool(getattr(recording, "live_title", None))
+
+    @classmethod
+    def has_active_session(cls, recording) -> bool:
+        return cls.is_actively_recording(recording) or bool(getattr(recording, "monitor_status", False))
+
+    @classmethod
+    def should_show_stop_monitoring_action(cls, recording) -> bool:
+        return bool(
+            getattr(recording, "monitor_status", False)
+            and cls.is_actively_recording(recording)
+        )
