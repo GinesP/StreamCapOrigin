@@ -191,7 +191,7 @@ if "%RELEASE_MODE%"=="1" (
     echo.
     echo Release prepared successfully.
     if "%RELEASE_COMMIT_CREATED%"=="1" (
-        echo Commit created: chore(release): bump version to !RELEASE_VERSION!
+        echo Commit created: chore^(release^): bump version to !RELEASE_VERSION!
     )
     echo Tag created: v!RELEASE_VERSION!
 )
