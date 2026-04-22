@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 set "ROOT_DIR=%~dp0"
 cd /d "%ROOT_DIR%"
@@ -72,11 +72,11 @@ if "%RELEASE_MODE%"=="1" (
             echo [release 1/6] Setting version to %BUMP_VALUE%...
             "venv\Scripts\python.exe" "scripts\bump_version.py" --set %BUMP_VALUE%
         )
-        if %ERRORLEVEL% neq 0 exit /b 1
+        if errorlevel 1 exit /b 1
     ) else (
         echo [release 1/6] Validating current version metadata...
         "venv\Scripts\python.exe" "scripts\bump_version.py" --check
-        if %ERRORLEVEL% neq 0 exit /b 1
+        if errorlevel 1 exit /b 1
     )
 
     for /f "delims=" %%V in ('venv\Scripts\python.exe scripts\bump_version.py --current') do set "RELEASE_VERSION=%%V"
@@ -89,16 +89,16 @@ if "%RELEASE_MODE%"=="1" (
     if errorlevel 1 (
         echo [release 2/6] Creating release version commit...
         git add pyproject.toml config/version.json
-        git commit -m "chore(release): bump version to %RELEASE_VERSION%"
-        if %ERRORLEVEL% neq 0 exit /b 1
+        git commit -m "chore(release): bump version to !RELEASE_VERSION!"
+        if errorlevel 1 exit /b 1
         set "RELEASE_COMMIT_CREATED=1"
     ) else (
         echo [release 2/6] Version files unchanged; skipping release bump commit.
     )
 
-    git rev-parse -q --verify "refs/tags/v%RELEASE_VERSION%" >nul 2>nul
-    if %ERRORLEVEL% equ 0 (
-        echo [ERROR] Tag v%RELEASE_VERSION% already exists.
+    git rev-parse -q --verify "refs/tags/v!RELEASE_VERSION!" >nul 2>nul
+    if not errorlevel 1 (
+        echo [ERROR] Tag v!RELEASE_VERSION! already exists.
         exit /b 1
     )
 )
@@ -181,19 +181,19 @@ echo ====================================================
 
 if "%RELEASE_MODE%"=="1" (
     echo.
-    echo [release 6/6] Creating git tag v%RELEASE_VERSION%...
-    git tag "v%RELEASE_VERSION%"
-    if %ERRORLEVEL% neq 0 (
-        echo [ERROR] Failed to create git tag v%RELEASE_VERSION%.
+    echo [release 6/6] Creating git tag v!RELEASE_VERSION!...
+    git tag "v!RELEASE_VERSION!"
+    if errorlevel 1 (
+        echo [ERROR] Failed to create git tag v!RELEASE_VERSION!.
         exit /b 1
     )
 
     echo.
     echo Release prepared successfully.
     if "%RELEASE_COMMIT_CREATED%"=="1" (
-        echo Commit created: chore(release): bump version to %RELEASE_VERSION%
+        echo Commit created: chore(release): bump version to !RELEASE_VERSION!
     )
-    echo Tag created: v%RELEASE_VERSION%
+    echo Tag created: v!RELEASE_VERSION!
 )
 
 exit /b 0

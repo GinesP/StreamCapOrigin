@@ -173,9 +173,28 @@ class RecordingListDelegate(QStyledItemDelegate):
         )
 
         status_text = rec.status_info or "Idle"
+        status_rect = QRect(text_x, row.y() + 41, name_right - text_x, 18)
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
         painter.setPen(QColor(status_color))
-        painter.drawText(QRect(text_x, row.y() + 41, name_right - text_x, 18), status_text)
+        painter.drawText(status_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, status_text)
+
+        duration_text = ""
+        if RecordingStateLogic.should_show_duration(rec):
+            duration = self.app.record_manager.get_duration(rec)
+            if duration != "00:00:00":
+                duration_text = f"  {duration}"
+
+        if duration_text:
+            status_metrics = painter.fontMetrics()
+            duration_x = text_x + status_metrics.horizontalAdvance(status_text)
+            duration_rect = QRect(duration_x, status_rect.y(), max(0, name_right - duration_x), status_rect.height())
+            painter.setFont(QFont("Segoe UI", 8))
+            painter.setPen(QColor("#777777"))
+            painter.drawText(
+                duration_rect,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                painter.fontMetrics().elidedText(duration_text, Qt.TextElideMode.ElideRight, duration_rect.width()),
+            )
 
         badge_x = row.right() - 520
         queue_label, queue_color = self._queue_badge(rec)
