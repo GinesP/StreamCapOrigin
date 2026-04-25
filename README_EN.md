@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/images/logo.svg" alt="StreamCap" />
+  <img src="./assets/images/logo.svg" alt="StreamCap Origin" />
 </div>
 <p align="center">
   <img alt="Python version" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">

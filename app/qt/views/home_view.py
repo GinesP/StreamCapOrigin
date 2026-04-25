@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import collections
+from pathlib import Path
 from typing import Sequence
 
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer, QRectF, QSize
 from PySide6.QtGui import (
-    QColor, QPainter, QBrush, QLinearGradient, QPen, QFont, QDesktopServices,
+    QColor, QPainter, QBrush, QLinearGradient, QPen, QDesktopServices, QPixmap,
     QFontMetrics,
 )
 from PySide6.QtWidgets import (
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
 from app.qt.themes.theme import theme_manager, STATUS_COLORS
 from app.qt.utils.elevation import apply_elevation
 from app.qt.utils.filters import RecordingFilters
+from app.qt.utils.typography import DISPLAY_FONT_FAMILY, body_font
 from app.utils.logger import logger
 
 
@@ -229,6 +231,7 @@ _FAST_COLOR = "#4CAF50"
 _MEDIUM_COLOR = "#FF9800"
 _SLOW_COLOR = "#F44336"
 _BUSY_ALPHA = 0.45
+_INTELLIGENCE_CHART_HEIGHT = 130
 
 
 class QueueBarChart(QWidget):
@@ -236,11 +239,13 @@ class QueueBarChart(QWidget):
     _GROUP_GAP = 14
     _BAR_GAP = 4
     _BOTTOM_PAD = 28
-    _TOP_PAD = 12
+    _TOP_PAD = 16
+    _LEFT_PAD = 34
+    _RIGHT_PAD = 10
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setMinimumHeight(130)
+        self.setFixedHeight(_INTELLIGENCE_CHART_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self._disp = [0, 0, 0]
@@ -289,7 +294,10 @@ class QueueBarChart(QWidget):
         w = self.width()
         h = self.height()
         bottom = h - self._BOTTOM_PAD
-        chart_h = bottom - self._TOP_PAD
+        chart_left = self._LEFT_PAD
+        chart_right = w - self._RIGHT_PAD
+        chart_w = max(chart_right - chart_left, 1)
+        chart_h = max(bottom - self._TOP_PAD, 1)
 
         p.fillRect(self.rect(), QColor(c["surface"]))
 
@@ -300,11 +308,29 @@ class QueueBarChart(QWidget):
         group_w = self._BAR_WIDTH * 2 + self._BAR_GAP
 
         total_w = len(labels) * group_w + (len(labels) - 1) * self._GROUP_GAP
-        x_start = (w - total_w) // 2
+        x_start = chart_left + max((chart_w - total_w) // 2, 0)
 
-        font = QFont("Segoe UI", 9)
+        font = body_font(9)
         p.setFont(font)
         fm = QFontMetrics(font)
+        axis_font = body_font(8)
+        axis_fm = QFontMetrics(axis_font)
+
+        for ratio in (1.0, 0.5, 0.0):
+            y = self._TOP_PAD + int((1.0 - ratio) * chart_h)
+            p.setPen(QPen(QColor(c["border"]), 1))
+            p.drawLine(chart_left, y, chart_right, y)
+
+            axis_value = str(int(round(max_val * ratio)))
+            p.setPen(QPen(QColor(c["text_muted"])))
+            p.setFont(axis_font)
+            p.drawText(
+                chart_left - axis_fm.horizontalAdvance(axis_value) - 6,
+                y + axis_fm.ascent() // 2,
+                axis_value,
+            )
+
+        p.setFont(font)
 
         for i, (col, lbl) in enumerate(zip(colors, labels)):
             gx = x_start + i * (group_w + self._GROUP_GAP)
@@ -346,16 +372,22 @@ class QueueBarChart(QWidget):
         if self._waiting > 0:
             p.setPen(QPen(QColor(c["text_sec"])))
             wait_txt = f"{self._waiting} {l_intel.get('waiting', '')}"
-            p.setFont(QFont("Segoe UI", 8))
-            p.drawText(w - fm.horizontalAdvance(wait_txt) - 8, h - 4, wait_txt)
+            wait_font = body_font(8)
+            wait_fm = QFontMetrics(wait_font)
+            p.setFont(wait_font)
+            p.drawText(w - wait_fm.horizontalAdvance(wait_txt) - 8, h - 4, wait_txt)
 
 
 class SparklineChart(QWidget):
     HISTORY = 40
+    _TOP_PAD = 16
+    _BOTTOM_PAD = 24
+    _LEFT_PAD = 34
+    _RIGHT_PAD = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setMinimumHeight(60)
+        self.setFixedHeight(_INTELLIGENCE_CHART_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._data: collections.deque[int] = collections.deque(maxlen=self.HISTORY)
         theme_manager.themeChanged.connect(self.update)
@@ -374,23 +406,40 @@ class SparklineChart(QWidget):
         c = theme_manager.colors
         w = self.width()
         h = self.height()
-        pad = 6
+        left_pad = self._LEFT_PAD
+        right_pad = self._RIGHT_PAD
+        top_pad = self._TOP_PAD
+        bottom_pad = self._BOTTOM_PAD
 
         p.fillRect(self.rect(), QColor(c["surface"]))
 
         data = list(self._data)
         n = len(data)
         max_v = max(data) or 1
-        step = (w - pad * 2) / max(n - 1, 1)
+        chart_w = max(w - left_pad - right_pad, 1)
+        chart_h = max(h - top_pad - bottom_pad, 1)
+        step = chart_w / max(n - 1, 1)
         accent = theme_manager.get_color("accent")
+        axis_font = body_font(8)
+        axis_fm = QFontMetrics(axis_font)
+
+        for ratio in (1.0, 0.5, 0.0):
+            y = top_pad + int((1.0 - ratio) * chart_h)
+            p.setPen(QPen(QColor(c["border"]), 1))
+            p.drawLine(left_pad, y, w - right_pad, y)
+
+            axis_value = str(int(round(max_v * ratio)))
+            p.setPen(QPen(QColor(c["text_muted"])))
+            p.setFont(axis_font)
+            p.drawText(left_pad - axis_fm.horizontalAdvance(axis_value) - 6, y + axis_fm.ascent() // 2, axis_value)
 
         from PySide6.QtGui import QPolygonF
         from PySide6.QtCore import QPointF
 
         pts = []
         for i, v in enumerate(data):
-            x = pad + i * step
-            y = (h - pad) - (v / max_v) * (h - pad * 2)
+            x = left_pad + i * step
+            y = (h - bottom_pad) - (v / max_v) * chart_h
             pts.append(QPointF(x, y))
 
         grad = QLinearGradient(0, 0, 0, h)
@@ -401,7 +450,7 @@ class SparklineChart(QWidget):
         grad.setColorAt(0, col_top)
         grad.setColorAt(1, col_bot)
 
-        fill_pts = [QPointF(pts[0].x(), h - pad)] + pts + [QPointF(pts[-1].x(), h - pad)]
+        fill_pts = [QPointF(pts[0].x(), h - bottom_pad)] + pts + [QPointF(pts[-1].x(), h - bottom_pad)]
         poly = QPolygonF(fill_pts)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(grad))
@@ -421,7 +470,7 @@ class SparklineChart(QWidget):
         p.drawEllipse(last_pt, 4, 4)
 
         p.setPen(QPen(QColor(c["border"]), 1))
-        p.drawLine(pad, h - pad, w - pad, h - pad)
+        p.drawLine(left_pad, h - bottom_pad, w - right_pad, h - bottom_pad)
 
 
 class IntelligenceMonitor(QFrame):
@@ -724,16 +773,36 @@ class QtHomeView(QWidget):
                 border-radius: 12px;
             }}
         """)
-        h_layout = QVBoxLayout(wrapper)
+        h_layout = QHBoxLayout(wrapper)
         h_layout.setContentsMargins(24, 20, 24, 20)
-        h_layout.setSpacing(6)
+        h_layout.setSpacing(16)
+
+        logo = QLabel()
+        logo.setFixedSize(56, 56)
+        logo.setStyleSheet("background: transparent;")
+        logo_path = Path(__file__).resolve().parents[3] / "assets" / "icons" / "streamcap_origin_app_icon.png"
+        if logo_path.exists():
+            pixmap = QPixmap(str(logo_path)).scaled(
+                56,
+                56,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            logo.setPixmap(pixmap)
+            logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._header_logo_lbl = logo
+        h_layout.addWidget(logo, 0, Qt.AlignmentFlag.AlignTop)
+
+        text_layout = QVBoxLayout()
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(6)
 
         title = QLabel(self.language["home_page"]["app_title"])
         self._header_title_lbl = title
         title.setStyleSheet(
-            f"font-size: 34px; font-weight: 800; color: {c['accent']}; background: transparent;"
+            f'font-family: "{DISPLAY_FONT_FAMILY}"; font-size: 34px; font-weight: 800; color: {c["accent"]}; background: transparent;'
         )
-        h_layout.addWidget(title)
+        text_layout.addWidget(title)
 
         subtitle = QLabel(
             self.language["home_page"]["tagline"]
@@ -742,7 +811,8 @@ class QtHomeView(QWidget):
         subtitle.setStyleSheet(
             f"font-size: 14px; color: {c['text_sec']}; background: transparent;"
         )
-        h_layout.addWidget(subtitle)
+        text_layout.addWidget(subtitle)
+        h_layout.addLayout(text_layout, 1)
 
         self._main_layout.addWidget(wrapper)
         self._header_wrapper = wrapper
@@ -973,7 +1043,7 @@ class QtHomeView(QWidget):
             lbl.setStyleSheet(section_style)
             
         self._header_title_lbl.setStyleSheet(
-            f"font-size: 34px; font-weight: 800; color: {c['accent']}; background: transparent;"
+            f'font-family: "{DISPLAY_FONT_FAMILY}"; font-size: 34px; font-weight: 800; color: {c["accent"]}; background: transparent;'
         )
 
         self._tip_frame.setStyleSheet(f"""

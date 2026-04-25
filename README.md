@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/images/logo.svg" alt="StreamCap" />
+  <img src="./assets/images/logo.svg" alt="StreamCap Origin" />
 </div>
 <p align="center">
   <img alt="Python version" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
@@ -16,7 +16,7 @@
   Español / <a href="./README_EN.md">English</a>
 </div><br>
 
-# StreamCap
+# StreamCap Origin
 
 StreamCap es un cliente multiplataforma para grabar directos, basado en FFmpeg y StreamGet. Permite monitorizar, grabar y gestionar streams de más de 40 plataformas con soporte para grabación por lotes, comprobación periódica, horarios de monitorización y transcodificación automática.
 

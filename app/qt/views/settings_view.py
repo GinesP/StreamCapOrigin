@@ -190,7 +190,7 @@ class QtSettingsView(QWidget):
         path_row = QHBoxLayout()
         path_row.addWidget(self.path_input)
         self.browse_btn = QPushButton(self._l.get("select", "Browse"))
-        self.browse_btn.setFixedWidth(80)
+        self.browse_btn.setMinimumWidth(120)
         self.browse_btn.clicked.connect(self._on_browse_clicked)
         path_row.addWidget(self.browse_btn)
         path_widget = QWidget()
@@ -345,7 +345,7 @@ class QtSettingsView(QWidget):
                 row = QHBoxLayout()
                 row.addWidget(field)
                 btn = QPushButton("Import JSON")
-                btn.setFixedWidth(100)
+                btn.setMinimumWidth(140)
                 btn.clicked.connect(lambda _, f=field, plat=p: self._on_browse_cookie_clicked(f, plat))
                 row.addWidget(btn)
                 wrapper = QWidget()
@@ -462,7 +462,7 @@ class QtSettingsView(QWidget):
         self.notif_enabled.setChecked(s.get_config_value("system_notification_enabled", False))
         self.start_notif.setChecked(s.get_config_value("stream_start_notification_enabled", False))
         self.end_notif.setChecked(s.get_config_value("stream_end_notification_enabled", False))
-        self.notif_title.setText(s.get_config_value("custom_notification_title", "StreamCap"))
+        self.notif_title.setText(s.get_config_value("custom_notification_title", "StreamCap Origin"))
         
         # Telegram & Webhook
         self.tg_token.setText(s.get_config_value("telegram_bot_token", ""))

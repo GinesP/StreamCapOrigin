@@ -15,12 +15,12 @@ from PySide6.QtWidgets import (
     QSlider,
     QWidget
 )
-from PySide6.QtGui import QFont
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
 from app.utils.logger import logger
 from app.utils.i18n import tr
+from app.qt.utils.typography import body_font
 
 
 class QtVideoPlayer(QDialog):
@@ -32,7 +32,7 @@ class QtVideoPlayer(QDialog):
         self.setMinimumSize(800, 500)
         
         # Set default font to avoid setPointSize <= 0 warning
-        self.setFont(QFont("Segoe UI", 10))
+        self.setFont(body_font(10))
         
         self._setup_ui()
         self._setup_player()

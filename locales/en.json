@@ -17,8 +17,8 @@
     "sidebar_compact_auto": "Compact mode enabled for narrow window"
   },
   "home_page": {
-    "app_title": "StreamCap",
-    "welcome": "Welcome to StreamCap",
+    "app_title": "StreamCap Origin",
+    "welcome": "Welcome to StreamCap Origin",
     "tagline": "Record every exciting moment of the live broadcast",
     "start_recording": "Start Recording",
     "recording_list": "Recording List",
@@ -543,7 +543,7 @@
     "exit": "Exit Program"
   },
   "login_page": {
-    "login_title": "StreamCap Login",
+    "login_title": "StreamCap Origin Login",
     "login_subtitle": "Please login to your account",
     "username": "Username",
     "password": "Password",

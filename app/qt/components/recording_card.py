@@ -31,9 +31,7 @@ from __future__ import annotations
 import os
 
 from PySide6.QtCore import Qt, QRect, QRectF
-from PySide6.QtGui import (
-    QColor, QFont, QPainter, QBrush, QPen, QPainterPath,
-)
+from PySide6.QtGui import QColor, QFont, QPainter, QBrush, QPen, QPainterPath
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton,
     QSizePolicy, QVBoxLayout, QWidget,
@@ -44,6 +42,7 @@ from app.utils.logger import logger
 from app.utils.i18n import tr
 from app.qt.themes.theme import theme_manager
 from app.qt.utils.iconography import apply_button_icon
+from app.qt.utils.typography import body_font
 from app.core.recording.recording_state_logic import RecordingStateLogic
 
 # ── Palette ───────────────────────────────────────────────────────────────────
@@ -70,7 +69,7 @@ class _Avatar(QLabel):
         self._bg  = "#4A4A6A"
         self.setFixedSize(size, size)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setFont(QFont("Segoe UI", max(8, size // 3), QFont.Weight.Bold))
+        self.setFont(body_font(max(8, size // 3), QFont.Weight.Bold))
         self._refresh_style()
 
     def _refresh_style(self) -> None:

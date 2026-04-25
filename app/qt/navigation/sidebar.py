@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from app.qt.themes.theme import theme_manager
 from app.qt.utils.iconography import apply_button_icon, apply_label_icon
+from app.qt.utils.typography import BODY_FONT_FAMILY, DISPLAY_FONT_FAMILY
 
 
 class SidebarItem(QPushButton):
@@ -48,7 +49,9 @@ class SidebarItem(QPushButton):
         layout.addWidget(self.icon_label)
 
         self.text_label = QLabel(label)
-        self.text_label.setStyleSheet("background: transparent; font-size: 13px;")
+        self.text_label.setStyleSheet(
+            f'background: transparent; font-family: "{BODY_FONT_FAMILY}"; font-size: 13px;'
+        )
         layout.addWidget(self.text_label)
         layout.addStretch()
         self._refresh_visuals()
@@ -86,7 +89,7 @@ class SidebarItem(QPushButton):
         )
         apply_label_icon(self.icon_label, self.icon_name, size=18, color=icon_color)
         self.text_label.setStyleSheet(
-            f"background: transparent; font-size: 13px; color: {text_color};"
+            f'background: transparent; font-family: "{BODY_FONT_FAMILY}"; font-size: 13px; color: {text_color};'
         )
         self._icon_initialized = True
 
@@ -229,12 +232,26 @@ class Sidebar(QFrame):
         header_layout.setContentsMargins(8, 6, 8, 10)
         header_layout.setSpacing(8)
 
+        title_wrap = QWidget()
+        title_layout = QVBoxLayout(title_wrap)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(0)
+
         self.title_lbl = QLabel("StreamCap")
         self.title_lbl.setProperty("class", "heading")
         self.title_lbl.setStyleSheet(
-            f"font-size: 18px; font-weight: 700; color: {theme_manager.get_color('accent')}; background: transparent;"
+            f'font-family: "{DISPLAY_FONT_FAMILY}"; font-size: 18px; font-weight: 700; color: {theme_manager.get_color("accent")}; background: transparent;'
         )
-        header_layout.addWidget(self.title_lbl, 1)
+        title_layout.addWidget(self.title_lbl)
+
+        self.subtitle_lbl = QLabel("Origin")
+        self.subtitle_lbl.setStyleSheet(
+            f'font-family: "{DISPLAY_FONT_FAMILY}"; font-size: 11px; font-weight: 600; color: {theme_manager.get_color("text_sec")}; background: transparent;'
+        )
+        title_layout.addWidget(self.subtitle_lbl)
+
+        self.title_wrap = title_wrap
+        header_layout.addWidget(self.title_wrap, 1)
 
         self.toggle_btn = QPushButton()
         self.toggle_btn.setProperty("class", "sidebar-toggle")
@@ -304,7 +321,7 @@ class Sidebar(QFrame):
         self.toggle_btn.setToolTip(expand if self._collapsed else collapse)
 
     def _apply_collapse_visual_state(self):
-        self.title_lbl.setVisible(not self._collapsed)
+        self.title_wrap.setVisible(not self._collapsed)
         for item in self._items:
             item.set_compact(self._collapsed)
 
@@ -367,7 +384,10 @@ class Sidebar(QFrame):
 
     def _on_theme_changed(self):
         self.title_lbl.setStyleSheet(
-            f"font-size: 18px; font-weight: 700; color: {theme_manager.get_color('accent')}; background: transparent;"
+            f'font-family: "{DISPLAY_FONT_FAMILY}"; font-size: 18px; font-weight: 700; color: {theme_manager.get_color("accent")}; background: transparent;'
+        )
+        self.subtitle_lbl.setStyleSheet(
+            f'font-family: "{DISPLAY_FONT_FAMILY}"; font-size: 11px; font-weight: 600; color: {theme_manager.get_color("text_sec")}; background: transparent;'
         )
         for item in self._items:
             item.refresh_theme_icon()
