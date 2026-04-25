@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.qt_app_manager import QtApp
 from app.qt.main_window import MainWindow
+from app.qt.utils.typography import BODY_FONT_FAMILY, body_font, load_app_fonts
 
 _qt_app = None
 
@@ -59,16 +60,25 @@ def main():
 
     # Create the Qt Application
     app = QApplication.instance() or QApplication(sys.argv)
-    app.setApplicationName("StreamCap")
-    app.setApplicationDisplayName("StreamCap")
+    app.setApplicationName("StreamCap Origin")
+    app.setApplicationDisplayName("StreamCap Origin")
+    load_app_fonts()
 
-    # Set the application icon globally
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icons", "icon.iconset", "icon_512x512.png")
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
+    # Set the application icon globally. Prefer the multi-resolution ICO on Windows
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    icon_candidates = [
+        os.path.join(base_dir, "assets", "icon.ico"),
+        os.path.join(base_dir, "assets", "icons", "icon.iconset", "icon_512x512.png"),
+    ]
+    for icon_path in icon_candidates:
+        if os.path.exists(icon_path):
+            app.setWindowIcon(QIcon(icon_path))
+            break
 
     # Set a robust default font
-    default_font = QFont("Segoe UI", 10)
+    default_font = body_font(10)
+    if not default_font.exactMatch():
+        default_font = QFont(BODY_FONT_FAMILY, 10)
     if not default_font.exactMatch():
         default_font = QFont("Arial", 10)
     app.setFont(default_font)

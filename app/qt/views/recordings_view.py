@@ -33,6 +33,7 @@ from app.qt.themes.theme import QUEUE_COLORS, theme_manager
 from app.qt.utils.elevation import apply_elevation
 from app.qt.utils.filters import RecordingFilters
 from app.qt.utils.iconography import apply_button_icon, icon_pixmap
+from app.qt.utils.typography import body_font
 from app.core.recording.recording_state_logic import RecordingStateLogic
 from app.utils.i18n import tr
 from app.utils.logger import logger
@@ -152,7 +153,7 @@ class RecordingListDelegate(QStyledItemDelegate):
         painter.setBrush(QBrush(QColor(status_color)))
         painter.drawEllipse(avatar_x, avatar_y, avatar_size, avatar_size)
         painter.setPen(QColor("#FFFFFF"))
-        painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        painter.setFont(body_font(11, QFont.Weight.Bold))
         letter = (rec.streamer_name or "?")[0].upper()
         painter.drawText(QRect(avatar_x, avatar_y, avatar_size, avatar_size), Qt.AlignmentFlag.AlignCenter, letter)
 
@@ -163,7 +164,7 @@ class RecordingListDelegate(QStyledItemDelegate):
         if RecordingStateLogic.should_show_live_title(rec):
             name = f"{rec.streamer_name} — {rec.live_title}"
 
-        painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        painter.setFont(body_font(10, QFont.Weight.Bold))
         painter.setPen(QColor(colors["text"]))
         name_rect = QRect(text_x, row.y() + 18, name_right - text_x, 22)
         painter.drawText(
@@ -174,7 +175,7 @@ class RecordingListDelegate(QStyledItemDelegate):
 
         status_text = rec.status_info or "Idle"
         status_rect = QRect(text_x, row.y() + 41, name_right - text_x, 18)
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
+        painter.setFont(body_font(9, QFont.Weight.DemiBold))
         painter.setPen(QColor(status_color))
         painter.drawText(status_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, status_text)
 
@@ -188,7 +189,7 @@ class RecordingListDelegate(QStyledItemDelegate):
             status_metrics = painter.fontMetrics()
             duration_x = text_x + status_metrics.horizontalAdvance(status_text)
             duration_rect = QRect(duration_x, status_rect.y(), max(0, name_right - duration_x), status_rect.height())
-            painter.setFont(QFont("Segoe UI", 8))
+            painter.setFont(body_font(8))
             painter.setPen(QColor("#777777"))
             painter.drawText(
                 duration_rect,
@@ -253,7 +254,7 @@ class RecordingListDelegate(QStyledItemDelegate):
         painter.setBrush(QBrush(QColor(color)))
         painter.drawRoundedRect(rect, 5, 5)
         painter.setPen(QColor("#FFFFFF"))
-        painter.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        painter.setFont(body_font(8, QFont.Weight.Bold))
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
 
     @staticmethod

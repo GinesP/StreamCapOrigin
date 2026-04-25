@@ -20,6 +20,7 @@ from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QWidget
 
+from app.qt.utils.typography import BODY_FONT_FAMILY, DISPLAY_FONT_FAMILY
 from app.utils.logger import logger
 
 
@@ -225,7 +226,7 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
     QMainWindow, QDialog, QWidget {{
         background-color: {c["bg"]};
         color: {c["text"]};
-        font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", "Arial", sans-serif;
+        font-family: "{BODY_FONT_FAMILY}", "Segoe UI Variable Text", "Segoe UI", "Arial", sans-serif;
         font-size: 13px;
         font-weight: 500;
     }}
@@ -273,12 +274,13 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
     }}
     QLabel[class="secondary"] {{ color: {c["text_sec"]}; }}
     QLabel[class="muted"]     {{ color: {c["text_muted"]}; font-size: 12px; }}
-    QLabel[class="heading"]   {{ font-size: 20px; font-weight: 700; color: {c["text"]}; }}
-    QLabel[class="subheading"]{{ font-size: 15px; font-weight: 500; color: {c["text_sec"]}; }}
+    QLabel[class="heading"]   {{ font-family: "{DISPLAY_FONT_FAMILY}", "Segoe UI", "Arial", sans-serif; font-size: 20px; font-weight: 700; color: {c["text"]}; }}
+    QLabel[class="subheading"]{{ font-family: "{BODY_FONT_FAMILY}", "Segoe UI", "Arial", sans-serif; font-size: 15px; font-weight: 500; color: {c["text_sec"]}; }}
     QLabel[class="accent"]    {{ color: {c["accent"]}; font-weight: 600; }}
 
     /* ── Buttons ───────────────────────────────────────────────── */
     QPushButton {{
+        font-family: "{BODY_FONT_FAMILY}", "Segoe UI", "Arial", sans-serif;
         background-color: {c["accent"]};
         color: #ffffff;
         border: none;
@@ -452,6 +454,7 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
         border-left: none;
     }}
     QPushButton[class="sidebar-item"] {{
+        font-family: "{BODY_FONT_FAMILY}", "Segoe UI", "Arial", sans-serif;
         background-color: transparent;
         color: {c["text_sec"]};
         text-align: left;
@@ -470,6 +473,7 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
         font-weight: 700;
     }}
     QPushButton[class="sidebar-toggle"] {{
+        font-family: "{BODY_FONT_FAMILY}", "Segoe UI", "Arial", sans-serif;
         background-color: transparent;
         color: {c["text_sec"]};
         border: 1px solid transparent;

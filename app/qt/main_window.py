@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
 
     MIN_WIDTH = 950
     MIN_HEIGHT = 600
-    WINDOW_TITLE = "StreamCap"
+    WINDOW_TITLE = "StreamCap Origin"
     SIDEBAR_COLLAPSE_BREAKPOINT = 1024
 
     def __init__(self, app_context):
@@ -55,6 +55,9 @@ class MainWindow(QMainWindow):
         self.app = app_context
         self.app.main_window = self
         self.setWindowTitle(self.WINDOW_TITLE)
+        app_icon = QApplication.windowIcon()
+        if not app_icon.isNull():
+            self.setWindowIcon(app_icon)
         self.setMinimumSize(QSize(self.MIN_WIDTH, self.MIN_HEIGHT))
         self.resize(1200, 750)
 
