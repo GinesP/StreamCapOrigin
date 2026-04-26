@@ -270,15 +270,21 @@ class LiveForecastDialog(QDialog):
             }}
             QScrollBar:vertical {{
                 background: {c['surface']};
-                width: 10px;
+                width: 12px;
                 border-radius: 5px;
+                margin: 0;
             }}
             QScrollBar::handle:vertical {{
                 background: {c['border']};
                 border-radius: 5px;
+                margin: 1px;
             }}
             QScrollBar::handle:vertical:hover {{
                 background: {c['text_muted']};
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: {c['surface']};
+                border-radius: 5px;
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0px;

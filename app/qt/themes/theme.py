@@ -53,8 +53,9 @@ NEUTRAL_DARK: dict[str, str] = {
     "sb_hover":    "#2A2A2A",
     "sb_selected": "#332218",  # Tinted with accent
     # Scrollbar
-    "scroll":      "#3A3A3A",
-    "scroll_h":    "#505050",
+    "scroll_track":"#1F1F1F",
+    "scroll":      "#5A5A5A",
+    "scroll_h":    "#707070",
     # Feedback
     "success":     "#4CAF50",
     "warning":     "#FF9800",
@@ -98,8 +99,9 @@ NEUTRAL_LIGHT: dict[str, str] = {
     "sb_hover":    "#E0E0EC",
     "sb_selected": "#FFE8DE",
     # Scrollbar
-    "scroll":      "#C0C0D0",
-    "scroll_h":    "#A0A0B5",
+    "scroll_track":"#ECECF2",
+    "scroll":      "#B4B4C2",
+    "scroll_h":    "#9898AA",
     # Feedback
     "success":     "#388E3C",
     "warning":     "#E65100",
@@ -237,33 +239,45 @@ def _generate_stylesheet(c: dict[str, str]) -> str:
         background-color: transparent;
     }}
     QScrollBar:vertical {{
-        background: transparent;
-        width: 12px;
+        background: {c["scroll_track"]};
+        width: 14px;
         margin: 0;
+        border: none;
+        border-radius: 6px;
     }}
     QScrollBar::handle:vertical {{
         background: {c["scroll"]};
         min-height: 36px;
         border-radius: 5px;
-        margin: 2px 3px;
+        margin: 2px;
     }}
     QScrollBar::handle:vertical:hover {{
         background: {c["scroll_h"]};
     }}
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+        background: {c["scroll_track"]};
+        border-radius: 6px;
+    }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
     QScrollBar:horizontal {{
-        background: transparent;
-        height: 12px;
+        background: {c["scroll_track"]};
+        height: 14px;
         margin: 0;
+        border: none;
+        border-radius: 6px;
     }}
     QScrollBar::handle:horizontal {{
         background: {c["scroll"]};
         min-width: 36px;
         border-radius: 5px;
-        margin: 3px 2px;
+        margin: 2px;
     }}
     QScrollBar::handle:horizontal:hover {{
         background: {c["scroll_h"]};
+    }}
+    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+        background: {c["scroll_track"]};
+        border-radius: 6px;
     }}
     QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0px; }}
 

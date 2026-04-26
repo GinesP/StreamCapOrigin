@@ -259,16 +259,23 @@ class QtLogView(QWidget):
             }}
             QScrollBar:vertical {{
                 background: #161b22;
-                width: 8px;
+                width: 10px;
                 margin: 0;
+                border: none;
+                border-radius: 4px;
             }}
             QScrollBar::handle:vertical {{
                 background: #30363d;
                 min-height: 36px;
                 border-radius: 4px;
+                margin: 1px;
             }}
             QScrollBar::handle:vertical:hover {{
                 background: #484f58;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: #161b22;
+                border-radius: 4px;
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
         """)
