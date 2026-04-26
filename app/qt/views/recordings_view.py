@@ -405,8 +405,10 @@ class QtRecordingsView(QWidget):
         placeholder = self._l.get("search", "Search")
         self.search_box.setPlaceholderText(f"{placeholder}...")
         self.search_box.setMinimumWidth(250)
+        self.search_box.setClearButtonEnabled(True)
         self.search_box.textChanged.connect(self._on_search_changed)
         top_filter_row.addWidget(self.search_box)
+
         top_filter_row.addStretch()
         
         bottom_filter_row = QHBoxLayout()
