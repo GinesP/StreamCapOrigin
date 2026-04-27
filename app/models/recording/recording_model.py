@@ -42,7 +42,8 @@ class Recording:
         last_seen_live=None,
         consistency_score=0.0,
         avatar_url=None,
-        cover_url=None
+        cover_url=None,
+        is_favorite=False,
     ):
         """
         Initialize a recording object.
@@ -91,6 +92,7 @@ class Recording:
         self.consistency_score = consistency_score
         self.avatar_url = avatar_url
         self.cover_url = cover_url
+        self.is_favorite = bool(is_favorite)
         
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
@@ -150,7 +152,8 @@ class Recording:
             "last_seen_live": self.last_seen_live,
             "consistency_score": self.consistency_score,
             "avatar_url": self.avatar_url,
-            "cover_url": self.cover_url
+            "cover_url": self.cover_url,
+            "is_favorite": self.is_favorite,
         }
 
     @classmethod
@@ -181,7 +184,8 @@ class Recording:
             last_seen_live=data.get("last_seen_live"),
             consistency_score=data.get("consistency_score", 0.0),
             avatar_url=data.get("avatar_url"),
-            cover_url=data.get("cover_url")
+            cover_url=data.get("cover_url"),
+            is_favorite=data.get("is_favorite", False),
         )
         recording.title = data.get("title", recording.title)
         recording.display_title = data.get("display_title", recording.title)

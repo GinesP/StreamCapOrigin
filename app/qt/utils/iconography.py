@@ -70,6 +70,8 @@ _FALLBACK = {
     "success": "✓",
     "error": "×",
     "warning": "!",
+    "favorite_off": "♡",
+    "favorite_on": "❤",
 }
 
 _SVG_MAP = {
@@ -97,6 +99,8 @@ _SVG_MAP = {
     "success": "success.svg",
     "error": "error.svg",
     "warning": "warning.svg",
+    "favorite_off": "heart-outline.svg",
+    "favorite_on": "heart-filled.svg",
 }
 
 _ICON_DIR = Path(__file__).resolve().parents[3] / "assets" / "icons" / "ui"

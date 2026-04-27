@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from app.models.recording.recording_status_model import CardStateType, RecordingStatus
 
 class RecordingStateLogic:
@@ -47,3 +49,43 @@ class RecordingStateLogic:
             getattr(recording, "monitor_status", False)
             and cls.is_actively_recording(recording)
         )
+
+    @staticmethod
+    def _parse_datetime(value) -> datetime | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            dt = value
+        else:
+            raw = str(value).strip()
+            if not raw:
+                return None
+            raw = raw.replace("Z", "+00:00")
+            try:
+                dt = datetime.fromisoformat(raw)
+            except ValueError:
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                    try:
+                        dt = datetime.strptime(raw, fmt)
+                        break
+                    except ValueError:
+                        dt = None
+                if dt is None:
+                    return None
+
+        if dt.tzinfo is not None:
+            dt = dt.astimezone().replace(tzinfo=None)
+        return dt
+
+    @classmethod
+    def is_stale(cls, recording, days: int = 30) -> bool:
+        """True when a stream has not been seen live for >days.
+
+        If `last_seen_live` is missing, falls back to `added_at`.
+        """
+        reference = cls._parse_datetime(getattr(recording, "last_seen_live", None))
+        if reference is None:
+            reference = cls._parse_datetime(getattr(recording, "added_at", None))
+        if reference is None:
+            return False
+        return (datetime.now() - reference) > timedelta(days=days)

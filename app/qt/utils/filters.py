@@ -30,6 +30,10 @@ class RecordingFilters:
         return (not recording.monitor_status
                 or recording.status_info == RecordingStatus.NOT_IN_SCHEDULED_CHECK)
 
+    @staticmethod
+    def is_stale(recording) -> bool:
+        return RecordingStateLogic.is_stale(recording)
+
     @classmethod
     def matches_status(cls, recording, filter_type) -> bool:
         if filter_type == "all": return True
@@ -38,6 +42,7 @@ class RecordingFilters:
         if filter_type == "error": return cls.is_error(recording)
         if filter_type == "offline": return cls.is_offline(recording)
         if filter_type == "stopped": return cls.is_stopped(recording)
+        if filter_type == "stale": return cls.is_stale(recording)
         return True
 
     @classmethod

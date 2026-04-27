@@ -3,6 +3,9 @@ Qt Premium Confirmation Dialog — StreamCap.
 A styled dialog for important confirmations (delete, exit, etc.).
 """
 
+import ctypes
+import sys
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
@@ -16,15 +19,18 @@ from app.utils.i18n import tr
 class QtConfirmDialog(QDialog):
     def __init__(self, title, message, sub_message="", type="warning", parent=None):
         super().__init__(parent)
+        self.setObjectName("confirmDialog")
         self.setWindowTitle(title)
         self.setMinimumWidth(380)
         self.setModal(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         apply_elevation(self, level=2)
         
         # We don't want standard title bar icons if we want a clean look
         # but for simplicity we keep them for now.
         
         self._setup_ui(title, message, sub_message, type)
+        self._apply_styles()
         theme_manager.themeChanged.connect(self._on_theme_changed)
 
     def _setup_ui(self, title, message, sub_message, type):
@@ -80,6 +86,41 @@ class QtConfirmDialog(QDialog):
 
     def _on_theme_changed(self) -> None:
         apply_elevation(self, level=2)
+        self._apply_styles()
+
+    def _apply_styles(self) -> None:
+        self.setStyleSheet(
+            f"""
+            QDialog#confirmDialog {{
+                background: {theme_manager.get_color('surface')};
+                border: 1px solid {theme_manager.get_color('border')};
+                border-radius: 0px;
+            }}
+            """
+        )
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._disable_native_rounded_corners()
+
+    def _disable_native_rounded_corners(self):
+        if sys.platform != "win32":
+            return
+        try:
+            hwnd = int(self.winId())
+            if not hwnd:
+                return
+            DWMWA_WINDOW_CORNER_PREFERENCE = 33
+            DWMWCP_DONOTROUND = 1
+            preference = ctypes.c_int(DWMWCP_DONOTROUND)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE,
+                ctypes.byref(preference),
+                ctypes.sizeof(preference),
+            )
+        except Exception:
+            pass
 
     @classmethod
     def confirm(cls, parent, title, message, sub_message="", type="warning"):

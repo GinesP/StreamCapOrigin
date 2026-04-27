@@ -86,6 +86,7 @@ class RecordingListDelegate(QStyledItemDelegate):
         ("folder", "folder"),
         ("play", "play"),
         ("stop_monitoring", "pause"),
+        ("favorite", "favorite_off"),
         ("preview", "preview"),
         ("edit", "edit"),
         ("info", "info"),
@@ -109,6 +110,7 @@ class RecordingListDelegate(QStyledItemDelegate):
         tooltips = {
             "folder": self._card_l.get("open_folder", "Open Folder"),
             "stop_monitoring": self._card_l.get("stop_monitor", "Stop Monitoring"),
+            "favorite": self._card_l.get("unfavorite", "Remove from favorites") if bool(getattr(rec, "is_favorite", False)) else self._card_l.get("favorite", "Mark as favorite"),
             "preview": "Preview",
             "edit": self._card_l.get("edit_record_config", "Edit"),
             "info": self._card_l.get("recording_info", "Info"),
@@ -158,15 +160,35 @@ class RecordingListDelegate(QStyledItemDelegate):
         painter.drawText(QRect(avatar_x, avatar_y, avatar_size, avatar_size), Qt.AlignmentFlag.AlignCenter, letter)
 
         text_x = avatar_x + avatar_size + 16
-        action_left = row.right() - 360
-        name_right = max(text_x + 120, action_left - 20)
+        action_rects = self.action_rects(row, rec)
+        action_left = min((rect.x() for _, _, rect in action_rects), default=row.right() - 34)
         name = rec.streamer_name or "Unknown"
         if RecordingStateLogic.should_show_live_title(rec):
             name = f"{rec.streamer_name} — {rec.live_title}"
 
+        badges: list[tuple[str, str, int]] = []
+        queue_label, queue_color = self._queue_badge(rec)
+        badges.append((queue_label, queue_color, 36))
+
+        likelihood = self._likelihood(rec)
+        if likelihood > 0:
+            label = "High" if likelihood >= 0.8 else "Normal"
+            color = "#4CAF50" if likelihood >= 0.8 else "#42A5F5"
+            badges.append((label, color, 58))
+
+        if RecordingStateLogic.is_stale(rec):
+            badges.append((tr("recording_card.stale_badge", default="30D"), "#EF6C00", 46))
+
+        gap = 6
+        badges_total = sum(w for _, _, w in badges) + max(0, len(badges) - 1) * gap
+        badge_x = max(text_x + 8, action_left - 14 - badges_total)
+
+        # Keep text strictly before badges/actions to avoid overlap in narrow widths
+        name_right = max(text_x + 40, min(action_left - 20, badge_x - 8))
+
         painter.setFont(body_font(10, QFont.Weight.Bold))
         painter.setPen(QColor(colors["text"]))
-        name_rect = QRect(text_x, row.y() + 18, name_right - text_x, 22)
+        name_rect = QRect(text_x, row.y() + 18, max(0, name_right - text_x), 22)
         painter.drawText(
             name_rect,
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
@@ -174,7 +196,7 @@ class RecordingListDelegate(QStyledItemDelegate):
         )
 
         status_text = rec.status_info or "Idle"
-        status_rect = QRect(text_x, row.y() + 41, name_right - text_x, 18)
+        status_rect = QRect(text_x, row.y() + 41, max(0, name_right - text_x), 18)
         painter.setFont(body_font(9, QFont.Weight.DemiBold))
         painter.setPen(QColor(status_color))
         painter.drawText(status_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, status_text)
@@ -197,16 +219,12 @@ class RecordingListDelegate(QStyledItemDelegate):
                 painter.fontMetrics().elidedText(duration_text, Qt.TextElideMode.ElideRight, duration_rect.width()),
             )
 
-        badge_x = row.right() - 520
-        queue_label, queue_color = self._queue_badge(rec)
-        self._draw_badge(painter, QRect(badge_x, row.y() + 26, 36, 22), queue_label, queue_color)
-        likelihood = self._likelihood(rec)
-        if likelihood > 0:
-            label = "High" if likelihood >= 0.8 else "Normal"
-            color = "#4CAF50" if likelihood >= 0.8 else "#42A5F5"
-            self._draw_badge(painter, QRect(badge_x + 42, row.y() + 26, 58, 22), label, color)
+        x_cursor = badge_x
+        for text, color, width in badges:
+            self._draw_badge(painter, QRect(x_cursor, row.y() + 26, width, 22), text, color)
+            x_cursor += width + gap
 
-        for action, icon_name, rect in self.action_rects(row, rec):
+        for action, icon_name, rect in action_rects:
             is_action_hovered = self.hovered_action == (getattr(rec, "rec_id", ""), action)
             if is_action_hovered:
                 painter.setPen(Qt.PenStyle.NoPen)
@@ -215,7 +233,10 @@ class RecordingListDelegate(QStyledItemDelegate):
                 painter.setBrush(QBrush(hover_color))
                 painter.drawRoundedRect(rect, 6, 6)
 
-            icon_color = colors["accent"] if is_action_hovered else colors["text_sec"]
+            if action == "favorite":
+                icon_color = "#C62828" if is_action_hovered else "#E53935"
+            else:
+                icon_color = colors["accent"] if is_action_hovered else colors["text_sec"]
             pix = icon_pixmap(icon_name, size=16, color=icon_color)
             if not pix.isNull():
                 icon_rect = QRect(rect.x() + 11, rect.y() + 6, 16, 16)
@@ -236,6 +257,8 @@ class RecordingListDelegate(QStyledItemDelegate):
                     actual_icon = "stop"
                 elif getattr(rec, "monitor_status", False):
                     actual_icon = "pause"
+            elif action == "favorite" and rec is not None:
+                actual_icon = "favorite_on" if bool(getattr(rec, "is_favorite", False)) else "favorite_off"
             rects.append((action, actual_icon, QRect(x, row_rect.y() + 23, 38, 28)))
             x -= 62
         rects.reverse()
@@ -430,6 +453,7 @@ class QtRecordingsView(QWidget):
             (self._l.get("filter_offline", "Offline"), "offline", "#9E9E9E"),
             (self._l.get("filter_error", "Error"), "error", "#FF9800"),
             (self._l.get("filter_stopped", "Detenido"), "stopped", "#607D8B"),
+            (self._l.get("filter_stale", "+30 días"), "stale", "#EF6C00"),
         ]
         
         self.filter_btns = []
@@ -914,6 +938,11 @@ class QtRecordingsView(QWidget):
         elif name == "stop_monitoring":
             if RecordingStateLogic.should_show_stop_monitoring_action(rec):
                 self.app.event_bus.run_task(self.app.record_manager.stop_monitor_recording, rec)
+
+        elif name == "favorite":
+            rec.is_favorite = not bool(getattr(rec, "is_favorite", False))
+            self.app.event_bus.publish("update", rec)
+            self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
 
         elif name == "preview":
             self._preview_recording(rec)

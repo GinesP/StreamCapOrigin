@@ -146,6 +146,7 @@ _ACTION_DEFS = [
     ("folder", "folder", "Open Folder"),
     ("play", "play", "Start / Stop"),
     ("stop_monitoring", "pause", "Stop Monitoring"),
+    ("favorite", "favorite_off", "Toggle Favorite"),
     ("preview", "preview", "Preview"),
     ("edit", "edit", "Edit"),
     ("info", "info", "Info"),
@@ -434,6 +435,23 @@ class QtRecordingCard(QFrame):
             stop_monitor_btn_l.setVisible(show_stop_monitoring)
             stop_monitor_btn_l.setToolTip("Stop Monitoring")
 
+        favorite_btn_g = self._g_btns.get("favorite")
+        favorite_btn_l = self._l_btns.get("favorite")
+        is_favorite = bool(getattr(rec, "is_favorite", False))
+        fav_icon = "favorite_on" if is_favorite else "favorite_off"
+        fav_tip = (
+            tr("recording_card.unfavorite", default="Remove from favorites")
+            if is_favorite
+            else tr("recording_card.favorite", default="Mark as favorite")
+        )
+        fav_color = "#E53935"
+        if favorite_btn_g:
+            apply_button_icon(favorite_btn_g, fav_icon, size=14, color=fav_color)
+            favorite_btn_g.setToolTip(fav_tip)
+        if favorite_btn_l:
+            apply_button_icon(favorite_btn_l, fav_icon, size=14, color=fav_color)
+            favorite_btn_l.setToolTip(fav_tip)
+
         # Badges
         self._fill_badges(rec, self._g_badge_row, self, "grid")
         self._fill_badges(rec, self._l_badge_row, self, "list")
@@ -442,6 +460,7 @@ class QtRecordingCard(QFrame):
     @staticmethod
     def _fill_badges(rec, layout: QHBoxLayout, card_instance: QtRecordingCard, prefix: str) -> None:
         interval = getattr(rec, "loop_time_seconds", 60) or 60
+        is_stale = RecordingStateLogic.is_stale(rec)
         q_t, q_c = (
             ("F", "#4CAF50") if interval <= 60 else
             ("M", "#FF9800") if interval <= 180 else
@@ -456,7 +475,7 @@ class QtRecordingCard(QFrame):
             pass
 
         cache_attr = f"_badge_state_{prefix}"
-        current_state = (q_t, q_c, score)
+        current_state = (q_t, q_c, score, is_stale)
         if getattr(card_instance, cache_attr, None) == current_state:
             return
         setattr(card_instance, cache_attr, current_state)
@@ -473,6 +492,19 @@ class QtRecordingCard(QFrame):
             l_t = "High" if score >= 0.8 else "Normal"
             l_c = "#4CAF50" if score >= 0.8 else "#42A5F5"
             layout.addWidget(_Badge(l_t, l_c, f"Likelihood {score:.0%}"))
+
+        if is_stale:
+            layout.addWidget(
+                _Badge(
+                    tr("recording_card.stale_badge", default="30D"),
+                    "#EF6C00",
+                    tr(
+                        "recording_card.stale_badge_tip",
+                        default="Not seen live for over 30 days",
+                    ),
+                )
+            )
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # Painting  (card background + shadow drawn here to avoid effect conflicts)
@@ -586,6 +618,11 @@ class QtRecordingCard(QFrame):
                 self.app.event_bus.run_task(
                     self.app.record_manager.stop_monitor_recording, rec
                 )
+
+        elif name == "favorite":
+            rec.is_favorite = not bool(getattr(rec, "is_favorite", False))
+            self.app.event_bus.publish("update", rec)
+            self.app.event_bus.run_task(self.app.record_manager.persist_recordings)
 
         elif name == "preview":
             path = getattr(rec, "recording_dir", None)

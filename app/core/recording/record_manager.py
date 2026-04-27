@@ -25,6 +25,7 @@ class RecordingManager:
         self.settings = app.settings
         self.periodic_task_started = False
         self.loop_time_seconds = None
+        self._needs_platform_migration_persist = False
         self.app.language_manager.add_observer(self)
         self.load_recordings()
         self._ = {}
@@ -34,6 +35,9 @@ class RecordingManager:
         self.platform_semaphores = defaultdict(lambda: asyncio.Semaphore(max_concurrent))
         self.active_recorders = {}
         self.persist_delay_handler = DelayedTaskExecutor(self.app, self, delay=2)
+
+        if self._needs_platform_migration_persist:
+            self.app.event_bus.run_task(self.persist_recordings)
         
         # 1. Multi-Priority Task Queues (Intelligence)
         # Dedicated queues to ensure fast checks aren't blocked by slow ones
@@ -80,6 +84,20 @@ class RecordingManager:
         recordings_data = self.app.config_manager.load_recordings_config()
         if not GlobalRecordingState.recordings:
             GlobalRecordingState.recordings = [Recording.from_dict(rec) for rec in recordings_data]
+
+            migrated = False
+            for recording in GlobalRecordingState.recordings:
+                canonical_platform, canonical_key = get_platform_info(getattr(recording, "url", "") or "")
+                if canonical_key and recording.platform_key != canonical_key:
+                    recording.platform_key = canonical_key
+                    migrated = True
+                if canonical_platform and recording.platform != canonical_platform:
+                    recording.platform = canonical_platform
+                    migrated = True
+
+            if migrated:
+                self._needs_platform_migration_persist = True
+
         logger.info(f"Live Recordings: Loaded {len(self.recordings)} items")
 
     def initialize_dynamic_state(self):
@@ -271,6 +289,10 @@ class RecordingManager:
             base_interval = int(self.settings.user_config.get("loop_time_seconds", 300))
             recording.loop_time_seconds = HistoryManager.get_adjusted_interval(recording, base_interval)
 
+            # Favorites never go to slow queue (>180s)
+            if getattr(recording, "is_favorite", False) and recording.loop_time_seconds > 180:
+                recording.loop_time_seconds = 180
+
             # 2. Check if it's time to poll
             is_exceeded = utils.is_time_interval_exceeded(recording.detection_time, recording.loop_time_seconds)
             
@@ -449,7 +471,7 @@ class RecordingManager:
             recording.status_info = RecordingStatus.STATUS_CHECKING
             platform, platform_key = get_platform_info(recording.url)
 
-            if platform and platform_key and (recording.platform is None or recording.platform_key is None):
+            if platform and platform_key and (recording.platform != platform or recording.platform_key != platform_key):
                 recording.platform = platform
                 recording.platform_key = platform_key
                 await self.persist_recordings()
