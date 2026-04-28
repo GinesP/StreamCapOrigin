@@ -14,6 +14,11 @@ from ...utils.logger import logger
 
 T = TypeVar("T")
 
+RECORDINGS_DB_PRAGMAS = (
+    "PRAGMA journal_mode=WAL",
+    "PRAGMA synchronous=NORMAL",
+)
+
 
 MUTABLE_CONFIG_FILES = (
     "user_settings.json",
@@ -153,56 +158,73 @@ class ConfigManager:
     def init_recordings_config(self):
         self._init_recordings_db()
 
+    @staticmethod
+    def _configure_recordings_db(conn):
+        """Apply SQLite settings for the recordings database connection."""
+        for pragma in RECORDINGS_DB_PRAGMAS:
+            conn.execute(pragma)
+
+    @staticmethod
+    async def _configure_recordings_db_async(db):
+        """Apply SQLite settings for the async recordings database connection."""
+        for pragma in RECORDINGS_DB_PRAGMAS:
+            await db.execute(pragma)
+
     def _init_recordings_db(self):
         """Initialize SQLite database for recordings and migrate from JSON if needed."""
         conn = sqlite3.connect(self.recordings_db_path)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS recordings (
-                rec_id TEXT PRIMARY KEY,
-                data TEXT
-            )
-        ''')
-        conn.commit()
-        
-        # Check if migration from JSON is needed
-        if os.path.exists(self.recordings_config_path):
-            try:
-                with open(self.recordings_config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                
-                if data:
-                    for rec in data:
-                        rec_id = rec.get("rec_id")
-                        if rec_id:
-                            cursor.execute(
-                                "INSERT OR IGNORE INTO recordings (rec_id, data) VALUES (?, ?)",
-                                (rec_id, json.dumps(rec, ensure_ascii=False))
-                            )
-                    conn.commit()
-                    logger.info("Migrated recordings.json to recordings.db")
-                
-                # Backup the old JSON file
-                backup_path = self.recordings_config_path + ".bak"
-                if not os.path.exists(backup_path):
-                    shutil.move(self.recordings_config_path, backup_path)
-                    logger.info(f"Backed up old recordings.json to {backup_path}")
-                else:
-                    os.remove(self.recordings_config_path)
+        try:
+            self._configure_recordings_db(conn)
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS recordings (
+                    rec_id TEXT PRIMARY KEY,
+                    data TEXT
+                )
+            ''')
+            conn.commit()
+            
+            # Check if migration from JSON is needed
+            if os.path.exists(self.recordings_config_path):
+                try:
+                    with open(self.recordings_config_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
                     
-            except Exception as e:
-                logger.error(f"Error migrating recordings.json: {e}")
-        
-        conn.close()
+                    if data:
+                        for rec in data:
+                            rec_id = rec.get("rec_id")
+                            if rec_id:
+                                cursor.execute(
+                                    "INSERT OR IGNORE INTO recordings (rec_id, data) VALUES (?, ?)",
+                                    (rec_id, json.dumps(rec, ensure_ascii=False))
+                                )
+                        conn.commit()
+                        logger.info("Migrated recordings.json to recordings.db")
+                    
+                    # Backup the old JSON file
+                    backup_path = self.recordings_config_path + ".bak"
+                    if not os.path.exists(backup_path):
+                        shutil.move(self.recordings_config_path, backup_path)
+                        logger.info(f"Backed up old recordings.json to {backup_path}")
+                    else:
+                        os.remove(self.recordings_config_path)
+                        
+                except Exception as e:
+                    logger.error(f"Error migrating recordings.json: {e}")
+        finally:
+            conn.close()
 
     def _load_recordings_db(self):
         """Load all recordings from the SQLite database."""
         try:
             conn = sqlite3.connect(self.recordings_db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT rec_id, data FROM recordings")
-            rows = cursor.fetchall()
-            conn.close()
+            try:
+                self._configure_recordings_db(conn)
+                cursor = conn.cursor()
+                cursor.execute("SELECT rec_id, data FROM recordings")
+                rows = cursor.fetchall()
+            finally:
+                conn.close()
             
             recordings = []
             for row in rows:
@@ -330,6 +352,8 @@ class ConfigManager:
         async with self._db_lock:
             try:
                 async with aiosqlite.connect(self.recordings_db_path) as db:
+                    await self._configure_recordings_db_async(db)
+
                     # Execute deletions
                     if ids_to_delete:
                         await db.executemany(
