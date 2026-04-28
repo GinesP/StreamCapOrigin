@@ -45,7 +45,6 @@ echo [3/3] Compiling with Nuitka...
     --msvc=latest ^
     --enable-plugin=pyside6 ^
     --windows-console-mode=disable ^
-    --nofollow-import-to=flet ^
     --include-package=app.qt ^
     --include-module=app.qt_app_manager ^
     --include-module=app.event_bus ^

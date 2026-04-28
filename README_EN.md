@@ -324,7 +324,6 @@ StreamCap is released under the Apache License 2.0. For more details, see the [L
 
 Special thanks to the following open-source projects and technologies for their support:
 
-- [flet](https://github.com/flet-dev/flet)
 - [FFmpeg](https://ffmpeg.org)
 - [streamget](https://github.com/ihmily/streamget)
 
