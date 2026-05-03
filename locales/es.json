@@ -172,16 +172,30 @@
         "seconds": "segundos",
         "hours": "horas"
     },
-        "live_forecast_dialog": {
-            "title": "🔮 Previsión de Streams",
-            "subtitle": "Streams próximos a estar online basados en el historial reciente.",
-            "close": "Cerrar",
-            "no_forecast": "No hay streams próximos según el historial.",
-            "status_expected": "Esperado",
-            "status_delayed": "Retrasado",
-            "status_countdown": "En ~{minutes}min",
-            "status_live": "En Vivo"
-        },
+  "live_forecast_dialog": {
+    "title": "🔮 Previsión de Streams",
+    "subtitle": "Predicciones más inteligentes según historial, horario configurado y actividad reciente.",
+    "close": "Cerrar",
+    "no_forecast": "No hay streams próximos según el historial.",
+    "status_expected": "Esperado",
+    "status_delayed": "Retrasado",
+    "status_countdown": "En ~{minutes}min",
+    "status_live": "En Vivo",
+    "confidence_high": "Confianza alta",
+    "confidence_medium": "Confianza media",
+    "confidence_low": "Confianza baja",
+    "reason_live_now": "Detectado en vivo ahora mismo",
+    "reason_historical_window": "Dentro de su ventana histórica habitual",
+    "reason_starting_soon": "Suele empezar pronto",
+    "reason_historical_pattern": "Coincide con el patrón histórico reciente",
+    "reason_scheduled_window": "Dentro de la ventana programada",
+    "reason_scheduled_soon": "La programación configurada empieza pronto",
+    "reason_session_pattern": "Coincide con el historial de sesiones grabadas",
+    "reason_low_signal": "Señal reciente limitada",
+    "avg_delay_label": "Retraso medio: {minutes} min",
+    "window_label": "Próximo: {next} · Ventana: {window}",
+    "horizons_tooltip": "Probabilidad por horizonte: {horizons}"
+  },
         "search_dialog": {
         "search_keyword": "Ingrese palabra clave de búsqueda"
     },

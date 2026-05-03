@@ -94,6 +94,8 @@ class RecordingManager:
                 if canonical_platform and recording.platform != canonical_platform:
                     recording.platform = canonical_platform
                     migrated = True
+                if recording.normalize_long_live_sessions_temporarily():
+                    migrated = True
 
             if migrated:
                 self._needs_platform_migration_persist = True
@@ -518,8 +520,13 @@ class RecordingManager:
                 stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, live_room_text)
 
             if stream_info.is_live:
+                detected_at = datetime.now()
+                split_due_to_gap = recording.split_stale_live_session_if_needed(detected_at=detected_at)
+                was_live = recording.is_live
+                if split_due_to_gap:
+                    was_live = False
                 # Update last active time
-                recording.last_active_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                recording.last_active_at = detected_at.strftime("%Y-%m-%d %H:%M:%S")
 
                 # Update counts using the new responsive method
                 alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
@@ -540,6 +547,12 @@ class RecordingManager:
                     recording.is_live = stream_info.is_live
                     recording.notified_live_start = False
                     recording.notified_live_end = False
+
+                if not was_live:
+                    recording.start_live_session(
+                        detected_at=detected_at,
+                        scheduled_start_time=recording.scheduled_start_time if recording.scheduled_recording else None
+                    )
 
                 if not recording.only_notify_no_record:
                     recording.status_info = RecordingStatus.PREPARING_RECORDING
@@ -565,7 +578,8 @@ class RecordingManager:
                 recording.increment_live_counts(is_live=False, alpha_active=alpha_active, alpha_offline=alpha_offline)
 
                 recording.is_recording = False
-                if recording.is_live:
+                if recording.is_live or recording.current_live_session_start:
+                    recording.end_live_session()
                     recording.is_live = False
                     pass # removed message push
 
@@ -584,6 +598,7 @@ class RecordingManager:
         finally:
             recording.is_checking = False
             self.app.event_bus.publish("update", recording)
+            await self.persist_recordings()
         return
 
     @staticmethod
@@ -603,6 +618,7 @@ class RecordingManager:
 
     def stop_recording(self, recording: Recording, manually_stopped: bool = True):
         """Stop the recording process."""
+        recording.end_live_session()
         recording.is_live = False
         if recording.is_recording:
 
@@ -634,7 +650,7 @@ class RecordingManager:
             recording.status_info = RecordingStatus.NOT_RECORDING
             logger.info(f"Stopped recording for {recording.title}")
 
-            self.app.event_bus.publish("persist_recordings")
+            self.app.event_bus.run_task(self.persist_recordings)
 
     def get_duration(self, recording: Recording):
         """Get the duration of the current recording session in a formatted string."""

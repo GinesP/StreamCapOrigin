@@ -1,38 +1,255 @@
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from ...models.recording.recording_model import Recording
 
 class HistoryManager:
+    @staticmethod
+    def _session_stats(recording: Recording, now: datetime) -> dict:
+        sessions = []
+        for session in getattr(recording, "live_sessions", []) or []:
+            try:
+                start = datetime.fromisoformat(session.get("start_time"))
+            except (TypeError, ValueError):
+                continue
+            age_days = max(0, (now - start).days)
+            if age_days > 90:
+                continue
+
+            weight = 1.0 / (1.0 + (age_days / 21.0))
+            sessions.append((session, start, weight))
+
+        if not sessions:
+            return {
+                "score": 0.0,
+                "confidence_boost": 0.0,
+                "next_slot_text": "",
+                "window_text": "",
+                "reason_key": "",
+                "avg_delay_minutes": None,
+            }
+
+        today = now.weekday()
+        current_minutes = now.hour * 60 + now.minute
+        weighted_hits = 0.0
+        weighted_total = 0.0
+        nearest_minute = None
+        nearest_distance = None
+        durations = []
+        delays = []
+
+        for session, start, weight in sessions:
+            start_minutes = start.hour * 60 + start.minute
+            distance = abs(start_minutes - current_minutes)
+            distance = min(distance, 1440 - distance)
+            day_match = start.weekday() == today
+            day_weight = weight * (1.25 if day_match else 0.35)
+            proximity = max(0.0, 1.0 - (distance / 240.0))
+
+            weighted_hits += day_weight * proximity
+            weighted_total += day_weight
+
+            if day_match and (nearest_distance is None or distance < nearest_distance):
+                nearest_distance = distance
+                nearest_minute = start_minutes
+
+            duration = session.get("duration_minutes")
+            if isinstance(duration, (int, float)) and duration > 0:
+                durations.append(duration)
+
+            delay = session.get("scheduled_delay_minutes")
+            if isinstance(delay, (int, float)):
+                delays.append(delay)
+
+        session_score = weighted_hits / weighted_total if weighted_total else 0.0
+        avg_duration = int(sum(durations) / len(durations)) if durations else 60
+        avg_delay = int(sum(delays) / len(delays)) if delays else None
+
+        window_text = ""
+        next_slot_text = ""
+        if nearest_minute is not None:
+            start_h, start_m = divmod(nearest_minute, 60)
+            end_minutes = (nearest_minute + avg_duration) % 1440
+            end_h, end_m = divmod(end_minutes, 60)
+            next_slot_text = f"{start_h:02d}:{start_m:02d}"
+            window_text = f"{start_h:02d}:{start_m:02d}-{end_h:02d}:{end_m:02d}"
+
+        confidence_boost = min(0.18, len(sessions) * 0.015)
+        reason_key = "live_forecast_dialog.reason_session_pattern" if session_score >= 0.35 else ""
+
+        return {
+            "score": session_score,
+            "confidence_boost": confidence_boost,
+            "next_slot_text": next_slot_text,
+            "window_text": window_text,
+            "reason_key": reason_key,
+            "avg_delay_minutes": avg_delay,
+        }
+
+    @staticmethod
+    def _parse_scheduled_windows(recording: Recording, now: datetime) -> list[tuple[datetime, datetime]]:
+        if not getattr(recording, "scheduled_recording", False):
+            return []
+
+        start_times = str(getattr(recording, "scheduled_start_time", "") or "").split(",")
+        hours_list = str(getattr(recording, "monitor_hours", "") or "").split(",")
+        windows: list[tuple[datetime, datetime]] = []
+
+        for index, start_time in enumerate(start_times):
+            start_time = start_time.strip()
+            if not start_time:
+                continue
+            try:
+                parsed = datetime.strptime(start_time, "%H:%M:%S")
+            except ValueError:
+                continue
+
+            try:
+                duration_hours = float((hours_list[index] if index < len(hours_list) else hours_list[0]).strip() or 2)
+            except (ValueError, IndexError):
+                duration_hours = 2
+
+            start_dt = now.replace(
+                hour=parsed.hour,
+                minute=parsed.minute,
+                second=parsed.second,
+                microsecond=0,
+            )
+            end_dt = start_dt + timedelta(hours=max(1.0, duration_hours))
+            windows.append((start_dt, end_dt))
+
+        return windows
+
+    @staticmethod
+    def get_forecast_details(
+        recording: Recording,
+        now: datetime | None = None,
+        include_horizons: bool = True,
+    ) -> dict:
+        now = now or datetime.now()
+        if recording.is_live:
+            return {
+                "score": 1.0,
+                "confidence": "high",
+                "reason_key": "live_forecast_dialog.reason_live_now",
+                "next_slot_text": "",
+                "window_text": "",
+                "avg_delay_minutes": None,
+                "horizons": {15: 1.0, 30: 1.0, 60: 1.0} if include_horizons else {},
+            }
+
+        day_str = str(now.weekday())
+        intervals = recording.historical_intervals or {}
+        active_hours = sorted(set(intervals.get(day_str, [])))
+        current_minutes = now.hour * 60 + now.minute
+
+        score = 0.15
+        confidence = "low"
+        reason_key = "live_forecast_dialog.reason_low_signal"
+        next_slot_text = ""
+        window_text = ""
+
+        if active_hours:
+            nearest_hour = min(active_hours, key=lambda hour: abs((hour * 60) - current_minutes))
+            minute_distance = abs((nearest_hour * 60) - current_minutes)
+            proximity = max(0.0, 1.0 - (minute_distance / 180.0))
+            score = max(score, 0.25 + (proximity * 0.55))
+
+            first_h = active_hours[0]
+            last_h = active_hours[-1]
+            end_h = (last_h + 1) % 24
+            window_text = f"{first_h:02d}:00-{end_h:02d}:00"
+            next_slot_text = f"{nearest_hour:02d}:00"
+
+            if now.hour in active_hours:
+                score = max(score, 0.92)
+                confidence = "high"
+                reason_key = "live_forecast_dialog.reason_historical_window"
+            elif minute_distance <= 60:
+                confidence = "medium"
+                reason_key = "live_forecast_dialog.reason_starting_soon"
+            else:
+                reason_key = "live_forecast_dialog.reason_historical_pattern"
+
+        session_stats = HistoryManager._session_stats(recording, now)
+        if session_stats["score"] > 0:
+            session_component = 0.20 + (session_stats["score"] * 0.65)
+            if session_component > score:
+                score = session_component
+                if session_stats["reason_key"]:
+                    reason_key = session_stats["reason_key"]
+                if session_stats["next_slot_text"]:
+                    next_slot_text = session_stats["next_slot_text"]
+                if session_stats["window_text"]:
+                    window_text = session_stats["window_text"]
+            score += session_stats["confidence_boost"]
+
+        score += min(0.12, max(0.0, getattr(recording, "consistency_score", 0.0)) * 0.12)
+        score += min(0.12, max(0.0, getattr(recording, "priority_score", 0.0)) * 0.12)
+
+        for start_dt, end_dt in HistoryManager._parse_scheduled_windows(recording, now):
+            if start_dt <= now <= end_dt:
+                score = max(score, 0.95)
+                confidence = "high"
+                reason_key = "live_forecast_dialog.reason_scheduled_window"
+                next_slot_text = start_dt.strftime("%H:%M")
+                window_text = f"{start_dt.strftime('%H:%M')}-{end_dt.strftime('%H:%M')}"
+                break
+
+            minutes_until = int((start_dt - now).total_seconds() // 60)
+            if 0 < minutes_until <= 90:
+                score = max(score, 0.70 + ((90 - minutes_until) / 90.0) * 0.15)
+                confidence = "high" if minutes_until <= 30 else "medium"
+                reason_key = "live_forecast_dialog.reason_scheduled_soon"
+                next_slot_text = start_dt.strftime("%H:%M")
+                window_text = f"{start_dt.strftime('%H:%M')}-{end_dt.strftime('%H:%M')}"
+                break
+
+        last_seen_live = getattr(recording, "last_seen_live", None)
+        if last_seen_live:
+            try:
+                inactive_days = (now - datetime.fromisoformat(last_seen_live)).days
+            except ValueError:
+                inactive_days = 0
+            if inactive_days > 14:
+                score *= 0.82
+            if inactive_days > 45:
+                score *= 0.70
+
+        score = max(0.05, min(1.0, score))
+        if score >= 0.75:
+            confidence = "high"
+        elif score >= 0.45 and confidence != "high":
+            confidence = "medium"
+
+        result = {
+            "score": score,
+            "confidence": confidence,
+            "reason_key": reason_key,
+            "next_slot_text": next_slot_text,
+            "window_text": window_text,
+            "avg_delay_minutes": session_stats.get("avg_delay_minutes"),
+            "horizons": {},
+        }
+
+        if include_horizons:
+            result["horizons"] = {
+                minutes: HistoryManager.get_forecast_details(
+                    recording,
+                    now + timedelta(minutes=minutes),
+                    include_horizons=False,
+                )["score"]
+                for minutes in (15, 30, 60)
+            }
+
+        return result
+
     @staticmethod
     def get_likelihood_score(recording: Recording) -> float:
         """
         Calculates a score between 0.0 and 1.0 representing how likely 
         the streamer is to be live right now based on historical data.
         """
-        if not recording.historical_intervals:
-            return 0.5  # Neutral score if no data
-            
-        now = datetime.now()
-        day_str = str(now.weekday())
-        current_hour = now.hour
-        
-        if day_str not in recording.historical_intervals:
-            return 0.2  # Low score if they never stream on this day
-            
-        active_hours = recording.historical_intervals[day_str]
-        
-        # Check if they are currently within a known active hour
-        if current_hour in active_hours:
-            return 1.0
-            
-        # Check if they usually start soon (within next 1 hour)
-        next_hour = (current_hour + 1) % 24
-        if next_hour in active_hours:
-            # High likelihood as they approach their usual start time
-            minute_progress = now.minute / 60.0
-            return 0.5 + (0.4 * minute_progress) # Ramps up from 0.5 to 0.9
-            
-        return 0.1  # Low likelihood if far from typical hours
+        return HistoryManager.get_forecast_details(recording)["score"]
 
     @staticmethod
     def get_adjusted_interval(recording: Recording, base_interval: int) -> int:

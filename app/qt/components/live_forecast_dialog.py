@@ -5,7 +5,7 @@ Displays on-demand forecast of upcoming live streams.
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QPushButton, 
+    QDialog, QVBoxLayout, QLabel, QPushButton,
     QHBoxLayout, QScrollArea, QWidget, QFrame, QSizePolicy
 )
 from PySide6.QtGui import QColor
@@ -69,6 +69,14 @@ def _get_forecast_time_info(recording) -> dict:
     # Far from active window — show start hour
     return {"state": "upcoming", "text": f"{first_h:02d}:00", "color": ""}
 
+
+def _get_confidence_color(confidence: str, colors: dict) -> str:
+    if confidence == "high":
+        return "#43A047"
+    if confidence == "medium":
+        return "#FB8C00"
+    return colors["text_muted"]
+
 class ForecastItemWidget(QFrame):
     """Single streamer forecast item with a clean UI."""
     def __init__(self, recording, likelihood: float, parent=None):
@@ -76,8 +84,8 @@ class ForecastItemWidget(QFrame):
         self.recording = recording
         self._likelihood = likelihood
         
-        self.setFixedHeight(54)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumHeight(78)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
         # Style the frame
         c = theme_manager.colors
@@ -89,8 +97,12 @@ class ForecastItemWidget(QFrame):
             }}
         """)
         
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
+
+        top_row = QHBoxLayout()
+        top_row.setSpacing(12)
         layout.setSpacing(12)
         
         # Platform badge
@@ -118,7 +130,7 @@ class ForecastItemWidget(QFrame):
         """)
         platform_badge.setFixedWidth(30)
         platform_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(platform_badge)
+        top_row.addWidget(platform_badge)
         
         # Streamer name
         name_lbl = QLabel(self.recording.streamer_name)
@@ -129,7 +141,7 @@ class ForecastItemWidget(QFrame):
             border: none;
             background: transparent;
         """)
-        layout.addWidget(name_lbl, 1)
+        top_row.addWidget(name_lbl, 1)
         
         # Consistency bar (10 segments)
         consistency = self.recording.consistency_score or 0.0
@@ -144,7 +156,7 @@ class ForecastItemWidget(QFrame):
         """)
         consistency_lbl.setFixedWidth(80)
         consistency_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(consistency_lbl)
+        top_row.addWidget(consistency_lbl)
         
         # Likelihood percentage
         likelihood_pct = int(self._likelihood * 100)
@@ -160,19 +172,39 @@ class ForecastItemWidget(QFrame):
         """)
         lik_lbl.setFixedWidth(45)
         lik_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(lik_lbl)
-        
+        top_row.addWidget(lik_lbl)
+
         # Time / Status
         self.time_lbl = QLabel()
-        self.time_lbl.setFixedWidth(100)
+        self.time_lbl.setFixedWidth(120)
         self.time_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(self.time_lbl)
+        top_row.addWidget(self.time_lbl)
+
+        layout.addLayout(top_row)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(10)
+
+        self.reason_lbl = QLabel()
+        self.reason_lbl.setStyleSheet(f"""
+            font-size: 11px;
+            color: {c['text_muted']};
+            border: none;
+            background: transparent;
+        """)
+        bottom_row.addWidget(self.reason_lbl, 1)
+
+        self.window_lbl = QLabel()
+        self.window_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        bottom_row.addWidget(self.window_lbl)
+        layout.addLayout(bottom_row)
         
         self.update_time_info()
 
     def update_time_info(self):
         c = theme_manager.colors
         info = _get_forecast_time_info(self.recording)
+        forecast = HistoryManager.get_forecast_details(self.recording)
         
         if info["state"] == "none":
             self.time_lbl.setText("")
@@ -197,6 +229,44 @@ class ForecastItemWidget(QFrame):
             background: transparent;
         """)
 
+        confidence_text = tr(f"live_forecast_dialog.confidence_{forecast['confidence']}")
+        reason_text = tr(forecast["reason_key"])
+        avg_delay = forecast.get("avg_delay_minutes")
+        if avg_delay is not None:
+            reason_text = (
+                f"{reason_text} · "
+                f"{tr('live_forecast_dialog.avg_delay_label').format(minutes=avg_delay)}"
+            )
+        self.reason_lbl.setText(f"{confidence_text} · {reason_text}")
+        self.reason_lbl.setStyleSheet(f"""
+            font-size: 11px;
+            color: {_get_confidence_color(forecast['confidence'], c)};
+            border: none;
+            background: transparent;
+        """)
+
+        next_slot = forecast.get("next_slot_text") or "—"
+        window_text = forecast.get("window_text") or "—"
+        self.window_lbl.setText(
+            tr("live_forecast_dialog.window_label").format(next=next_slot, window=window_text)
+        )
+        self.window_lbl.setStyleSheet(f"""
+            font-size: 11px;
+            color: {c['text_muted']};
+            border: none;
+            background: transparent;
+        """)
+
+        horizons = forecast.get("horizons") or {}
+        if horizons:
+            horizon_text = " · ".join(
+                f"{minutes}m {int(probability * 100)}%"
+                for minutes, probability in horizons.items()
+            )
+            self.window_lbl.setToolTip(
+                tr("live_forecast_dialog.horizons_tooltip").format(horizons=horizon_text)
+            )
+
 
 class LiveForecastDialog(QDialog):
     def __init__(self, app_context, recordings, parent=None):
@@ -211,8 +281,8 @@ class LiveForecastDialog(QDialog):
         self.app.event_bus.subscribe("language_changed", self._on_language_changed)
         
         self.setWindowTitle(tr("live_forecast_dialog.title"))
-        self.setMinimumSize(600, 450)
-        self.resize(650, 500)
+        self.setMinimumSize(780, 450)
+        self.resize(840, 500)
         
         self._setup_ui()
 
@@ -336,7 +406,7 @@ class LiveForecastDialog(QDialog):
             # Also check if they have valid time info
             info = _get_forecast_time_info(rec)
             state = info.get("state")
-            if rec.is_live or (score >= 0.50 and state in ('expected', 'delayed', 'countdown', 'live_range')):
+            if rec.is_live or score >= 0.35 or state in ('expected', 'delayed', 'countdown', 'live_range'):
                 forecasts.append((rec, score))
                 
         # Sort by score descending, then consistency descending

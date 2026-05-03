@@ -174,13 +174,27 @@
   },
   "live_forecast_dialog": {
     "title": "🔮 Live Stream Forecast",
-    "subtitle": "Upcoming streams based on recent history.",
+    "subtitle": "Smarter live predictions based on history, schedule and recent activity.",
     "close": "Close",
     "no_forecast": "No upcoming streams found based on history.",
     "status_expected": "Expected",
     "status_delayed": "Delayed",
     "status_countdown": "In ~{minutes}min",
-    "status_live": "Live"
+    "status_live": "Live",
+    "confidence_high": "High confidence",
+    "confidence_medium": "Medium confidence",
+    "confidence_low": "Low confidence",
+    "reason_live_now": "Currently detected live",
+    "reason_historical_window": "Inside the usual historical window",
+    "reason_starting_soon": "Usually starts soon",
+    "reason_historical_pattern": "Matches recent historical pattern",
+    "reason_scheduled_window": "Inside the configured scheduled window",
+    "reason_scheduled_soon": "Configured schedule starts soon",
+    "reason_session_pattern": "Matches recorded session history",
+    "reason_low_signal": "Limited recent signal",
+    "avg_delay_label": "Avg delay: {minutes} min",
+    "window_label": "Next: {next} · Window: {window}",
+    "horizons_tooltip": "Probability by horizon: {horizons}"
   },
   "search_dialog": {
     "search_keyword": "Enter search keyword"
