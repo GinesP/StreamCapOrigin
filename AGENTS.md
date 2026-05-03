@@ -14,13 +14,16 @@
 - Test command used by CI: `python -m unittest discover`.
 - Version metadata check: `.\venv\Scripts\python.exe scripts\bump_version.py --check`.
 - Version helpers: `.\venv\Scripts\python.exe scripts\bump_version.py --current`, `--patch`, or `--set X.Y.Z`.
+- Manual Windows installer compile: `ISCC.exe .\installer\StreamCap.iss`.
 
 ## Release Workflow
 - `pyproject.toml` is the technical version source of truth.
 - Keep `config/version.json` synchronized with `pyproject.toml` via `scripts/bump_version.py`.
 - The Windows Qt release build uses `build_qt_nuitka.bat`, which validates version metadata before compiling `main_qt.py`.
 - `package_windows_installer.bat` is the current packaging entry point; in release mode it can validate/bump version metadata, create the release version commit, and create the git tag after a successful installer build.
+- `package_windows_installer.bat` uses `ISCC.exe` from `PATH` when available, otherwise checks common Inno Setup 6 install paths or an explicit `ISCC_EXE` override.
 - The build output is `dist\main_qt.dist\StreamCap.exe`; the Nuitka report is `dist\nuitka-report.xml`.
+- The Windows installer output is `dist\installer`.
 
 ## Python
 - Follow existing style and naming conventions.
