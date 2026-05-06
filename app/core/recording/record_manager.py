@@ -11,6 +11,7 @@ from ...utils.delay import DelayedTaskExecutor
 from ...utils.i18n import tr
 from ...utils.logger import logger
 from ..platforms.platform_handlers import get_platform_info
+from .predictor_metrics import PredictorMetricsStore
 from .stream_manager import LiveStreamRecorder
 
 
@@ -35,6 +36,10 @@ class RecordingManager:
         self.platform_semaphores = defaultdict(lambda: asyncio.Semaphore(max_concurrent))
         self.active_recorders = {}
         self.persist_delay_handler = DelayedTaskExecutor(self.app, self, delay=2)
+        self.predictor_metrics = PredictorMetricsStore(
+            f"{self.app.config_manager.config_path}/predictor_metrics.jsonl"
+        )
+        self._predictor_last_offline_result_at: dict[str, datetime] = {}
 
         if self._needs_platform_migration_persist:
             self.app.event_bus.run_task(self.persist_recordings)
@@ -51,6 +56,12 @@ class RecordingManager:
             asyncio.create_task(self._process_priority_queue("medium", self._queue_medium)), # Second medium worker
             asyncio.create_task(self._process_priority_queue("slow", self._queue_slow))
         ]
+
+    def _record_predictor_metric(self, event_type: str, payload: dict):
+        try:
+            self.predictor_metrics.record_event(event_type, payload)
+        except Exception as e:
+            logger.debug(f"Predictor metrics skipped: {e}")
 
     async def _process_priority_queue(self, name: str, queue: asyncio.Queue):
         """Dedicated worker for a specific priority queue."""
@@ -318,6 +329,16 @@ class RecordingManager:
                     continue
 
                 recording.is_checking = True
+                self._record_predictor_metric(
+                    "check_dispatched",
+                    {
+                        "rec_id": recording.rec_id,
+                        "priority": prio_key,
+                        "likelihood": round(float(likelihood), 4),
+                        "loop_time_seconds": recording.loop_time_seconds,
+                        "is_favorite": bool(getattr(recording, "is_favorite", False)),
+                    },
+                )
                 
                 # 5. Dispatch to priority-specific queue
                 if prio_key == "F":
@@ -521,6 +542,10 @@ class RecordingManager:
 
             if stream_info.is_live:
                 detected_at = datetime.now()
+                last_offline_result_at = self._predictor_last_offline_result_at.get(recording.rec_id)
+                detection_latency_seconds = None
+                if last_offline_result_at:
+                    detection_latency_seconds = max((detected_at - last_offline_result_at).total_seconds(), 0.0)
                 split_due_to_gap = recording.split_stale_live_session_if_needed(detected_at=detected_at)
                 was_live = recording.is_live
                 if split_due_to_gap:
@@ -571,6 +596,18 @@ class RecordingManager:
                     recording.last_duration = timedelta()
                     recording.status_info = RecordingStatus.LIVE_BROADCASTING
 
+                self._record_predictor_metric(
+                    "check_result",
+                    {
+                        "rec_id": recording.rec_id,
+                        "is_live": True,
+                        "was_live": bool(was_live),
+                        "loop_time_seconds": recording.loop_time_seconds,
+                        "detection_latency_seconds": detection_latency_seconds,
+                    },
+                )
+                self._predictor_last_offline_result_at.pop(recording.rec_id, None)
+
             else:
                 # Update counts for non-live case
                 alpha_active = float(self.settings.user_config.get("ema_alpha_active", 0.1))
@@ -594,6 +631,17 @@ class RecordingManager:
                             "display_title": title,
                         }
                     )
+
+                self._record_predictor_metric(
+                    "check_result",
+                    {
+                        "rec_id": recording.rec_id,
+                        "is_live": False,
+                        "was_live": False,
+                        "loop_time_seconds": recording.loop_time_seconds,
+                    },
+                )
+                self._predictor_last_offline_result_at[recording.rec_id] = datetime.now()
 
         finally:
             recording.is_checking = False

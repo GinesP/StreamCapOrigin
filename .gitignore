@@ -181,3 +181,5 @@ ffprobe.exe
 config/recordings.db
 config/recordings.json.bak
 screenshots_tmp/
+config/predictor_metrics.jsonl
+tmp/
