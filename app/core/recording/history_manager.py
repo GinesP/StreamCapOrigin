@@ -120,6 +120,19 @@ class HistoryManager:
         return windows
 
     @staticmethod
+    def _cluster_hours(hours: list[int], max_gap: int = 4) -> list[list[int]]:
+        """Agrupa horas donde el gap entre consecutivas <= max_gap (default: 4h)."""
+        if not hours:
+            return []
+        sorted_h = sorted(set(hours))
+        clusters: list[list[int]] = [[sorted_h[0]]]
+        for h in sorted_h[1:]:
+            if h - clusters[-1][-1] > max_gap:
+                clusters.append([])
+            clusters[-1].append(h)
+        return clusters
+
+    @staticmethod
     def get_forecast_details(
         recording: Recording,
         now: datetime | None = None,
@@ -154,8 +167,11 @@ class HistoryManager:
             proximity = max(0.0, 1.0 - (minute_distance / 180.0))
             score = max(score, 0.25 + (proximity * 0.55))
 
-            first_h = active_hours[0]
-            last_h = active_hours[-1]
+            # Clusterizar horas para evitar ventanas min-max que cubren todo el día
+            clusters = HistoryManager._cluster_hours(active_hours)
+            target = next(c for c in clusters if nearest_hour in c)
+            first_h = target[0]
+            last_h = target[-1]
             end_h = (last_h + 1) % 24
             window_text = f"{first_h:02d}:00-{end_h:02d}:00"
             next_slot_text = f"{nearest_hour:02d}:00"
@@ -177,10 +193,11 @@ class HistoryManager:
                 score = session_component
                 if session_stats["reason_key"]:
                     reason_key = session_stats["reason_key"]
-                if session_stats["next_slot_text"]:
-                    next_slot_text = session_stats["next_slot_text"]
-                if session_stats["window_text"]:
-                    window_text = session_stats["window_text"]
+            # Siempre usar ventana de sesiones cuando está disponible (minuto-grano)
+            if session_stats["window_text"]:
+                window_text = session_stats["window_text"]
+            if session_stats["next_slot_text"]:
+                next_slot_text = session_stats["next_slot_text"]
             score += session_stats["confidence_boost"]
 
         score += min(0.12, max(0.0, getattr(recording, "consistency_score", 0.0)) * 0.12)
