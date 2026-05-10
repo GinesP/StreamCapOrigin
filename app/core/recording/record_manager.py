@@ -1,6 +1,7 @@
 import asyncio
 import random
 import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -13,6 +14,16 @@ from ...utils.logger import logger
 from ..platforms.platform_handlers import get_platform_info
 from .predictor_metrics import PredictorMetricsStore
 from .stream_manager import LiveStreamRecorder
+
+
+def _dispatch_seconds(info: dict | None) -> float | None:
+    """Seconds between dispatch and now. Returns None if not tracked."""
+    if not info:
+        return None
+    started = info.get("at")
+    if started is None:
+        return None
+    return round((datetime.now() - started).total_seconds(), 3)
 
 
 class GlobalRecordingState:
@@ -40,22 +51,32 @@ class RecordingManager:
             f"{self.app.config_manager.config_path}/predictor_metrics.jsonl"
         )
         self._predictor_last_offline_result_at: dict[str, datetime] = {}
+        self._predictor_dispatched_at: dict[str, dict] = {}
 
         if self._needs_platform_migration_persist:
             self.app.event_bus.run_task(self.persist_recordings)
         
         # 1. Multi-Priority Task Queues (Intelligence)
-        # Dedicated queues to ensure fast checks aren't blocked by slow ones
-        self._queue_fast = asyncio.Queue()    # <= 60s
-        self._queue_medium = asyncio.Queue()  # <= 180s
-        self._queue_slow = asyncio.Queue()    # > 180s
-        
-        self._worker_tasks = [
-            asyncio.create_task(self._process_priority_queue("fast", self._queue_fast)),
-            asyncio.create_task(self._process_priority_queue("medium", self._queue_medium)),
-            asyncio.create_task(self._process_priority_queue("medium", self._queue_medium)), # Second medium worker
-            asyncio.create_task(self._process_priority_queue("slow", self._queue_slow))
-        ]
+        self._queue_fast = asyncio.Queue()
+        self._queue_medium = asyncio.Queue()
+        self._queue_slow = asyncio.Queue()
+
+        # Adaptive worker pools: all min=1 max=2, only ONE queue at 2 workers
+        self._pool_config = {
+            "fast":   {"queue": self._queue_fast,   "min": 1, "max": 2, "scale_up_at": 5},
+            "medium": {"queue": self._queue_medium, "min": 1, "max": 2, "scale_up_at": 8},
+            "slow":   {"queue": self._queue_slow,   "min": 1, "max": 2, "scale_up_at": 5},
+        }
+        self._pool_workers: dict[str, list[asyncio.Task]] = {name: [] for name in self._pool_config}
+        self._pool_empty_since: dict[str, float | None] = {name: None for name in self._pool_config}
+        self._boosted_queue: str | None = None  # which queue currently has the extra worker
+
+        for name, cfg in self._pool_config.items():
+            for _ in range(cfg["min"]):
+                task = asyncio.create_task(self._process_priority_queue(name, cfg["queue"]))
+                self._pool_workers[name].append(task)
+
+        self._adaptive_monitor = asyncio.create_task(self._monitor_queues())
 
     def _record_predictor_metric(self, event_type: str, payload: dict):
         try:
@@ -67,15 +88,110 @@ class RecordingManager:
         """Dedicated worker for a specific priority queue."""
         logger.debug(f"Intelligence Worker-{name} started.")
         while True:
-            recording = await queue.get()
+            try:
+                recording = await queue.get()
+            except asyncio.CancelledError:
+                logger.debug(f"Intelligence Worker-{name} cancelled while idle.")
+                break
             try:
                 if recording.monitor_status and not recording.is_recording:
-                    # Relying on Semaphore inside check_if_live for platform safety
                     await self.check_if_live(recording)
+            except asyncio.CancelledError:
+                logger.debug(f"Intelligence Worker-{name} cancelled mid-check.")
+                break
             except Exception as e:
                 logger.error(f"Error in {name} queue worker: {e}")
             finally:
                 queue.task_done()
+
+    def _spawn_worker(self, name: str) -> None:
+        cfg = self._pool_config[name]
+        task = asyncio.create_task(self._process_priority_queue(name, cfg["queue"]))
+        self._pool_workers[name].append(task)
+        logger.debug(
+            f"Adaptive: spawned {name} worker "
+            f"(total={len(self._pool_workers[name])}, depth={cfg['queue'].qsize()})"
+        )
+
+    async def _remove_worker(self, name: str) -> None:
+        workers = self._pool_workers[name]
+        if not workers:
+            return
+        task = workers.pop()
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        logger.debug(
+            f"Adaptive: removed {name} worker (total={len(workers)})"
+        )
+
+    async def _monitor_queues(self) -> None:
+        """Periodically check queue depths and adjust worker count.
+
+        Rule: at most ONE queue can have 2 workers at a time.
+        The most congested queue gets the boost; others stay at 1.
+        """
+        MONITOR_INTERVAL = 15  # seconds
+        SCALE_DOWN_IDLE = 60   # seconds of continuous emptiness
+        while True:
+            await asyncio.sleep(MONITOR_INTERVAL)
+            now = time.monotonic()
+
+            # ---- Scale down idle workers first (frees up the boost) ----
+            for name in list(self._pool_config):
+                cfg = self._pool_config[name]
+                depth = cfg["queue"].qsize()
+                current = len(self._pool_workers[name])
+
+                if depth == 0:
+                    if self._pool_empty_since[name] is None:
+                        self._pool_empty_since[name] = now
+                    elif now - self._pool_empty_since[name] >= SCALE_DOWN_IDLE:
+                        if current > cfg["min"]:
+                            await self._remove_worker(name)
+                            if self._boosted_queue == name:
+                                self._boosted_queue = None
+                            self._pool_empty_since[name] = now
+                else:
+                    self._pool_empty_since[name] = None
+
+            # ---- Decide which queue needs the boost most ----
+            candidates = []
+            for name, cfg in self._pool_config.items():
+                depth = cfg["queue"].qsize()
+                current = len(self._pool_workers[name])
+                if depth > cfg["scale_up_at"] and current < cfg["max"]:
+                    # Weight: how far above threshold, normalized
+                    excess = depth - cfg["scale_up_at"]
+                    candidates.append((excess, name))
+
+            if not candidates:
+                continue
+
+            # Most congested queue wins
+            candidates.sort(reverse=True)
+            _, best = candidates[0]
+
+            if self._boosted_queue is None:
+                # No queue boosted yet — give it to the winner
+                self._spawn_worker(best)
+                self._boosted_queue = best
+            elif self._boosted_queue != best:
+                # Boost is on a different queue; move it if winner is
+                # significantly more congested (avoid flapping)
+                cfg_current = self._pool_config[self._boosted_queue]
+                depth_current = cfg_current["queue"].qsize()
+                cfg_best = self._pool_config[best]
+                depth_best = cfg_best["queue"].qsize()
+
+                # Only move if winner has >= 2x the depth of current holder
+                if depth_best >= depth_current * 2 or depth_current <= cfg_current["scale_up_at"]:
+                    await self._remove_worker(self._boosted_queue)
+                    self._spawn_worker(best)
+                    self._boosted_queue = best
+            # else: boost already on the winning queue, nothing to do
 
     @property
     def recordings(self):
@@ -193,6 +309,8 @@ class RecordingManager:
         if recording.monitor_status:
             # If it's recording, stop it first
             self.stop_recording(recording, manually_stopped=True)
+            self._predictor_dispatched_at.pop(recording.rec_id, None)
+            self._predictor_last_offline_result_at.pop(recording.rec_id, None)
 
             # Now update to stopped monitoring state
             monitor_stopped_label = self._.get('monitor_stopped', 'Stopped monitoring')
@@ -329,6 +447,10 @@ class RecordingManager:
                     continue
 
                 recording.is_checking = True
+                self._predictor_dispatched_at[recording.rec_id] = {
+                    "at": datetime.now(),
+                    "likelihood": round(float(likelihood), 4),
+                }
                 self._record_predictor_metric(
                     "check_dispatched",
                     {
@@ -596,6 +718,7 @@ class RecordingManager:
                     recording.last_duration = timedelta()
                     recording.status_info = RecordingStatus.LIVE_BROADCASTING
 
+                info = self._predictor_dispatched_at.pop(recording.rec_id, None)
                 self._record_predictor_metric(
                     "check_result",
                     {
@@ -604,6 +727,8 @@ class RecordingManager:
                         "was_live": bool(was_live),
                         "loop_time_seconds": recording.loop_time_seconds,
                         "detection_latency_seconds": detection_latency_seconds,
+                        "dispatch_wait_seconds": _dispatch_seconds(info),
+                        "likelihood_at_dispatch": info.get("likelihood") if info else None,
                     },
                 )
                 self._predictor_last_offline_result_at.pop(recording.rec_id, None)
@@ -632,6 +757,7 @@ class RecordingManager:
                         }
                     )
 
+                info = self._predictor_dispatched_at.pop(recording.rec_id, None)
                 self._record_predictor_metric(
                     "check_result",
                     {
@@ -639,6 +765,8 @@ class RecordingManager:
                         "is_live": False,
                         "was_live": False,
                         "loop_time_seconds": recording.loop_time_seconds,
+                        "dispatch_wait_seconds": _dispatch_seconds(info),
+                        "likelihood_at_dispatch": info.get("likelihood") if info else None,
                     },
                 )
                 self._predictor_last_offline_result_at[recording.rec_id] = datetime.now()

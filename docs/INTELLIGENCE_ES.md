@@ -111,9 +111,23 @@ config/predictor_metrics.jsonl
 | Evento | Momento | Payload |
 |--------|---------|---------|
 | `check_dispatched` | Cuando un streamer se encola | rec_id, priority, likelihood, loop_time_seconds, is_favorite |
-| `check_result` | Cuando termina la verificación | rec_id, is_live, was_live, loop_time_seconds, detection_latency_seconds |
+| `check_result` | Cuando termina la verificación | rec_id, is_live, was_live, loop_time_seconds, detection_latency_seconds, dispatch_wait_seconds, likelihood_at_dispatch |
 
-El reporte de métricas se genera con `scripts/predictor_metrics_report.py`.
+**Nuevos campos en `check_result`** (desde 2026-05-09):
+- `dispatch_wait_seconds`: segundos desde que se encoló hasta que terminó el check. Expone congestión de colas.
+- `likelihood_at_dispatch`: la likelihood que el predictor asignó en el dispatch anterior. Permite calibrar la precisión del predictor.
+
+El reporte de métricas se genera con `scripts/predictor_metrics_report.py`:
+```bash
+# Reporte estándar (JSON, últimos 72h)
+python scripts/predictor_metrics_report.py
+
+# Reporte legible (incluye percentiles, breakdown F/M/S, likelihood por cola)
+python scripts/predictor_metrics_report.py --human
+
+# Comparar contra backup histórico
+python scripts/predictor_metrics_report.py --metrics-file predictor_metrics_2026-05-09_backup.jsonl --human
+```
 
 ---
 
@@ -197,19 +211,23 @@ Esto permite anticipar si la probabilidad va a subir o bajar en los próximos mi
 
 ### 3.3 `get_adjusted_interval()` → Frecuencia de revisión
 
-Traduce el score de probabilidad en un intervalo de revisión:
+Traduce el score de probabilidad en un intervalo de revisión. **La likelihood siempre gana al deep sleep** —
+si el predictor dice que un streamer tiene ≥50% de probabilidad de estar live, se revisa más rápido
+aunque sea históricamente inactivo:
 
 ```python
-if priority_score < 0.01 y live_check_count > 30:
-    target = base_interval * 3          # Deep Sleep (streamer muerto)
-elif likelihood >= 0.9:
-    target = 60                          # Fast: cada 60s
+likelihood = get_likelihood_score(recording)
+
+if likelihood >= 0.9:
+    target = 60                          # Fast: alta certeza, cada 60s
 elif likelihood >= 0.5:
-    target = base_interval // 2          # Medium: mitad del base
-elif likelihood <= 0.2:
-    target = int(base_interval * 1.5)   # Slow: 1.5× el base
+    target = base_interval // 2          # Medium: el predictor cree que puede estar live
+elif priority_score < 0.01 y live_check_count > 30:
+    target = base_interval * 3           # Deep Sleep: históricamente muerto Y baja likelihood
+elif likelihood <= 0.15:
+    target = int(base_interval * 1.5)    # Slow: muy improbable
 else:
-    target = base_interval               # Normal
+    target = base_interval               # Normal: sin señales claras
 ```
 
 Luego se aplica **jitter del 15%** (valor aleatorio entre 85%-115%) para evitar patrones predecibles que las plataformas puedan detectar como bots.
@@ -231,21 +249,30 @@ Se ejecuta periódicamente (cada 180s por defecto) y procesa TODOS los streamers
    b. Calcular adjusted_interval
    c. ¿Intervalo excedido? → encolar. ¿No? → skip.
    d. Asignar a cola según intervalo:
-      ≤ 60s   → FAST   (1 worker)
-      ≤ 180s  → MEDIUM (2 workers)
-      > 180s  → SLOW   (1 worker)
+       ≤ 60s   → FAST   (1-2 workers, adaptativo)
+       ≤ 180s  → MEDIUM (1-2 workers, adaptativo)
+       > 180s  → SLOW   (1-2 workers, adaptativo)
 3. Publicar resumen del ciclo en event_bus
 ```
 
-### 4.2 Las 3 Colas Prioritarias
+### 4.2 Las 3 Colas Prioritarias (Workers Adaptativos)
 
-Tres colas asíncronas independientes:
+Tres colas asíncronas independientes con **workers adaptativos** que escalan según demanda:
 
-| Cola | Intervalo | Workers | Uso principal |
-|------|-----------|---------|---------------|
-| **Fast (F)** | ≤ 60s | 1 | Streamers en ventana de emisión activa |
-| **Medium (M)** | ≤ 180s | 2 | Streamers con probabilidad media o favoritos |
-| **Slow (S)** | > 180s | 1 | Streamers fuera de horario o con baja actividad |
+| Cola | Intervalo | Workers (base) | Workers (máx) | Scale-up threshold | Uso principal |
+|------|-----------|----------------|---------------|--------------------|---------------|
+| **Fast (F)** | ≤ 60s | 1 | 2 | ≥5 en cola | Streamers en ventana de emisión activa |
+| **Medium (M)** | ≤ 180s | 1 | 2 | ≥8 en cola | Streamers con probabilidad media o favoritos |
+| **Slow (S)** | > 180s | 1 | 2 | ≥5 en cola | Streamers fuera de horario o con baja actividad |
+
+**Regla global**: solo UNA cola puede tener el worker extra (2 workers) a la vez. La cola más congestionada
+recibe el boost. Esto evita exceder los límites de concurrencia de las plataformas (máximo 4 workers totales:
+3 base + 1 boost).
+
+Un monitor corre cada 15 segundos:
+- **Scale up**: si una cola supera su threshold y ninguna otra tiene 2 workers → se añade un worker.
+- **Reasignación**: si otra cola está más congestionada (≥2× profundidad), el boost se mueve.
+- **Scale down**: si una cola está vacía por 60 segundos, el worker extra se elimina.
 
 Las colas evitan que streamers lentos bloqueen a los que están en ventana de emisión.
 
@@ -260,7 +287,8 @@ async with semaphore:
 ```
 
 - **Stagger**: Cada request espera 0.5-3s aleatorios antes de adquirir el semáforo, distribuyendo la carga.
-- **Semáforos por plataforma**: Evita saturar una misma plataforma con requests simultáneos.
+- **Semáforos por plataforma**: Evita saturar una misma plataforma con requests simultáneos (máx 3 por defecto).
+- **Workers adaptativos**: El monitor `_monitor_queues()` ajusta el número de workers en tiempo real. La concurrencia máxima total es de 4 workers (3 base + 1 boost), lo que combinado con el límite de 3 por plataforma mantiene el sistema dentro de márgenes seguros frente a protecciones antibot.
 
 ### 4.4 Summary del ciclo
 
@@ -393,6 +421,12 @@ PredictorMetricsStore
 
 | Fecha | Cambio | Motivo |
 |-------|--------|--------|
+| 2026-05-10 | Fix: `next_slot_text` prefiere sesiones/horas futuras | A las 23:10 mostraba "Próximo: 20:38" (pasado) en vez de la siguiente ventana |
+| 2026-05-10 | Workers adaptativos con límite global (solo 1 cola boosted) | Evitar >4 workers concurrentes → no disparar antibot |
+| 2026-05-10 | Fix: likelihood gana al deep sleep en `get_adjusted_interval()` | Streams 100% likelihood caían en Slow por ser históricamente inactivos |
+| 2026-05-09 | Percentiles (p50/p95/p99) y `dispatch_wait_seconds` en métricas | El promedio escondía cola larga; p95=570s reveló congestión estructural |
+| 2026-05-09 | Breakdown F/M/S y `likelihood_at_dispatch` en reporte | Visibilidad de distribución de carga y calibración del predictor |
+| 2026-05-09 | `--human` y `--metrics-file` en predictor_metrics_report.py | Reporte legible y comparación contra backups |
 | 2026-05-08 | Clustering de `historical_intervals` | Evitar ventanas `00:00-22:00` con solo 5 slots dispersos |
 | 2026-05-08 | Desacople ventana de `_session_stats` del score | Usar ventana precisa (minuto-grano) siempre que haya datos de sesión |
 | 2026-05-03 | FIFO-5 por día en `historical_intervals` | Detectar cambios de horario rápidamente |
