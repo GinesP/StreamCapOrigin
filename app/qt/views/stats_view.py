@@ -140,7 +140,7 @@ class QtStatsView(QWidget):
         self._gen_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._gen_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._gen_table.setStyleSheet(
-            f"QTableWidget {{ background: {theme_manager.get_color('surface')}; alternate-background-color: {theme_manager.get_color('card')}; border: 1px solid {theme_manager.get_color('border')}; border-radius: 8px; }}"
+            f"QTableWidget {{ background: {theme_manager.get_color('surface')}; alternate-background-color: {theme_manager.get_color('surface2')}; border: 1px solid {theme_manager.get_color('border')}; border-radius: 8px; }}"
             f"QHeaderView::section {{ background: {theme_manager.get_color('card')}; color: {theme_manager.get_color('text')}; padding: 6px; border: none; }}"
         )
         layout.addWidget(self._gen_table)
@@ -509,7 +509,7 @@ class QtStatsView(QWidget):
             f"QPushButton {{ background: {c['card']}; color: {c['text']}; border: 1px solid {c['border']}; border-radius: 6px; padding: 4px 12px; }}"
         )
         self._gen_table.setStyleSheet(
-            f"QTableWidget {{ background: {c['surface']}; alternate-background-color: {c['card']}; border: 1px solid {c['border']}; border-radius: 8px; }}"
+            f"QTableWidget {{ background: {c['surface']}; alternate-background-color: {c['surface2']}; border: 1px solid {c['border']}; border-radius: 8px; }}"
             f"QHeaderView::section {{ background: {c['card']}; color: {c['text']}; padding: 6px; border: none; }}"
         )
         self._pred_empty.setStyleSheet(
