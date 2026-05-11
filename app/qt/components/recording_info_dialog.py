@@ -124,10 +124,14 @@ class QtRecordingInfoDialog(QDialog):
         if added_at:
             stats_items.append((tr("recording_card.added_at", default="Added at"), added_at))
 
+        avg_min = getattr(self.rec, "avg_session_duration_minutes", None)
+        avg_session_str = self._format_duration(avg_min) if avg_min is not None else tr("recording_info.never", default="Never")
+
         stats_items.extend([
             (tr("recording_info.last_seen_live", default="Last Seen Live"), last_seen),
             (tr("recording_info.checks_count", default="Checks Count"), str(getattr(self.rec, "live_check_count", 0))),
             (tr("recording_info.found_live", default="Found Live"), str(getattr(self.rec, "live_found_count", 0))),
+            (tr("recording_info.avg_session", default="Avg Session Duration"), avg_session_str),
         ])
 
         self._add_section(
@@ -256,6 +260,15 @@ class QtRecordingInfoDialog(QDialog):
             return dt.strftime("%Y-%m-%d %H:%M")
         except Exception:
             return str(date_value)
+
+    @staticmethod
+    def _format_duration(total_minutes: float) -> str:
+        """Format a duration in minutes to a human-friendly string like '1h 15m' or '45m'."""
+        total_minutes = int(round(total_minutes))
+        hours, minutes = divmod(total_minutes, 60)
+        if hours > 0:
+            return f"{hours}h {minutes:02d}m"
+        return f"{minutes}m"
 
     def showEvent(self, event):
         super().showEvent(event)

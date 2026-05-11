@@ -251,6 +251,18 @@ class Recording:
         )
         self.prune_live_sessions()
 
+    @property
+    def avg_session_duration_minutes(self) -> float | None:
+        """Average duration of **completed** live sessions, in minutes."""
+        durations = [
+            s["duration_minutes"]
+            for s in self.live_sessions
+            if s.get("end_time") and isinstance(s.get("duration_minutes"), (int, float))
+        ]
+        if not durations:
+            return None
+        return sum(durations) / len(durations)
+
     def end_live_session(self, ended_at=None):
         from datetime import datetime
 

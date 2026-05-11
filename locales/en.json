@@ -621,7 +621,8 @@
     "priority_score": "Priority Score",
     "last_seen_live": "Last Seen Live",
     "checks_count": "Checks Count",
-    "found_live": "Found Live"
+    "found_live": "Found Live",
+    "avg_session": "Avg Session Duration"
   },
   "console": {
     "started_recording": "Started recording for {}",
