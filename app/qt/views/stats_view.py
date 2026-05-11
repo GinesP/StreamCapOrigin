@@ -30,6 +30,18 @@ from app.qt.views.home_view import StatCard, SparklineChart, QueueBarChart
 from app.utils.i18n import tr
 
 
+class _NumericTableItem(QTableWidgetItem):
+    """QTableWidgetItem que ordena numéricamente por el valor UserRole+1."""
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, QTableWidgetItem):
+            return super().__lt__(other)
+        a = self.data(Qt.ItemDataRole.UserRole)
+        b = other.data(Qt.ItemDataRole.UserRole)
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            return a < b
+        return super().__lt__(other)
+
+
 class QtStatsView(QWidget):
     CACHE_TTL = 60.0
 
@@ -263,18 +275,22 @@ class QtStatsView(QWidget):
             if url:
                 seen_urls.add(url)
 
-            sessions = [
+            sessions_72h = [
                 s for s in rec.live_sessions
                 if s.get("start_time") and datetime.fromisoformat(s["start_time"]) >= cutoff
             ]
-            total_sessions += len(sessions)
+            durations = [
+                s.get("duration_minutes") for s in sessions_72h
+                if isinstance(s.get("duration_minutes"), (int, float))
+            ]
+            total_sessions += len(sessions_72h)
             priorities.append(rec.priority_score or 0.0)
             consistencies.append(rec.consistency_score or 0.0)
             streamers.append({
                 "name": rec.streamer_name,
                 "platform": rec.platform_key or rec.platform or "—",
-                "sessions": len(sessions),
-                "avg_duration": rec.avg_session_duration_minutes,
+                "sessions": len(sessions_72h),
+                "avg_duration": (sum(durations) / len(durations)) if durations else None,
                 "priority": rec.priority_score or 0.0,
                 "consistency": rec.consistency_score or 0.0,
                 "favorite": bool(rec.is_favorite),
@@ -309,6 +325,10 @@ class QtStatsView(QWidget):
         d = summary.to_dict()
         if d.get("total_checks", 0) == 0:
             return None
+        # Include a synthetic latency series for the sparkline
+        # (from MetricsSummary we only have the average)
+        lat = d.get("avg_detection_latency_seconds")
+        d["latencies"] = [lat] if lat is not None else []
         return d
 
     # ── Refresh / Render ─────────────────────────────────────────────
@@ -330,6 +350,8 @@ class QtStatsView(QWidget):
             self._render_heatmap_tab()
 
     def _render_general_tab(self) -> None:
+        if self._current_tab != 0:
+            return
         data = self._get_cached_or_compute("general", self._aggregate_general_data)
         self._gen_cards["total_streamers"].set_value(str(data["total_streamers"]))
         self._gen_cards["total_sessions"].set_value(str(data["total_sessions"]))
@@ -364,16 +386,31 @@ class QtStatsView(QWidget):
         for i, s in enumerate(streamers):
             self._gen_table.setItem(i, 0, QTableWidgetItem(s["name"]))
             self._gen_table.setItem(i, 1, QTableWidgetItem(s["platform"]))
-            self._gen_table.setItem(i, 2, QTableWidgetItem(str(s["sessions"])))
-            self._gen_table.setItem(i, 3, QTableWidgetItem(fmt_duration(s["avg_duration"])))
-            self._gen_table.setItem(i, 4, QTableWidgetItem(str(round(s["priority"], 2))))
-            self._gen_table.setItem(i, 5, QTableWidgetItem(str(round(s["consistency"], 2))))
+
+            item_sessions = _NumericTableItem(str(s["sessions"]))
+            item_sessions.setData(Qt.ItemDataRole.UserRole, s["sessions"])
+            self._gen_table.setItem(i, 2, item_sessions)
+
+            item_dur = _NumericTableItem(fmt_duration(s["avg_duration"]))
+            item_dur.setData(Qt.ItemDataRole.UserRole, s["avg_duration"] or 0)
+            self._gen_table.setItem(i, 3, item_dur)
+
+            item_pri = _NumericTableItem(str(round(s["priority"], 2)))
+            item_pri.setData(Qt.ItemDataRole.UserRole, round(s["priority"], 2))
+            self._gen_table.setItem(i, 4, item_pri)
+
+            item_con = _NumericTableItem(str(round(s["consistency"], 2)))
+            item_con.setData(Qt.ItemDataRole.UserRole, round(s["consistency"], 2))
+            self._gen_table.setItem(i, 5, item_con)
+
             fav = "★" if s["favorite"] else ""
             self._gen_table.setItem(i, 6, QTableWidgetItem(fav))
 
         self._gen_table.setSortingEnabled(True)
 
     def _render_heatmap_tab(self) -> None:
+        if self._current_tab != 2:
+            return
         # Populate selector if empty
         if self._hm_selector.count() == 0:
             self._hm_selector.addItem(tr("stats_view.select_streamer", "All Streamers"), None)
@@ -393,7 +430,12 @@ class QtStatsView(QWidget):
         self._render_heatmap_tab()
 
     def _render_predictor_tab(self) -> None:
-        data = self._get_cached_or_compute("predictor", self._load_predictor_data)
+        if self._current_tab != 1:
+            return  # user switched away while loading
+        try:
+            data = self._get_cached_or_compute("predictor", self._load_predictor_data)
+        except Exception:
+            data = None
         has_data = data is not None
 
         for card in self._pred_cards.values():
@@ -417,10 +459,8 @@ class QtStatsView(QWidget):
         lh = data.get("avg_likelihood_at_dispatch")
         self._pred_cards["avg_likelihood"].set_value("—" if lh is None else f"{lh:.2f}")
 
-        # Sparkline: build synthetic deque from recent latency values
-        # We don't have per-check latencies in summary, so use avg as single point
-        # Or better: read raw records and extract latencies
-        latencies = self._extract_recent_latencies()
+        # Sparkline from cached latency series (avoids re-reading JSONL)
+        latencies = data.get("latencies", [])
         self._pred_sparkline._data.clear()
         for v in latencies:
             self._pred_sparkline.add_point(int(v))
@@ -451,15 +491,6 @@ class QtStatsView(QWidget):
         self._pred_detail_labels["dispatch_breakdown"].setText(
             f"{tr('stats_view.dispatch_breakdown', 'Dispatch Breakdown')}: F={data.get('dispatch_fast',0)} M={data.get('dispatch_medium',0)} S={data.get('dispatch_slow',0)}"
         )
-
-    def _extract_recent_latencies(self) -> list[float]:
-        store = self.app.record_manager.predictor_metrics
-        # Access internal loading or file directly is not ideal; fallback to summary
-        # For sparkline we need a series. Use summarize and if avg exists add it.
-        summary = store.summarize(lookback_hours=72)
-        if summary.avg_detection_latency_seconds is not None:
-            return [summary.avg_detection_latency_seconds]
-        return []
 
     # ── Translations / Theme ─────────────────────────────────────────
 
