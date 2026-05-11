@@ -621,7 +621,8 @@
         "last_seen_live": "Última vez en vivo",
         "checks_count": "Número de comprobaciones",
         "found_live": "Veces detectado en vivo",
-        "avg_session": "Duración media de sesión"
+        "avg_session": "Duración media de sesión",
+        "next_window": "Próxima ventana"
     },
     "console": {
         "started_recording": "Comenzó la grabación para {}",

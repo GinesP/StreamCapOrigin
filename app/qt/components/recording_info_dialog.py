@@ -26,6 +26,7 @@ from app.qt.themes.theme import theme_manager
 from app.qt.utils.elevation import apply_elevation
 from app.utils.i18n import tr
 from app.models.recording.recording_status_model import RecordingStatus
+from app.core.recording.history_manager import HistoryManager
 
 
 class QtRecordingInfoDialog(QDialog):
@@ -127,11 +128,22 @@ class QtRecordingInfoDialog(QDialog):
         avg_min = getattr(self.rec, "avg_session_duration_minutes", None)
         avg_session_str = self._format_duration(avg_min) if avg_min is not None else tr("recording_info.never", default="Never")
 
+        forecast = HistoryManager.get_forecast_details(self.rec)
+        next_slot_text = forecast.get("next_slot_text") or ""
+        window_text = forecast.get("window_text") or ""
+        if next_slot_text and window_text:
+            next_window_str = f"{window_text}"
+        elif next_slot_text:
+            next_window_str = next_slot_text
+        else:
+            next_window_str = tr("recording_info.never", default="Never")
+
         stats_items.extend([
             (tr("recording_info.last_seen_live", default="Last Seen Live"), last_seen),
             (tr("recording_info.checks_count", default="Checks Count"), str(getattr(self.rec, "live_check_count", 0))),
             (tr("recording_info.found_live", default="Found Live"), str(getattr(self.rec, "live_found_count", 0))),
             (tr("recording_info.avg_session", default="Avg Session Duration"), avg_session_str),
+            (tr("recording_info.next_window", default="Next Window"), next_window_str),
         ])
 
         self._add_section(

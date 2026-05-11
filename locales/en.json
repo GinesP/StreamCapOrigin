@@ -622,7 +622,8 @@
     "last_seen_live": "Last Seen Live",
     "checks_count": "Checks Count",
     "found_live": "Found Live",
-    "avg_session": "Avg Session Duration"
+    "avg_session": "Avg Session Duration",
+    "next_window": "Next Window"
   },
   "console": {
     "started_recording": "Started recording for {}",
