@@ -129,8 +129,12 @@ class QtStatsView(QWidget):
         self._gen_table = QTableWidget()
         self._gen_table.setColumnCount(7)
         self._gen_table.setSortingEnabled(True)
-        self._gen_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self._gen_table.horizontalHeader().setStretchLastSection(False)
+        header = self._gen_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # streamer name
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)    # fav
+        header.resizeSection(6, 30)
         self._gen_table.verticalHeader().setVisible(False)
         self._gen_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._gen_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
