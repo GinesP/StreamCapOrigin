@@ -139,6 +139,7 @@ class QtStatsView(QWidget):
         self._gen_table.setAlternatingRowColors(True)
         self._gen_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._gen_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._gen_table.cellDoubleClicked.connect(self._on_general_table_dblclick)
         self._gen_table.setStyleSheet(
             f"QTableWidget {{ background: {theme_manager.get_color('surface')}; alternate-background-color: {theme_manager.get_color('surface2')}; border: 1px solid {theme_manager.get_color('border')}; border-radius: 8px; }}"
             f"QHeaderView::section {{ background: {theme_manager.get_color('card')}; color: {theme_manager.get_color('text')}; padding: 6px; border: none; }}"
@@ -499,6 +500,20 @@ class QtStatsView(QWidget):
         self._hm_selector.clear()
         self._retranslate_ui()
         self._refresh_current_tab()
+
+    def _on_general_table_dblclick(self, row: int, _col: int) -> None:
+        """Double-click on a streamer row → navigate to Recordings view with search pre-filled."""
+        item = self._gen_table.item(row, 0)
+        if not item or not item.text():
+            return
+        streamer_name = item.text()
+        mw = self.app.main_window
+        if not mw:
+            return
+        mw.show_page("recordings")
+        rec_view = mw._pages.get("recordings")
+        if rec_view and hasattr(rec_view, "search_box"):
+            rec_view.search_box.setText(streamer_name)
 
     def _on_theme_changed(self) -> None:
         c = theme_manager.colors
