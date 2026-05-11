@@ -210,7 +210,27 @@ class RecordingManager:
         """Load recordings from a JSON file into objects."""
         recordings_data = self.app.config_manager.load_recordings_config()
         if not GlobalRecordingState.recordings:
-            GlobalRecordingState.recordings = [Recording.from_dict(rec) for rec in recordings_data]
+            raw = [Recording.from_dict(rec) for rec in recordings_data]
+
+            # Deduplicate by URL — keep the recording with higher live_found_count
+            seen: dict[str, Recording] = {}
+            duplicates = 0
+            for rec in raw:
+                key = (rec.url or "").strip().lower()
+                if not key:
+                    seen.setdefault(rec.rec_id, rec)
+                    continue
+                existing = seen.get(key)
+                if existing is None:
+                    seen[key] = rec
+                else:
+                    duplicates += 1
+                    # Keep the one with more live data
+                    if (rec.live_found_count or 0) > (existing.live_found_count or 0):
+                        seen[key] = rec
+            if duplicates:
+                logger.warning(f"Deduplicated {duplicates} recording(s) by URL during loading.")
+            GlobalRecordingState.recordings = list(seen.values())
 
             migrated = False
             for recording in GlobalRecordingState.recordings:

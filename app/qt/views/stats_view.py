@@ -242,14 +242,21 @@ class QtStatsView(QWidget):
 
     def _aggregate_general_data(self) -> dict:
         recordings = self.app.record_manager.recordings
-        total = len(recordings)
         cutoff = datetime.now() - timedelta(hours=72)
         total_sessions = 0
         priorities = []
         consistencies = []
-        streamers = []
+        seen_urls: set[str] = set()
+        streamers: list[dict] = []
 
         for rec in recordings:
+            # Deduplicate by URL — skip if we already saw this URL
+            url = (rec.url or "").strip()
+            if url and url in seen_urls:
+                continue
+            if url:
+                seen_urls.add(url)
+
             sessions = [
                 s for s in rec.live_sessions
                 if s.get("start_time") and datetime.fromisoformat(s["start_time"]) >= cutoff
@@ -270,7 +277,7 @@ class QtStatsView(QWidget):
         streamers.sort(key=lambda x: x["sessions"], reverse=True)
 
         return {
-            "total_streamers": total,
+            "total_streamers": len(streamers),
             "total_sessions": total_sessions,
             "avg_priority": round(sum(priorities) / len(priorities), 2) if priorities else 0.0,
             "avg_consistency": round(sum(consistencies) / len(consistencies), 2) if consistencies else 0.0,

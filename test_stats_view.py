@@ -65,6 +65,7 @@ class StatsViewAggregationTests(unittest.TestCase):
         now = datetime.now()
         rec1 = self._make_recording(
             rec_id="r1",
+            url="http://example.com/alice",
             streamer_name="Alice",
             platform_key="twitch",
             priority_score=0.8,
@@ -77,6 +78,7 @@ class StatsViewAggregationTests(unittest.TestCase):
         )
         rec2 = self._make_recording(
             rec_id="r2",
+            url="http://example.com/bob",
             streamer_name="Bob",
             platform_key="youtube",
             priority_score=0.4,
