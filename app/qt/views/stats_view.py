@@ -331,11 +331,17 @@ class QtStatsView(QWidget):
         self._gen_cards["avg_consistency"].set_value(str(data["avg_consistency"]))
 
         streamers = data["streamers"]
+
+        # Disable sorting while populating to prevent Qt row artifacts
+        self._gen_table.setSortingEnabled(False)
+        self._gen_table.setRowCount(0)
         self._gen_table.setRowCount(max(len(streamers), 1))
+
         if not streamers:
             self._gen_table.setItem(0, 0, QTableWidgetItem(tr("stats_view.no_streamers", "No streamers configured")))
             for c in range(1, 7):
                 self._gen_table.setItem(0, c, QTableWidgetItem(""))
+            self._gen_table.setSortingEnabled(True)
             return
 
         headers = [
@@ -358,6 +364,8 @@ class QtStatsView(QWidget):
             self._gen_table.setItem(i, 5, QTableWidgetItem(str(round(s["consistency"], 2))))
             fav = "★" if s["favorite"] else ""
             self._gen_table.setItem(i, 6, QTableWidgetItem(fav))
+
+        self._gen_table.setSortingEnabled(True)
 
     def _render_heatmap_tab(self) -> None:
         # Populate selector if empty
@@ -477,11 +485,8 @@ class QtStatsView(QWidget):
             l.get("no_sessions", "No sessions recorded") if not self._hm_chart._data else ""
         )
 
-        # Re-render table headers if visible
-        if self._current_tab == 0:
-            self._render_general_tab()
-        if self._current_tab == 1:
-            self._render_predictor_tab()
+        # NOTE: Tab re-render is done by the caller (e.g. _on_language_changed → _refresh_current_tab).
+        # Do NOT render here to avoid duplicate row artifacts in the table.
 
     def _on_language_changed(self, topic, new_language) -> None:
         self._invalidate_cache()
