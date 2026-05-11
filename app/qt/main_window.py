@@ -87,6 +87,7 @@ class MainWindow(QMainWindow):
             "Ctrl+3": "settings",
             "Ctrl+4": "about",
             "Ctrl+5": "logs",
+            "Ctrl+6": "stats",
         }
         for key, page in shortcuts.items():
             s = QShortcut(QKeySequence(key), self)
@@ -174,6 +175,9 @@ class MainWindow(QMainWindow):
         if name == "home":
             from app.qt.views.home_view import QtHomeView
             return QtHomeView(self.app)
+        elif name == "stats":
+            from app.qt.views.stats_view import QtStatsView
+            return QtStatsView(self.app)
         elif name == "recordings":
             from app.qt.views.recordings_view import QtRecordingsView
             return QtRecordingsView(self.app)
@@ -253,6 +257,7 @@ class MainWindow(QMainWindow):
         sidebar_labels = language_data.get("record_sidebar", {})
         keys_map = {
             "home": "home",
+            "stats": "stats",
             "recordings": "recordings",
             "settings": "settings",
             "logs": "logs",

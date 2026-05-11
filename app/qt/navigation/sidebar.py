@@ -141,6 +141,7 @@ class Sidebar(QFrame):
 
     NAV_ITEMS = [
         ("home", "Home", "home"),
+        ("stats", "Stats", "stats"),
         ("recordings", "Recordings", "recordings"),
         ("settings", "Settings", "settings"),
         ("logs", "Logs", "logs"),
@@ -204,6 +205,7 @@ class Sidebar(QFrame):
 
             keys_map = {
                 "home": "home",
+                "stats": "stats",
                 "recordings": "recordings",
                 "settings": "settings",
                 "logs": "logs",
