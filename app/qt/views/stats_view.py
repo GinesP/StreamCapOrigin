@@ -264,10 +264,11 @@ class QtStatsView(QWidget):
         recordings = self.app.record_manager.recordings
         cutoff = datetime.now() - timedelta(hours=72)
         total_sessions = 0
-        priorities = []
-        consistencies = []
         seen_urls: set[str] = set()
         streamers: list[dict] = []
+        # Only count priority/consistency from streamers WITH activity in the window
+        active_priorities: list[float] = []
+        active_consistencies: list[float] = []
 
         for rec in recordings:
             # Deduplicate by URL — skip if we already saw this URL
@@ -285,9 +286,11 @@ class QtStatsView(QWidget):
                 s.get("duration_minutes") for s in sessions_72h
                 if isinstance(s.get("duration_minutes"), (int, float))
             ]
+            has_activity = len(sessions_72h) > 0
             total_sessions += len(sessions_72h)
-            priorities.append(rec.priority_score or 0.0)
-            consistencies.append(rec.consistency_score or 0.0)
+            if has_activity:
+                active_priorities.append(rec.priority_score or 0.0)
+                active_consistencies.append(rec.consistency_score or 0.0)
             streamers.append({
                 "name": rec.streamer_name,
                 "platform": rec.platform_key or rec.platform or "—",
@@ -303,8 +306,8 @@ class QtStatsView(QWidget):
         return {
             "total_streamers": len(streamers),
             "total_sessions": total_sessions,
-            "avg_priority": round(sum(priorities) / len(priorities), 2) if priorities else 0.0,
-            "avg_consistency": round(sum(consistencies) / len(consistencies), 2) if consistencies else 0.0,
+            "avg_priority": round(sum(active_priorities) / len(active_priorities), 3) if active_priorities else 0.0,
+            "avg_consistency": round(sum(active_consistencies) / len(active_consistencies), 3) if active_consistencies else 0.0,
             "streamers": streamers,
         }
 
