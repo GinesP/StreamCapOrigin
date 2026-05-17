@@ -411,10 +411,18 @@ class LiveForecastDialog(QDialog):
         current_minutes = now.hour * 60 + now.minute
 
         def _slot_minutes_until(rec) -> int | None:
-            """Return minutes until the next predicted slot, or None if unknown."""
-            if rec.is_live:
+            """Return minutes until the next predicted slot, or None if unknown.
+
+            For live / active-window states returns 0 so they sort first.
+            For future slots returns the actual minutes-until (capped at 300 for
+            the filter, but the raw value is used for sorting).
+            """
+            info = _get_forecast_time_info(rec)
+            state = info.get("state")
+            # Imminent / overdue — sort first regardless of wall-clock distance
+            if state in ('live_range', 'expected', 'delayed') or rec.is_live:
                 return 0
-            # Parse next_slot_text from forecast details (works for all states)
+            # Future slots — parse next_slot_text for real distance
             forecast = HistoryManager.get_forecast_details(rec)
             slot = forecast.get("next_slot_text", "")
             if not slot:
