@@ -144,6 +144,57 @@ class PredictorMetricsStoreTests(unittest.TestCase):
                 1,
             )
 
+    def test_interrupt_pending_operations_is_safe_when_idle(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = PredictorMetricsStore(Path(temp_dir) / "predictor_metrics.db")
+            store.interrupt_pending_operations()
+            store.record_event("check_result", {"rec_id": "rec-1", "is_live": False})
+            summary = store.summarize(lookback_hours=72)
+
+            conn = sqlite3.connect(store.db_path)
+            row_count = conn.execute("SELECT COUNT(*) FROM predictor_metrics").fetchone()[0]
+            conn.close()
+            self.assertEqual(row_count, 1)
+            self.assertEqual(summary.total_checks, 1)
+
+    def test_summarize_aborts_when_interrupted_during_postprocessing(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = PredictorMetricsStore(Path(temp_dir) / "predictor_metrics.db")
+            rows = [
+                (
+                    f"2026-05-03T09:{idx // 60:02d}:{idx % 60:02d}",
+                    "check_result",
+                    f"rec-{idx}",
+                    0,
+                    None,
+                    None,
+                    json.dumps({"rec_id": f"rec-{idx}", "is_live": False}),
+                )
+                for idx in range(2000)
+            ]
+            with store._connect() as conn:
+                conn.executemany(
+                    "INSERT INTO predictor_metrics (timestamp, event, rec_id, is_live, priority, likelihood, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    rows,
+                )
+                conn.commit()
+
+            original_parse_ts = store._parse_ts
+            call_count = {"value": 0}
+
+            def slow_parse(value):
+                call_count["value"] += 1
+                if call_count["value"] == 50:
+                    store.interrupt_pending_operations()
+                return original_parse_ts(value)
+
+            store._parse_ts = slow_parse
+            try:
+                with self.assertRaises(sqlite3.OperationalError):
+                    store.summarize(lookback_hours=99999)
+            finally:
+                store._parse_ts = original_parse_ts
+
     def test_metrics_summary_to_dict_has_expected_keys(self):
         summary = MetricsSummary(
             total_checks=1,

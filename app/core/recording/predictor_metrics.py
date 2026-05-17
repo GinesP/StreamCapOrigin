@@ -1,7 +1,7 @@
 import json
 import sqlite3
 import threading
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -95,6 +95,9 @@ class PredictorMetricsStore:
         self.file_path = Path(file_path)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self._active_connections_lock = threading.Lock()
+        self._active_connections: set[sqlite3.Connection] = set()
+        self._interrupt_event = threading.Event()
         self.db_path = self._resolve_db_path(self.file_path)
         self.legacy_jsonl_path = (
             self.file_path if self.file_path.suffix.lower() == ".jsonl" else self.file_path.with_suffix(".jsonl")
@@ -114,9 +117,34 @@ class PredictorMetricsStore:
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA temp_store=MEMORY")
 
-    def _init_db(self) -> None:
+    @contextmanager
+    def _connect(self):
         with closing(sqlite3.connect(self.db_path)) as conn:
             self._configure_db(conn)
+            with self._active_connections_lock:
+                self._active_connections.add(conn)
+            try:
+                yield conn
+            finally:
+                with self._active_connections_lock:
+                    self._active_connections.discard(conn)
+
+    def interrupt_pending_operations(self) -> None:
+        self._interrupt_event.set()
+        with self._active_connections_lock:
+            active_connections = list(self._active_connections)
+        for conn in active_connections:
+            try:
+                conn.interrupt()
+            except sqlite3.Error:
+                continue
+
+    def _raise_if_interrupted(self) -> None:
+        if self._interrupt_event.is_set():
+            raise sqlite3.OperationalError("interrupted")
+
+    def _init_db(self) -> None:
+        with self._connect() as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS predictor_metrics (
@@ -152,8 +180,7 @@ class PredictorMetricsStore:
         if not self.legacy_jsonl_path.exists():
             return
         source_key = f"legacy_jsonl_migrated::{self.legacy_jsonl_path.resolve()}"
-        with closing(sqlite3.connect(self.db_path)) as conn:
-            self._configure_db(conn)
+        with self._connect() as conn:
             already_migrated = conn.execute(
                 "SELECT value FROM predictor_metrics_meta WHERE key = ?",
                 (source_key,),
@@ -225,8 +252,7 @@ class PredictorMetricsStore:
     def record_event(self, event_type: str, payload: dict) -> None:
         timestamp = _utcnow().isoformat()
         with self._lock:
-            with closing(sqlite3.connect(self.db_path)) as conn:
-                self._configure_db(conn)
+            with self._connect() as conn:
                 conn.execute(
                     "INSERT INTO predictor_metrics (timestamp, event, rec_id, is_live, priority, likelihood, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (
@@ -242,6 +268,7 @@ class PredictorMetricsStore:
                 conn.commit()
 
     def summarize(self, lookback_hours: int = 72, near_live_minutes: int = 15) -> MetricsSummary:
+        self._interrupt_event.clear()
         horizon_start = _utcnow() - timedelta(hours=max(1, int(lookback_hours)))
         records = self._load_records_after(horizon_start)
         results = [item for item in records if item.get("event") == "check_result"]
@@ -253,6 +280,7 @@ class PredictorMetricsStore:
 
         by_rec: dict[str, list[dict]] = {}
         for item in results:
+            self._raise_if_interrupted()
             rec_id = str(item.get("payload", {}).get("rec_id") or "")
             if not rec_id:
                 continue
@@ -266,8 +294,10 @@ class PredictorMetricsStore:
         near_live_delta = timedelta(minutes=max(1, int(near_live_minutes)))
 
         for events in by_rec.values():
+            self._raise_if_interrupted()
             ordered = sorted(events, key=lambda item: item.get("timestamp", ""))
             for idx, current in enumerate(ordered):
+                self._raise_if_interrupted()
                 payload = current.get("payload", {})
                 ts = self._parse_ts(current.get("timestamp"))
                 if ts is None:
@@ -308,6 +338,7 @@ class PredictorMetricsStore:
 
         dispatch_times: list[float] = []
         for item in results:
+            self._raise_if_interrupted()
             dw = item.get("payload", {}).get("dispatch_wait_seconds")
             if isinstance(dw, (int, float)):
                 dispatch_times.append(float(dw))
@@ -315,6 +346,7 @@ class PredictorMetricsStore:
         # ---- Priority attribution: match each result to its dispatch ----
         disp_by_rec: dict[str, list[dict]] = {}
         for item in dispatched:
+            self._raise_if_interrupted()
             rec_id = str(item.get("payload", {}).get("rec_id") or "")
             if not rec_id:
                 continue
@@ -322,6 +354,7 @@ class PredictorMetricsStore:
 
         # Sort all dispatch lists by timestamp once
         for rec_id in disp_by_rec:
+            self._raise_if_interrupted()
             disp_by_rec[rec_id].sort(key=lambda x: x.get("timestamp", ""))
 
         d_fast = d_medium = d_slow = 0
@@ -332,8 +365,10 @@ class PredictorMetricsStore:
         lh_slow: list[float] = []
 
         for rec_id, result_list in by_rec.items():
+            self._raise_if_interrupted()
             disp_list = disp_by_rec.get(rec_id, [])
             for result in result_list:
+                self._raise_if_interrupted()
                 r_ts = self._parse_ts(result.get("timestamp"))
                 if r_ts is None:
                     continue
@@ -409,15 +444,16 @@ class PredictorMetricsStore:
     def _load_records_after(self, horizon_start: datetime) -> list[dict]:
         if not self.db_path.exists():
             return []
-        with closing(sqlite3.connect(self.db_path)) as conn:
-            self._configure_db(conn)
+        with self._connect() as conn:
             rows = conn.execute(
                 "SELECT timestamp, event, payload_json FROM predictor_metrics WHERE timestamp >= ? ORDER BY timestamp ASC",
                 (horizon_start.isoformat(),),
             ).fetchall()
 
+        self._raise_if_interrupted()
         records = []
         for timestamp, event, payload_json in rows:
+            self._raise_if_interrupted()
             try:
                 payload = json.loads(payload_json)
             except json.JSONDecodeError:

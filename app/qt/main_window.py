@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
     def _setup_shortcuts(self):
         """Register global keyboard shortcuts (Design Guide §7.2)."""
         from PySide6.QtGui import QKeySequence, QShortcut
-        
+
         # Navigation
         shortcuts = {
             "Ctrl+1": "home",
@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
 
         # Actions
         QShortcut(QKeySequence("Ctrl+T"), self).activated.connect(self._toggle_theme)
-        
+
         # Context-aware: Focus search
         self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self.search_shortcut.activated.connect(self._on_search_shortcut)
@@ -123,7 +123,7 @@ class MainWindow(QMainWindow):
             if view and hasattr(view, "_on_add_stream_clicked"):
                 view._on_add_stream_clicked()
         elif self.sidebar.current_page == "home":
-            self.show_page("recordings") # Shift to recordings
+            self.show_page("recordings")  # Shift to recordings
             QTimer.singleShot(100, self._on_add_shortcut)
 
     def _on_refresh_shortcut(self):
@@ -131,7 +131,7 @@ class MainWindow(QMainWindow):
         view = self.content_stack.currentWidget()
         if view and hasattr(view, "refresh") and callable(view.refresh):
             view.refresh()
-        elif view and hasattr(view, "_load_data"): # Common pattern in our views
+        elif view and hasattr(view, "_load_data"):  # Common pattern in our views
             view._load_data()
 
     # ── UI Setup ─────────────────────────────────────────────────────
@@ -174,21 +174,27 @@ class MainWindow(QMainWindow):
         """Factory method to create page widgets lazily."""
         if name == "home":
             from app.qt.views.home_view import QtHomeView
+
             return QtHomeView(self.app)
         elif name == "stats":
             from app.qt.views.stats_view import QtStatsView
+
             return QtStatsView(self.app)
         elif name == "recordings":
             from app.qt.views.recordings_view import QtRecordingsView
+
             return QtRecordingsView(self.app)
         elif name == "settings":
             from app.qt.views.settings_view import QtSettingsView
+
             return QtSettingsView(self.app)
         elif name == "logs":
             from app.qt.views.log_view import QtLogView
+
             return QtLogView(self.app)
         elif name == "about":
             from app.qt.views.about_view import QtAboutView
+
             return QtAboutView(self.app)
         return self._create_placeholder(name)
 
@@ -228,7 +234,7 @@ class MainWindow(QMainWindow):
         if name not in self._pages:
             widget = self._create_page(name)
             self.register_page(name, widget)
-            
+
         self.content_stack.setCurrentWidget(self._pages[name])
         self.sidebar.select_page(name)
 
@@ -246,11 +252,11 @@ class MainWindow(QMainWindow):
         """Return the shared video player, creating it on first use."""
         if self.app.video_player is None:
             from app.qt.components.video_player import QtVideoPlayer  # lazy: QtMultimedia
+
             self.app.video_player = QtVideoPlayer(self.app, parent=self)
         return self.app.video_player
 
     # ── Events ───────────────────────────────────────────────────────
-
 
     def _on_language_changed(self, topic, language_data):
         """Update the UI when the language changes."""
@@ -261,7 +267,7 @@ class MainWindow(QMainWindow):
             "recordings": "recordings",
             "settings": "settings",
             "logs": "logs",
-            "about": "about"
+            "about": "about",
         }
         translated = {page_name: sidebar_labels[key] for key, page_name in keys_map.items() if key in sidebar_labels}
         self.sidebar.update_labels(translated)
@@ -273,9 +279,9 @@ class MainWindow(QMainWindow):
             if widget == current_widget:
                 current_page = name
                 break
-                
+
         self._register_pages()
-        
+
         if current_page:
             self.show_page(current_page)
         else:
@@ -292,13 +298,13 @@ class MainWindow(QMainWindow):
     def _apply_theme(self):
         """Apply the current theme at startup."""
         from app.qt.themes.theme import ACCENT_COLORS, theme_manager
-        
+
         self._dark_mode = self.app.settings.user_config.get("theme_mode", "dark") == "dark"
         theme_manager._dark = self._dark_mode
-        
+
         theme_color = self.app.settings.user_config.get("theme_color", "orange")
         theme_manager._accent = ACCENT_COLORS.get(theme_color, "#FF6428")
-        
+
         theme_manager._rebuild_colors()
         theme_manager._apply_to_app()
         theme_manager._emit_theme_changed()
@@ -339,19 +345,18 @@ class MainWindow(QMainWindow):
         if sys.platform != "win32":
             return
         try:
+
             class MARGINS(ctypes.Structure):
                 _fields_ = [
-                    ("cxLeftWidth",    ctypes.c_int),
-                    ("cxRightWidth",   ctypes.c_int),
-                    ("cyTopHeight",    ctypes.c_int),
+                    ("cxLeftWidth", ctypes.c_int),
+                    ("cxRightWidth", ctypes.c_int),
+                    ("cyTopHeight", ctypes.c_int),
                     ("cyBottomHeight", ctypes.c_int),
                 ]
 
             hwnd = int(self.winId())
             margins = MARGINS(1, 1, 1, 1)
-            ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(
-                hwnd, ctypes.byref(margins)
-            )
+            ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(margins))
         except Exception:
             pass  # DWM unavailable (RDP, VM, older Windows)
 
@@ -366,23 +371,34 @@ class MainWindow(QMainWindow):
 
         from app.qt.components.confirm_dialog import QtConfirmDialog
         from app.utils.i18n import tr
+
         if QtConfirmDialog.confirm(
             self,
             tr("app_close_handler.confirm_exit"),
             tr("app_close_handler.confirm_exit_content"),
             tr("app_close_handler.minimize_to_tray_tip"),
-            type="warning"
+            type="warning",
         ):
             self._is_shutting_down = True
             event.ignore()
 
             # Prevent new recordings and tell StreamManager we are closing
-            if hasattr(self.app, 'recording_enabled'):
+            if hasattr(self.app, "recording_enabled"):
                 self.app.recording_enabled = False
 
+            if hasattr(self.app, "event_bus") and self.app.event_bus:
+                self.app.event_bus.publish("app_closing")
+
+            if hasattr(self.app, "record_manager") and self.app.record_manager:
+                self.app.record_manager.predictor_metrics.interrupt_pending_operations()
+
             # Stop all active recordings
-            if hasattr(self.app, 'record_manager') and self.app.record_manager:
-                active_recs = [rec for rec in self.app.record_manager.recordings if getattr(rec, 'is_recording', False) or getattr(rec, 'monitor_status', False)]
+            if hasattr(self.app, "record_manager") and self.app.record_manager:
+                active_recs = [
+                    rec
+                    for rec in self.app.record_manager.recordings
+                    if getattr(rec, "is_recording", False) or getattr(rec, "monitor_status", False)
+                ]
                 for rec in active_recs:
                     self.app.record_manager.stop_recording(rec, manually_stopped=True)
 
@@ -392,6 +408,7 @@ class MainWindow(QMainWindow):
 
             # Launch async sequence to wait for transcoding tasks
             import asyncio
+
             asyncio.ensure_future(self._perform_shutdown())
         else:
             event.ignore()
@@ -438,38 +455,43 @@ class MainWindow(QMainWindow):
         # Wait up to 30 seconds for active ffmpeg processes to clear
         for _ in range(60):
             active_processes = 0
-            if hasattr(self.app, 'process_manager') and self.app.process_manager:
+            if hasattr(self.app, "process_manager") and self.app.process_manager:
                 active_processes = len([p for p in self.app.process_manager.ffmpeg_processes if p.returncode is None])
-                
+
             active_recorders = 0
-            if hasattr(self.app, 'record_manager') and self.app.record_manager:
+            if hasattr(self.app, "record_manager") and self.app.record_manager:
                 active_recorders = len(self.app.record_manager.active_recorders)
-                
+
             bg_tasks = 0
             try:
                 from app.core.runtime.process_manager import BackgroundService
+
                 bg_tasks = BackgroundService.get_instance().tasks.unfinished_tasks
             except Exception:
                 pass
-                
+
             # Check for active asyncio tasks related to recording or transcoding
             asyncio_tasks_active = 0
             for task in asyncio.all_tasks():
                 coro = task.get_coro()
-                if coro and hasattr(coro, '__name__'):
-                    if coro.__name__ in ['start_ffmpeg', 'converts_mp4', '_do_converts_mp4', 'start_recording']:
+                if coro and hasattr(coro, "__name__"):
+                    if coro.__name__ in ["start_ffmpeg", "converts_mp4", "_do_converts_mp4", "start_recording"]:
                         asyncio_tasks_active += 1
 
             if active_processes == 0 and active_recorders == 0 and bg_tasks == 0 and asyncio_tasks_active == 0:
                 logger.info("All background tasks and recordings finished. Safe to exit.")
                 break
-                
-            logger.info(f"Waiting for shutdown... Recorders: {active_recorders}, FFMpeg: {active_processes}, BG_Tasks: {bg_tasks}, AsyncTasks: {asyncio_tasks_active}")
+
+            logger.info(
+                f"Waiting for shutdown... Recorders: {active_recorders}, FFMpeg: {active_processes}, BG_Tasks: {bg_tasks}, AsyncTasks: {asyncio_tasks_active}"
+            )
             await asyncio.sleep(1.0)
 
         logger.info("Shutdown delay completed, quitting application.")
         from PySide6.QtWidgets import QApplication
+
         QApplication.instance().quit()
+
 
 def run_qt_app():
     # Deprecated for main_qt.py approach

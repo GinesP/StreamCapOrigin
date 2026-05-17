@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 import time
 from datetime import datetime, timedelta
 from typing import Any, Callable
@@ -33,6 +34,7 @@ from app.utils.i18n import tr
 
 class _NumericTableItem(QTableWidgetItem):
     """QTableWidgetItem que ordena numéricamente por el valor UserRole+1."""
+
     def __lt__(self, other) -> bool:
         if not isinstance(other, QTableWidgetItem):
             return super().__lt__(other)
@@ -51,12 +53,15 @@ class QtStatsView(QWidget):
         self.app = app_context
         self._cache: dict[str, tuple[Any, float]] = {}
         self._current_tab = 0
+        self._predictor_task: asyncio.Task | None = None
+        self._is_closing = False
 
         self._setup_ui()
         self._retranslate_ui()
         self._refresh_current_tab()
 
         self.app.event_bus.subscribe("language_changed", self._on_language_changed)
+        self.app.event_bus.subscribe("app_closing", self._on_app_closing)
         theme_manager.themeChanged.connect(self._on_theme_changed)
 
     # ── Cache ────────────────────────────────────────────────────────
@@ -77,6 +82,20 @@ class QtStatsView(QWidget):
             self._predictor_loading = False
         else:
             self._cache.pop(key, None)
+
+    def _cancel_predictor_load(self) -> None:
+        self._predictor_loading = False
+        task = self._predictor_task
+        self._predictor_task = None
+        if task and not task.done():
+            task.cancel()
+        record_manager = getattr(self.app, "record_manager", None)
+        if record_manager and getattr(record_manager, "predictor_metrics", None):
+            record_manager.predictor_metrics.interrupt_pending_operations()
+
+    def _on_app_closing(self, _topic: str, *_args, **_kwargs) -> None:
+        self._is_closing = True
+        self._cancel_predictor_load()
 
     # ── UI Setup ─────────────────────────────────────────────────────
 
@@ -147,7 +166,7 @@ class QtStatsView(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # streamer name
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)    # fav
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)  # fav
         header.resizeSection(6, 30)
         self._gen_table.verticalHeader().setVisible(False)
         self._gen_table.setAlternatingRowColors(True)
@@ -236,8 +255,12 @@ class QtStatsView(QWidget):
         detail_grid.setSpacing(8)
         self._pred_detail_labels: dict[str, QLabel] = {}
         detail_items = [
-            "latency_p50", "latency_p95", "latency_p99",
-            "dispatch_p50", "dispatch_p95", "dispatch_breakdown",
+            "latency_p50",
+            "latency_p95",
+            "latency_p99",
+            "dispatch_p50",
+            "dispatch_p95",
+            "dispatch_breakdown",
         ]
         for i, key in enumerate(detail_items):
             lbl = QLabel()
@@ -279,27 +302,29 @@ class QtStatsView(QWidget):
                 seen_urls.add(url)
 
             sessions_72h = [
-                s for s in rec.live_sessions
+                s
+                for s in rec.live_sessions
                 if s.get("start_time") and datetime.fromisoformat(s["start_time"]) >= cutoff
             ]
             durations = [
-                s.get("duration_minutes") for s in sessions_72h
-                if isinstance(s.get("duration_minutes"), (int, float))
+                s.get("duration_minutes") for s in sessions_72h if isinstance(s.get("duration_minutes"), (int, float))
             ]
             has_activity = len(sessions_72h) > 0
             total_sessions += len(sessions_72h)
             if has_activity:
                 active_priorities.append(rec.priority_score or 0.0)
                 active_consistencies.append(rec.consistency_score or 0.0)
-            streamers.append({
-                "name": rec.streamer_name,
-                "platform": rec.platform_key or rec.platform or "—",
-                "sessions": len(sessions_72h),
-                "avg_duration": (sum(durations) / len(durations)) if durations else None,
-                "priority": rec.priority_score or 0.0,
-                "consistency": rec.consistency_score or 0.0,
-                "favorite": bool(rec.is_favorite),
-            })
+            streamers.append(
+                {
+                    "name": rec.streamer_name,
+                    "platform": rec.platform_key or rec.platform or "—",
+                    "sessions": len(sessions_72h),
+                    "avg_duration": (sum(durations) / len(durations)) if durations else None,
+                    "priority": rec.priority_score or 0.0,
+                    "consistency": rec.consistency_score or 0.0,
+                    "favorite": bool(rec.is_favorite),
+                }
+            )
 
         streamers.sort(key=lambda x: x["sessions"], reverse=True)
 
@@ -307,7 +332,9 @@ class QtStatsView(QWidget):
             "total_streamers": len(streamers),
             "total_sessions": total_sessions,
             "avg_priority": round(sum(active_priorities) / len(active_priorities), 3) if active_priorities else 0.0,
-            "avg_consistency": round(sum(active_consistencies) / len(active_consistencies), 3) if active_consistencies else 0.0,
+            "avg_consistency": round(sum(active_consistencies) / len(active_consistencies), 3)
+            if active_consistencies
+            else 0.0,
             "streamers": streamers,
         }
 
@@ -449,7 +476,7 @@ class QtStatsView(QWidget):
         if not getattr(self, "_predictor_loading", False):
             self._predictor_loading = True
             self._show_predictor_loading()
-            self.app.event_bus.run_task(self._load_predictor_async)
+            self._predictor_task = asyncio.create_task(self._load_predictor_async())
         else:
             self._show_predictor_loading()
 
@@ -467,6 +494,8 @@ class QtStatsView(QWidget):
 
     async def _load_predictor_async(self) -> None:
         """Load predictor data in a background thread so the UI stays responsive."""
+        data: dict | None = None
+        cancelled = False
         try:
             # Run summarize() in a thread so it does NOT block the Qt event loop.
             # _load_predictor_data only touches Python objects, never Qt widgets.
@@ -476,14 +505,22 @@ class QtStatsView(QWidget):
             if d.get("total_checks", 0) > 0:
                 lat = d.get("avg_detection_latency_seconds")
                 d["latencies"] = [lat] if lat is not None else []
-                data: dict | None = d
-            else:
-                data = None
+                data = d
+        except asyncio.CancelledError:
+            cancelled = True
+        except sqlite3.OperationalError as exc:
+            if "interrupted" in str(exc).lower():
+                cancelled = True
         except Exception:
             data = None
         finally:
             self._predictor_loading = False
+            current_task = asyncio.current_task()
+            if self._predictor_task is current_task:
+                self._predictor_task = None
 
+        if cancelled or self._is_closing:
+            return
         if data is not None:
             now = time.time()
             self._cache["predictor"] = (data, now + self.CACHE_TTL)
@@ -542,7 +579,7 @@ class QtStatsView(QWidget):
             f"{tr('stats_view.dispatch_p95', 'Dispatch P95')}: {data.get('dispatch_p95') or '—'}"
         )
         self._pred_detail_labels["dispatch_breakdown"].setText(
-            f"{tr('stats_view.dispatch_breakdown', 'Dispatch Breakdown')}: F={data.get('dispatch_fast',0)} M={data.get('dispatch_medium',0)} S={data.get('dispatch_slow',0)}"
+            f"{tr('stats_view.dispatch_breakdown', 'Dispatch Breakdown')}: F={data.get('dispatch_fast', 0)} M={data.get('dispatch_medium', 0)} S={data.get('dispatch_slow', 0)}"
         )
 
     # ── Translations / Theme ─────────────────────────────────────────
@@ -568,12 +605,8 @@ class QtStatsView(QWidget):
         day_labels = [l.get(k, ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]) for i, k in enumerate(day_keys)]
         self._hm_chart.set_day_labels(day_labels)
         fmt_template = l.get("cell_tooltip", "{day}, {hour}:00 — {count} sessions")
-        self._hm_chart.set_tooltip_formatter(
-            lambda d, h, c: fmt_template.format(day=day_labels[d], hour=h, count=c)
-        )
-        self._hm_legend_lbl.setText(
-            l.get("no_sessions", "No sessions recorded") if not self._hm_chart._data else ""
-        )
+        self._hm_chart.set_tooltip_formatter(lambda d, h, c: fmt_template.format(day=day_labels[d], hour=h, count=c))
+        self._hm_legend_lbl.setText(l.get("no_sessions", "No sessions recorded") if not self._hm_chart._data else "")
 
         # NOTE: Tab re-render is done by the caller (e.g. _on_language_changed → _refresh_current_tab).
         # Do NOT render here to avoid duplicate row artifacts in the table.
@@ -611,12 +644,8 @@ class QtStatsView(QWidget):
             f"QTableWidget {{ background: {c['surface']}; alternate-background-color: {c['surface2']}; border: 1px solid {c['border']}; border-radius: 8px; }}"
             f"QHeaderView::section {{ background: {c['card']}; color: {c['text']}; padding: 6px; border: none; }}"
         )
-        self._pred_empty.setStyleSheet(
-            f"color: {c['text_muted']}; font-size: 13px; background: transparent;"
-        )
-        self._hm_legend_lbl.setStyleSheet(
-            f"color: {c['text_muted']}; font-size: 11px; background: transparent;"
-        )
+        self._pred_empty.setStyleSheet(f"color: {c['text_muted']}; font-size: 13px; background: transparent;")
+        self._hm_legend_lbl.setStyleSheet(f"color: {c['text_muted']}; font-size: 11px; background: transparent;")
 
     def refresh(self) -> None:
         self._on_refresh_clicked()
