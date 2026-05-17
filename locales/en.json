@@ -645,6 +645,7 @@
     "col_favorite": "Fav",
     "no_streamers": "No streamers configured",
     "no_predictor_data": "No predictor data available yet. Data appears after the first live check cycle.",
+    "predictor_loading": "Loading predictor data…",
     "total_checks": "Total Checks",
     "live_detections": "Live Detections",
     "avg_latency": "Avg Latency (s)",

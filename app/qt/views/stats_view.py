@@ -73,6 +73,7 @@ class QtStatsView(QWidget):
     def _invalidate_cache(self, key: str | None = None) -> None:
         if key is None:
             self._cache.clear()
+            self._predictor_loading = False
         else:
             self._cache.pop(key, None)
 
@@ -432,12 +433,51 @@ class QtStatsView(QWidget):
     def _render_predictor_tab(self) -> None:
         if self._current_tab != 1:
             return  # user switched away while loading
+
+        # Check cache first
+        cache_hit = "predictor" in self._cache and self._cache["predictor"][1] > time.time()
+        if cache_hit:
+            data = self._cache["predictor"][0]
+            self._show_predictor_data(data)
+            return
+
+        # Not in cache — start async load or show loading state
+        if not getattr(self, "_predictor_loading", False):
+            self._predictor_loading = True
+            self._show_predictor_loading()
+            self.app.event_bus.run_task(self._load_predictor_async)
+        else:
+            self._show_predictor_loading()
+
+    def _show_predictor_loading(self) -> None:
+        for card in self._pred_cards.values():
+            card.setVisible(False)
+        self._pred_sparkline.setVisible(False)
+        self._pred_barchart.setVisible(False)
+        self._pred_spark_label.setVisible(False)
+        self._pred_bar_label.setVisible(False)
+        for lbl in self._pred_detail_labels.values():
+            lbl.setVisible(False)
+        self._pred_empty.setVisible(True)
+        self._pred_empty.setText(tr("stats_view.predictor_loading", "Loading predictor data…"))
+
+    async def _load_predictor_async(self) -> None:
+        """Load predictor data in a background thread so the UI stays responsive."""
         try:
-            data = self._get_cached_or_compute("predictor", self._load_predictor_data)
+            import asyncio
+            data = await asyncio.to_thread(self._load_predictor_data)
         except Exception:
             data = None
-        has_data = data is not None
+        finally:
+            self._predictor_loading = False
 
+        if data is not None:
+            now = time.time()
+            self._cache["predictor"] = (data, now + self.CACHE_TTL)
+        self._render_predictor_tab()
+
+    def _show_predictor_data(self, data: dict) -> None:
+        has_data = data is not None
         for card in self._pred_cards.values():
             card.setVisible(has_data)
         self._pred_sparkline.setVisible(has_data)
