@@ -197,7 +197,8 @@ class HistoryManager:
                 display_hour = nearest_hour
 
             clusters = HistoryManager._cluster_hours(active_hours)
-            target = next(c for c in clusters if nearest_hour in c)
+            # Window and next_slot MUST use the same display_hour cluster
+            target = next((c for c in clusters if display_hour in c), clusters[0])
             first_h = target[0]
             last_h = target[-1]
             end_h = (last_h + 1) % 24
