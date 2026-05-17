@@ -398,44 +398,49 @@ class LiveForecastDialog(QDialog):
         now = datetime.now()
         current_minutes = now.hour * 60 + now.minute
 
-        # Gather forecasts
+        def _slot_minutes_until(rec) -> int | None:
+            """Return minutes until the next predicted slot, or None if unknown."""
+            info = _get_forecast_time_info(rec)
+            state = info.get("state")
+            if rec.is_live or state in ('live_range',):
+                return 0
+            if state in ('expected', 'delayed'):
+                return 0
+            if state == 'countdown':
+                return 61 - now.minute  # minutes left in this hour
+            # upcoming — parse next_slot_text
+            forecast = HistoryManager.get_forecast_details(rec)
+            slot = forecast.get("next_slot_text", "")
+            if not slot:
+                return None
+            try:
+                parts = slot.strip().split(":")
+                slot_min = int(parts[0]) * 60 + (int(parts[1]) if len(parts) > 1 else 0)
+            except (ValueError, IndexError):
+                return None
+            if slot_min >= current_minutes:
+                return slot_min - current_minutes
+            return (1440 - current_minutes) + slot_min
+
+        # Gather forecasts with proximity info
         forecasts = []
         for rec in self.recordings:
             score = HistoryManager.get_likelihood_score(rec)
             info = _get_forecast_time_info(rec)
             state = info.get("state")
 
-            # Fast pass for live / imminent states
+            # Only include if within 5 hours or live/imminent
             if rec.is_live or state in ('live_range', 'expected', 'delayed', 'countdown'):
-                forecasts.append((rec, score))
+                forecasts.append((rec, score, _slot_minutes_until(rec)))
                 continue
 
-            # For upcoming / historical pattern states, check time proximity
-            if state in ('upcoming',) or score < 0.35:
-                # Parse the predicted hour from the window text or next_slot
-                forecast = HistoryManager.get_forecast_details(rec)
-                slot = forecast.get("next_slot_text", "")
-                if not slot:
-                    continue
-                try:
-                    parts = slot.strip().split(":")
-                    slot_hour = int(parts[0])
-                    slot_minutes = slot_hour * 60 + (int(parts[1]) if len(parts) > 1 else 0)
-                except (ValueError, IndexError):
-                    continue
+            if state in ('upcoming',) or score >= 0.35:
+                mins = _slot_minutes_until(rec)
+                if mins is not None and mins <= 300:
+                    forecasts.append((rec, score, mins))
 
-                # Circular distance: how many minutes until this slot
-                if slot_minutes >= current_minutes:
-                    minutes_until = slot_minutes - current_minutes
-                else:
-                    minutes_until = (1440 - current_minutes) + slot_minutes
-
-                # Only include if within 5 hours (300 minutes) or delayed up to 30 min
-                if minutes_until <= 300 or (minutes_until >= 1410 and minutes_until <= 1440):
-                    forecasts.append((rec, score))
-                
-        # Sort by score descending, then consistency descending
-        forecasts.sort(key=lambda x: (x[1], x[0].consistency_score or 0.0), reverse=True)
+        # Sort by proximity (closest first), then score as tiebreaker
+        forecasts.sort(key=lambda x: (x[2], -x[1]))
         
         if not forecasts:
             empty_lbl = QLabel(tr("live_forecast_dialog.no_forecast"))
@@ -444,7 +449,7 @@ class LiveForecastDialog(QDialog):
             self.scroll_layout.addWidget(empty_lbl)
             return
         
-        for rec, score in forecasts:
+        for rec, score, _mins in forecasts:
             item_widget = ForecastItemWidget(rec, score, parent=self.scroll_content)
             self.scroll_layout.addWidget(item_widget)
 
