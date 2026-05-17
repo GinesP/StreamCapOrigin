@@ -221,10 +221,11 @@ class HistoryManager:
                 score = session_component
                 if session_stats["reason_key"]:
                     reason_key = session_stats["reason_key"]
-            # Siempre usar ventana de sesiones cuando está disponible (minuto-grano)
-            if session_stats["window_text"]:
+            # Usar ventana de sesiones SOLO si ambos campos están disponibles
+            # (minuto-grano), para no mezclar datos de sesiones con datos de
+            # historical_intervals.
+            if session_stats["window_text"] and session_stats["next_slot_text"]:
                 window_text = session_stats["window_text"]
-            if session_stats["next_slot_text"]:
                 next_slot_text = session_stats["next_slot_text"]
             score += session_stats["confidence_boost"]
 
