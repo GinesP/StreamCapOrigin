@@ -290,7 +290,14 @@ class QueueBarChart(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         c = theme_manager.colors
-        l_intel = self.parent().app.language_manager.language.get("home_view", {})
+        # Safe label lookup — parent() may not have .app if Qt reparented the widget.
+        l_intel = {}
+        try:
+            parent_app = getattr(self.parent(), "app", None)
+            if parent_app is not None:
+                l_intel = getattr(parent_app, "language_manager", None).language.get("home_view", {})
+        except Exception:
+            l_intel = {}
         w = self.width()
         h = self.height()
         bottom = h - self._BOTTOM_PAD
