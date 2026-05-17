@@ -137,6 +137,7 @@ celerybeat.pid
 .venv
 .atl/
 .pi/
+.pi-lens/
 .vscode/
 env/
 venv/

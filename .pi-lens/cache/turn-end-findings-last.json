@@ -1,4 +1,0 @@
-{
-  "signature": "app/core/recording/record_manager.py::Unresolved from this turn — app/core/recording/record_manager.py:\n🔴 STOP — 5 issue(s) must be fixed:\n  Operator \"-\" not supported for types \"float\" and \"float | None\"\n    Operator \"-\" not supported for types \"float\" and \"None\"\n  \"rec_id\" is not a known attribute of \"None\"\n  Cannot assign to attribute \"status_info\" for class \"Recording\"\n    Expression of type \"Literal['STOPPED_MONITORING']\" cannot be assigned to attribute \"status_info\" of class \"Recording\"\n      \"Literal['STOPPED_MONITORING']\" is not assignable to \"None\"\n  Object of type \"None\" cannot be used as iterable value\n  \"user_config\" is not defined",
-  "sessionId": "lens-mpa0zukd-bd91971f"
-}
