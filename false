@@ -1,0 +1,164 @@
+---
+
+## Review: JSONL → SQLite Migration
+
+### Correct: What's already good
+
+1. **Dual path resolution** (`_resolve_db_path`): Accepts `.db` or `.jsonl` input; either way resolves to a `.db` path for the SQLite store and a `.jsonl` path for legacy migration. This means existing code passing `.jsonl` still works seamlessly.
+
+2. **Migration safety guards** (lines 157–166): Checks meta table for a migration marker keyed to the resolved absolute path of the legacy file AND checks if the DB already has rows. This prevents duplicate imports across process restarts.
+
+3. **Source file preservation**: Legacy JSONL is never deleted or renamed. The migration test (`test_migrates_legacy_jsonl_without_deleting_source_file`) explicitly asserts `legacy_path.exists()`.
+
+4. **Batch insert** (lines 191–197): 1000-row batches in migration prevent memory blow on large JSONL files. The 40 MB legacy backup (`config/predictor_metrics_2026-05-09_backup.jsonl`) would produce ~190 batches.
+
+5. **WAL + NORMAL pragmas**: Good crash-safety/performance balance. WAL mode allows concurrent reads during writes.
+
+6. **`_load_records_after` output shape**: Returns `{"timestamp", "event", "payload"}` dicts — identical shape to what the old JSONL parser produced. The `summarize()` method and all downstream consumers work without changes.
+
+7. **Backwards-compat for `--metrics-file`**: The CLI help text mentions both `.db` and legacy `.jsonl`. The constructor resolves either.
+
+8. **Parameterized queries everywhere**: No SQL injection risk. No f-string SQL assembly.
+
+---
+
+### Issue: Performance regression — per-call connection churn
+
+**Location**: `record_event()` (line 232)
+
+Every call opens a new `sqlite3.connect`, configures PRAGMAs, inserts one row, and commits. If `record_event` is called at high frequency (e.g., multiple check dispatches/seconds), this adds measurable overhead compared to the old append-to-JSONL approach. The old code was a single file-open + write.
+
+**Risk**: Moderate under high event rates. Each connect+WAL-setup+commit cycle is ~1–10ms.
+
+**Suggestion**: Keep a persistent connection (or a small connection pool) in the store, or defer commits with an explicit `flush()` call for latency-sensitive paths.
+
+---
+
+### Issue: Migration missed if DB pre-populated via other means
+
+**Location**: `_migrate_legacy_jsonl_if_needed()` lines 164–166
+
+```python
+row_count = conn.execute("SELECT COUNT(*) FROM predictor_metrics").fetchone()[0]
+if row_count:
+    return
+```
+
+If the store is constructed on a system that already has some new-format rows (from a crash recovery replay, test seeding, or partial migration), and legacy JSONL still exists, the remaining legacy data is silently skipped. The migration marker is also not written, so a future clean DB would re-import.
+
+**Severity**: Low. In normal production the first run has 0 rows and legacy JSONL exists; subsequent runs see the migration marker. Only an edge case where rows exist but not all legacy data was imported.
+
+**Suggestion**: Consider inserting the migration marker even on the `row_count > 0` skip branch, or log a warning that migration was skipped.
+
+---
+
+### Issue: Tautological `str(...)` expression for rec_id
+
+**Location**: Lines 184 and 239
+
+```python
+str(payload.get("rec_id") or "") or None
+```
+
+Tracing:  
+- `payload.get("rec_id")` → `None` or a value  
+- `None or ""` → `""`  
+- `str("")` → `""`  
+- `"" or None` → `None`
+
+If `rec_id` is `None`/missing → `None` (NULL in DB). If `rec_id` is valid string → the string. If `rec_id` is `""` explicitly → `None` (data loss for empty-string rec_id).
+
+**Severity**: Very low — empty `rec_id` is already skipped in `summarize()` (line 260–261). But the `str()` wrapping is pointless when `payload.get("rec_id")` is already a string. Can simplify to `payload.get("rec_id") or None`.
+
+---
+
+### Issue: `_configure_db` called on every new connection — redundant but not wrong
+
+**Location**: `record_event()` (line 233), `_init_db()` (line 117), `_migrate_legacy_jsonl_if_needed()` (line 156), `_load_records_after()` (line 427)
+
+Every `sqlite3.connect` gets its own connection-local PRAGMA settings. Calling `_configure_db` each time is correct (new connection = new defaults). Not a bug, just worth noting if someone later switches to a persistent connection — they'd only need to set it once.
+
+---
+
+### Issue: Commit granularity in `record_event` is one row per commit
+
+**Location**: Line 246
+
+Each event commits individually. For bulk replay or burst events, batching commits would be faster. The existing `_lock` ensures ordering, so a deferred-commit approach (e.g., auto-commit after N ms or M rows) would be safe.
+
+**Severity**: Low. Only matters under high throughput.
+
+---
+
+### Bug: `entry` dict in `record_event` is dead code
+
+**Location**: Lines 226–230
+
+```python
+entry = {
+    "timestamp": _utcnow().isoformat(),
+    "event": event_type,
+    "payload": payload,
+}
+```
+
+Only `entry["timestamp"]` is used (line 237). `event_type` and `payload` are used directly from the parameters. The `entry` variable is redundant. Not a bug per se, but wastes a dict allocation per call.
+
+---
+
+### Issue: Untracked `nul` file in repo root
+
+**Evidence**: `git status` shows `nul` as untracked. This is likely an artifact of a Windows path resolution incident (NUL is a reserved device name). Should be removed and added to `.gitignore`.
+
+---
+
+### Issue: Scope leak — SKILL.md changes are unrelated
+
+The diff includes 3 SKILL.md files with added `model` and `thinking` front-matter fields:
+
+```
+.agents/skills/bash-defensive-patterns/SKILL.md
+.agents/skills/python-executor/SKILL.md
+.agents/skills/python-testing-patterns/SKILL.md
+```
+
+These are not part of the JSONL→SQLite migration. They should be in a separate commit to keep history clean.
+
+---
+
+### Issue: No test for migration idempotency
+
+The `_migrate_legacy_jsonl_if_needed()` idempotency guards (meta marker + row count) are untested. A test that constructs `PredictorMetricsStore` twice with the same legacy JSONL and verifies no duplicate rows on the second construction would cover this.
+
+---
+
+### Issue: No test for malformed/mixed JSONL lines
+
+The migration gracefully skips blank lines and `json.JSONDecodeError` lines (lines 172–178). This is correct behavior, but untested.
+
+---
+
+### Issue: No test for concurrent writes
+
+The `_lock` (threading.Lock) ensures only one `record_event` runs at a time, but there's no test exercising this under concurrency.
+
+---
+
+### Blocker: None identified
+
+No data-loss scenarios or crashes found in the migration path. All SQL is parameterized. The legacy source is preserved. The new records are properly indexed. The summary output shape is identical to before.
+
+---
+
+### Summary
+
+| Area | Verdict |
+|------|---------|
+| Data safety | ✅ Good — WAL mode, param queries, source preserved |
+| Migration correctness | ✅ Solid guards, batch inserts, marker tracking |
+| Backwards compatibility | ✅ Internal API shape preserved |
+| Test coverage | ⚠️ Adequate but gaps (idempotency, malformed lines, concurrent writes) |
+| Obvious bugs | ⚠️ No crashes, but `str(...)` tautology and dead `entry` dict |
+| Performance | ⚠️ Per-call connect+commit churn is main regression risk |
+
+**Recommendation**: Address the per-call connection churn before merging if `record_event` is called at high frequency. The other issues are low-severity and can follow as separate cleanups. The SKILL.md changes and the `nul` file should be split out of this commit.

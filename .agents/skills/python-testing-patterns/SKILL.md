@@ -1,6 +1,8 @@
 ---
 name: python-testing-patterns
 description: Implement comprehensive testing strategies with pytest, fixtures, mocking, and test-driven development. Use when writing Python tests, setting up test suites, or implementing testing best practices.
+model: opencode-go/deepseek-v4-flash
+thinking: medium
 ---
 
 # Python Testing Patterns
