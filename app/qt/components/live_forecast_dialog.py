@@ -13,6 +13,7 @@ from app.utils.i18n import tr
 
 from app.core.recording.history_manager import HistoryManager
 from app.qt.themes.theme import theme_manager
+from datetime import datetime
 
 # Platform colors for badges
 _PLATFORM_COLORS = {
@@ -30,8 +31,6 @@ def _get_platform_color(platform: str | None) -> str:
 
 def _get_forecast_time_info(recording) -> dict:
     """Return dict with state, text_key, text, color, prefix for the forecast time column."""
-    from datetime import datetime
-    
     now = datetime.now()
     current_hour = now.hour
     day_str = str(now.weekday())
@@ -396,18 +395,44 @@ class LiveForecastDialog(QDialog):
                 item.widget().deleteLater()
                 
         c = theme_manager.colors
-        
+        now = datetime.now()
+        current_minutes = now.hour * 60 + now.minute
+
         # Gather forecasts
         forecasts = []
         for rec in self.recordings:
             score = HistoryManager.get_likelihood_score(rec)
-            # Only consider items with a likelihood >= 50% to be "likely soon"
-            # Or if they are currently live
-            # Also check if they have valid time info
             info = _get_forecast_time_info(rec)
             state = info.get("state")
-            if rec.is_live or score >= 0.35 or state in ('expected', 'delayed', 'countdown', 'live_range'):
+
+            # Fast pass for live / imminent states
+            if rec.is_live or state in ('live_range', 'expected', 'delayed', 'countdown'):
                 forecasts.append((rec, score))
+                continue
+
+            # For upcoming / historical pattern states, check time proximity
+            if state in ('upcoming',) or score < 0.35:
+                # Parse the predicted hour from the window text or next_slot
+                forecast = HistoryManager.get_forecast_details(rec)
+                slot = forecast.get("next_slot_text", "")
+                if not slot:
+                    continue
+                try:
+                    parts = slot.strip().split(":")
+                    slot_hour = int(parts[0])
+                    slot_minutes = slot_hour * 60 + (int(parts[1]) if len(parts) > 1 else 0)
+                except (ValueError, IndexError):
+                    continue
+
+                # Circular distance: how many minutes until this slot
+                if slot_minutes >= current_minutes:
+                    minutes_until = slot_minutes - current_minutes
+                else:
+                    minutes_until = (1440 - current_minutes) + slot_minutes
+
+                # Only include if within 5 hours (300 minutes) or delayed up to 30 min
+                if minutes_until <= 300 or (minutes_until >= 1410 and minutes_until <= 1440):
+                    forecasts.append((rec, score))
                 
         # Sort by score descending, then consistency descending
         forecasts.sort(key=lambda x: (x[1], x[0].consistency_score or 0.0), reverse=True)
