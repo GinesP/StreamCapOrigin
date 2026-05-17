@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timedelta
 from typing import Any, Callable
@@ -464,8 +465,17 @@ class QtStatsView(QWidget):
     async def _load_predictor_async(self) -> None:
         """Load predictor data in a background thread so the UI stays responsive."""
         try:
-            import asyncio
-            data = await asyncio.to_thread(self._load_predictor_data)
+            # Run summarize() in a thread so it does NOT block the Qt event loop.
+            # _load_predictor_data only touches Python objects, never Qt widgets.
+            store = self.app.record_manager.predictor_metrics
+            summary = await asyncio.to_thread(store.summarize, 72)
+            d = summary.to_dict()
+            if d.get("total_checks", 0) > 0:
+                lat = d.get("avg_detection_latency_seconds")
+                d["latencies"] = [lat] if lat is not None else []
+                data: dict | None = d
+            else:
+                data = None
         except Exception:
             data = None
         finally:
