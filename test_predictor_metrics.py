@@ -1,9 +1,9 @@
 import io
 import json
+import sqlite3
 import tempfile
 import unittest
 from contextlib import redirect_stdout
-from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.core.recording.predictor_metrics import MetricsSummary, PredictorMetricsStore
@@ -11,51 +11,124 @@ from scripts import predictor_metrics_report
 
 
 class PredictorMetricsStoreTests(unittest.TestCase):
-    def test_record_event_appends_jsonl_rows(self):
+    def test_record_event_persists_sqlite_rows(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            store = PredictorMetricsStore(Path(temp_dir) / "predictor_metrics.jsonl")
+            store = PredictorMetricsStore(Path(temp_dir) / "predictor_metrics.db")
 
             store.record_event("check_dispatched", {"rec_id": "r-1", "loop_time_seconds": 60})
             store.record_event("check_result", {"rec_id": "r-1", "is_live": False})
 
-            lines = store.file_path.read_text(encoding="utf-8").strip().splitlines()
-            self.assertEqual(len(lines), 2)
-            first_row = json.loads(lines[0])
-            second_row = json.loads(lines[1])
-            self.assertEqual(first_row["event"], "check_dispatched")
-            self.assertEqual(second_row["event"], "check_result")
+            conn = sqlite3.connect(store.db_path)
+            rows = conn.execute("SELECT event, rec_id FROM predictor_metrics ORDER BY id ASC").fetchall()
+            conn.close()
 
-    def test_summary_uses_honest_naming_and_expected_counts(self):
+            self.assertEqual(rows, [("check_dispatched", "r-1"), ("check_result", "r-1")])
+
+    def test_migrates_legacy_jsonl_without_deleting_source_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            store = PredictorMetricsStore(Path(temp_dir) / "predictor_metrics.jsonl")
-            store.file_path.write_text(
+            legacy_path = Path(temp_dir) / "predictor_metrics.jsonl"
+            legacy_path.write_text(
                 "\n".join(
                     [
-                        json.dumps({
-                            "timestamp": "2026-05-03T09:00:00",
-                            "event": "check_result",
-                            "payload": {"rec_id": "rec-1", "is_live": False, "loop_time_seconds": 300},
-                        }),
-                        json.dumps({
-                            "timestamp": "2026-05-03T09:03:00",
-                            "event": "check_result",
-                            "payload": {
-                                "rec_id": "rec-1",
-                                "is_live": True,
-                                "loop_time_seconds": 300,
-                                "detection_latency_seconds": 180,
-                            },
-                        }),
-                        json.dumps({
-                            "timestamp": "2026-05-03T09:30:00",
-                            "event": "check_result",
-                            "payload": {"rec_id": "rec-2", "is_live": False, "loop_time_seconds": 180},
-                        }),
+                        json.dumps(
+                            {
+                                "timestamp": "2026-05-03T09:00:00",
+                                "event": "check_dispatched",
+                                "payload": {"rec_id": "rec-1", "priority": "F", "likelihood": 0.9},
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "timestamp": "2026-05-03T09:03:00",
+                                "event": "check_result",
+                                "payload": {"rec_id": "rec-1", "is_live": True, "dispatch_wait_seconds": 12},
+                            }
+                        ),
                     ]
-                ) + "\n",
+                )
+                + "\n",
                 encoding="utf-8",
             )
 
+            store = PredictorMetricsStore(legacy_path)
+            summary = store.summarize(lookback_hours=99999)
+
+            self.assertTrue(legacy_path.exists())
+            self.assertEqual(summary.total_checks, 1)
+            self.assertEqual(summary.live_detections, 1)
+
+            conn = sqlite3.connect(store.db_path)
+            row_count = conn.execute("SELECT COUNT(*) FROM predictor_metrics").fetchone()[0]
+            conn.close()
+            self.assertEqual(row_count, 2)
+
+    def test_migration_is_idempotent_across_store_reinitialization(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / "predictor_metrics.jsonl"
+            legacy_path.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-05-03T09:00:00",
+                        "event": "check_result",
+                        "payload": {"rec_id": "rec-1", "is_live": False},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            first_store = PredictorMetricsStore(legacy_path)
+            conn = sqlite3.connect(first_store.db_path)
+            first_count = conn.execute("SELECT COUNT(*) FROM predictor_metrics").fetchone()[0]
+            conn.close()
+
+            second_store = PredictorMetricsStore(legacy_path)
+            conn = sqlite3.connect(second_store.db_path)
+            second_count = conn.execute("SELECT COUNT(*) FROM predictor_metrics").fetchone()[0]
+            conn.close()
+
+            self.assertEqual(first_count, 1)
+            self.assertEqual(second_count, 1)
+
+    def test_summary_uses_honest_naming_and_expected_counts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / "predictor_metrics.jsonl"
+            legacy_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "timestamp": "2026-05-03T09:00:00",
+                                "event": "check_result",
+                                "payload": {"rec_id": "rec-1", "is_live": False, "loop_time_seconds": 300},
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "timestamp": "2026-05-03T09:03:00",
+                                "event": "check_result",
+                                "payload": {
+                                    "rec_id": "rec-1",
+                                    "is_live": True,
+                                    "loop_time_seconds": 300,
+                                    "detection_latency_seconds": 180,
+                                },
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "timestamp": "2026-05-03T09:30:00",
+                                "event": "check_result",
+                                "payload": {"rec_id": "rec-2", "is_live": False, "loop_time_seconds": 180},
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            store = PredictorMetricsStore(legacy_path)
             summary = store.summarize(lookback_hours=99999, near_live_minutes=15)
 
             self.assertEqual(summary.total_checks, 3)
@@ -122,18 +195,20 @@ class PredictorMetricsStoreTests(unittest.TestCase):
 class PredictorMetricsReportTests(unittest.TestCase):
     def test_report_prints_metrics_file_note_and_summary_json(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            metrics_store = PredictorMetricsStore(Path(temp_dir) / "config" / "predictor_metrics.jsonl")
+            metrics_store = PredictorMetricsStore(Path(temp_dir) / "config" / "predictor_metrics.db")
             metrics_store.record_event("check_dispatched", {"rec_id": "r-1", "loop_time_seconds": 60})
             metrics_store.record_event("check_result", {"rec_id": "r-1", "is_live": False})
 
             output = io.StringIO()
             with redirect_stdout(output):
-                predictor_metrics_report.main([
-                    "--user-data-dir",
-                    temp_dir,
-                    "--lookback-hours",
-                    "24",
-                ])
+                predictor_metrics_report.main(
+                    [
+                        "--user-data-dir",
+                        temp_dir,
+                        "--lookback-hours",
+                        "24",
+                    ]
+                )
 
             rendered = output.getvalue()
             self.assertIn("metrics_file=", rendered)

@@ -48,7 +48,7 @@ class RecordingManager:
         self.active_recorders = {}
         self.persist_delay_handler = DelayedTaskExecutor(self.app, self, delay=2)
         self.predictor_metrics = PredictorMetricsStore(
-            f"{self.app.config_manager.config_path}/predictor_metrics.jsonl"
+            f"{self.app.config_manager.config_path}/predictor_metrics.db"
         )
         self._predictor_last_offline_result_at: dict[str, datetime] = {}
         self._predictor_dispatched_at: dict[str, dict] = {}

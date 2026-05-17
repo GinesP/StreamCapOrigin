@@ -1,5 +1,7 @@
 import json
+import sqlite3
 import threading
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -93,17 +95,151 @@ class PredictorMetricsStore:
         self.file_path = Path(file_path)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self.db_path = self._resolve_db_path(self.file_path)
+        self.legacy_jsonl_path = (
+            self.file_path if self.file_path.suffix.lower() == ".jsonl" else self.file_path.with_suffix(".jsonl")
+        )
+        self._init_db()
+        self._migrate_legacy_jsonl_if_needed()
+
+    @staticmethod
+    def _resolve_db_path(file_path: Path) -> Path:
+        if file_path.suffix.lower() == ".db":
+            return file_path
+        return file_path.with_suffix(".db")
+
+    @staticmethod
+    def _configure_db(conn: sqlite3.Connection) -> None:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+
+    def _init_db(self) -> None:
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            self._configure_db(conn)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS predictor_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    event TEXT NOT NULL,
+                    rec_id TEXT,
+                    is_live INTEGER,
+                    priority TEXT,
+                    likelihood REAL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_predictor_metrics_timestamp ON predictor_metrics(timestamp)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_predictor_metrics_event_timestamp ON predictor_metrics(event, timestamp)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_predictor_metrics_rec_timestamp ON predictor_metrics(rec_id, timestamp)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS predictor_metrics_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+                """
+            )
+            conn.commit()
+
+    def _migrate_legacy_jsonl_if_needed(self) -> None:
+        if not self.legacy_jsonl_path.exists():
+            return
+        source_key = f"legacy_jsonl_migrated::{self.legacy_jsonl_path.resolve()}"
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            self._configure_db(conn)
+            already_migrated = conn.execute(
+                "SELECT value FROM predictor_metrics_meta WHERE key = ?",
+                (source_key,),
+            ).fetchone()
+            if already_migrated:
+                return
+
+            row_count = conn.execute("SELECT COUNT(*) FROM predictor_metrics").fetchone()[0]
+            if row_count:
+                return
+
+            imported_rows = 0
+            batch = []
+            with self.legacy_jsonl_path.open("r", encoding="utf-8") as fh:
+                for raw in fh:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        item = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    payload = item.get("payload") or {}
+                    batch.append(
+                        (
+                            item.get("timestamp") or _utcnow().isoformat(),
+                            item.get("event") or "unknown",
+                            payload.get("rec_id") or None,
+                            self._to_db_bool(payload.get("is_live")),
+                            payload.get("priority"),
+                            self._extract_likelihood(payload),
+                            json.dumps(payload, ensure_ascii=False),
+                        )
+                    )
+                    if len(batch) >= 1000:
+                        conn.executemany(
+                            "INSERT INTO predictor_metrics (timestamp, event, rec_id, is_live, priority, likelihood, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            batch,
+                        )
+                        imported_rows += len(batch)
+                        batch.clear()
+
+            if batch:
+                conn.executemany(
+                    "INSERT INTO predictor_metrics (timestamp, event, rec_id, is_live, priority, likelihood, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    batch,
+                )
+                imported_rows += len(batch)
+            conn.execute(
+                "INSERT OR REPLACE INTO predictor_metrics_meta (key, value) VALUES (?, ?)",
+                (source_key, str(imported_rows)),
+            )
+            conn.commit()
+
+    @staticmethod
+    def _to_db_bool(value) -> int | None:
+        if value is None:
+            return None
+        return 1 if bool(value) else 0
+
+    @staticmethod
+    def _extract_likelihood(payload: dict) -> float | None:
+        for key in ("likelihood", "likelihood_at_dispatch"):
+            value = payload.get(key)
+            if isinstance(value, (int, float)):
+                return float(value)
+        return None
 
     def record_event(self, event_type: str, payload: dict) -> None:
-        entry = {
-            "timestamp": _utcnow().isoformat(),
-            "event": event_type,
-            "payload": payload,
-        }
-        line = json.dumps(entry, ensure_ascii=False)
+        timestamp = _utcnow().isoformat()
         with self._lock:
-            with self.file_path.open("a", encoding="utf-8") as fh:
-                fh.write(line + "\n")
+            with closing(sqlite3.connect(self.db_path)) as conn:
+                self._configure_db(conn)
+                conn.execute(
+                    "INSERT INTO predictor_metrics (timestamp, event, rec_id, is_live, priority, likelihood, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        timestamp,
+                        event_type,
+                        payload.get("rec_id") or None,
+                        self._to_db_bool(payload.get("is_live")),
+                        payload.get("priority"),
+                        self._extract_likelihood(payload),
+                        json.dumps(payload, ensure_ascii=False),
+                    ),
+                )
+                conn.commit()
 
     def summarize(self, lookback_hours: int = 72, near_live_minutes: int = 15) -> MetricsSummary:
         horizon_start = _utcnow() - timedelta(hours=max(1, int(lookback_hours)))
@@ -155,7 +291,7 @@ class PredictorMetricsStore:
                     continue
 
                 has_near_live = False
-                for future in ordered[idx + 1:]:
+                for future in ordered[idx + 1 :]:
                     future_payload = future.get("payload", {})
                     if not future_payload.get("is_live"):
                         continue
@@ -247,9 +383,7 @@ class PredictorMetricsStore:
             avg_detection_latency_seconds=(
                 (sum(detection_latencies) / len(detection_latencies)) if detection_latencies else None
             ),
-            avg_lead_minutes_vs_interval=(
-                (sum(lead_minutes) / len(lead_minutes)) if lead_minutes else None
-            ),
+            avg_lead_minutes_vs_interval=((sum(lead_minutes) / len(lead_minutes)) if lead_minutes else None),
             latency_p50=_pct(detection_latencies, 50),
             latency_p95=_pct(detection_latencies, 95),
             latency_p99=_pct(detection_latencies, 99),
@@ -261,18 +395,10 @@ class PredictorMetricsStore:
             lives_fast=l_fast,
             lives_medium=l_medium,
             lives_slow=l_slow,
-            avg_likelihood_at_dispatch=(
-                (sum(likelihoods) / len(likelihoods)) if likelihoods else None
-            ),
-            avg_likelihood_fast=(
-                (sum(lh_fast) / len(lh_fast)) if lh_fast else None
-            ),
-            avg_likelihood_medium=(
-                (sum(lh_medium) / len(lh_medium)) if lh_medium else None
-            ),
-            avg_likelihood_slow=(
-                (sum(lh_slow) / len(lh_slow)) if lh_slow else None
-            ),
+            avg_likelihood_at_dispatch=((sum(likelihoods) / len(likelihoods)) if likelihoods else None),
+            avg_likelihood_fast=((sum(lh_fast) / len(lh_fast)) if lh_fast else None),
+            avg_likelihood_medium=((sum(lh_medium) / len(lh_medium)) if lh_medium else None),
+            avg_likelihood_slow=((sum(lh_slow) / len(lh_slow)) if lh_slow else None),
             lh_fast_p50=_pct(lh_fast, 50),
             lh_medium_p50=_pct(lh_medium, 50),
             lh_slow_p50=_pct(lh_slow, 50),
@@ -281,22 +407,28 @@ class PredictorMetricsStore:
         )
 
     def _load_records_after(self, horizon_start: datetime) -> list[dict]:
-        if not self.file_path.exists():
+        if not self.db_path.exists():
             return []
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            self._configure_db(conn)
+            rows = conn.execute(
+                "SELECT timestamp, event, payload_json FROM predictor_metrics WHERE timestamp >= ? ORDER BY timestamp ASC",
+                (horizon_start.isoformat(),),
+            ).fetchall()
+
         records = []
-        with self.file_path.open("r", encoding="utf-8") as fh:
-            for raw in fh:
-                raw = raw.strip()
-                if not raw:
-                    continue
-                try:
-                    item = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                ts = self._parse_ts(item.get("timestamp"))
-                if ts is None or ts < horizon_start:
-                    continue
-                records.append(item)
+        for timestamp, event, payload_json in rows:
+            try:
+                payload = json.loads(payload_json)
+            except json.JSONDecodeError:
+                continue
+            records.append(
+                {
+                    "timestamp": timestamp,
+                    "event": event,
+                    "payload": payload,
+                }
+            )
         return records
 
     @staticmethod
