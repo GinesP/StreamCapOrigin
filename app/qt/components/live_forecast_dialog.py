@@ -412,15 +412,9 @@ class LiveForecastDialog(QDialog):
 
         def _slot_minutes_until(rec) -> int | None:
             """Return minutes until the next predicted slot, or None if unknown."""
-            info = _get_forecast_time_info(rec)
-            state = info.get("state")
-            if rec.is_live or state in ('live_range',):
+            if rec.is_live:
                 return 0
-            if state in ('expected', 'delayed'):
-                return 0
-            if state == 'countdown':
-                return 61 - now.minute  # minutes left in this hour
-            # upcoming — parse next_slot_text
+            # Parse next_slot_text from forecast details (works for all states)
             forecast = HistoryManager.get_forecast_details(rec)
             slot = forecast.get("next_slot_text", "")
             if not slot:
